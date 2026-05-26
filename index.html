@@ -4299,36 +4299,47 @@ function cardEvolucionPeso(c){
     </div>`;
   }
 
-  // Agrupar por mes (YYYY-MM): nos quedamos con el último peso de cada mes
+  // Agrupar por mes (YYYY-MM): guardamos el PRIMER y el ÚLTIMO registro del mes.
+  // metrics viene ordenado por fecha ascendente.
   const meses = {};
   metrics.forEach(m => {
     const key = String(m.date).slice(0,7); // YYYY-MM
-    meses[key] = Number(m.weight_kg); // como están ordenadas, el último gana
+    const peso = Number(m.weight_kg);
+    if (!meses[key]){
+      meses[key] = { inicio:peso, fin:peso, fechaIni:m.date, fechaFin:m.date, n:1 };
+    } else {
+      meses[key].fin = peso;       // el último visto gana
+      meses[key].fechaFin = m.date;
+      meses[key].n++;
+    }
   });
   const claves = Object.keys(meses).sort();
   // Mostrar como máximo los últimos 6 meses
   const visibles = claves.slice(-6);
-  const valores = visibles.map(k => meses[k]);
-  const min = Math.min(...valores);
-  const max = Math.max(...valores);
+  // Para la altura usamos el peso de fin de mes
+  const fines = visibles.map(k => meses[k].fin);
+  const min = Math.min(...fines);
+  const max = Math.max(...fines);
   const rango = (max - min) || 1;
 
   const NOMBRES_MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
   const barras = visibles.map((k, i) => {
-    const peso = valores[i];
+    const m = meses[k];
     const esUltimo = i === visibles.length - 1;
-    // altura proporcional: entre 16px y 38px
-    const altura = 16 + Math.round(((peso - min) / rango) * 22);
+    const altura = 16 + Math.round(((m.fin - min) / rango) * 22);
     const mesNum = parseInt(k.slice(5,7), 10) - 1;
-    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-      <div style="height:${altura}px;width:100%;border-radius:4px 4px 0 0;background:${esUltimo?'var(--green)':'var(--bg3)'}"></div>
-      <div style="font-size:8.5px;color:${esUltimo?'var(--green)':'var(--text3)'};font-weight:${esUltimo?'700':'400'};text-align:center;line-height:1.2">${NOMBRES_MES[mesNum]||''}<br>${peso}</div>
+    // datos para el tooltip, serializados en atributos data-
+    return `<div class="peso-bar" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:default;position:relative"
+        data-mes="${NOMBRES_MES[mesNum]||''}"
+        data-inicio="${m.inicio}" data-fin="${m.fin}" data-n="${m.n}">
+      <div style="height:${altura}px;width:100%;border-radius:4px 4px 0 0;background:${esUltimo?'var(--green)':'var(--bg3)'};transition:opacity .12s"></div>
+      <div style="font-size:8.5px;color:${esUltimo?'var(--green)':'var(--text3)'};font-weight:${esUltimo?'700':'400'};text-align:center;line-height:1.2">${NOMBRES_MES[mesNum]||''}<br>${m.fin}</div>
     </div>`;
   }).join('');
 
-  // Cambio total en el rango visible
-  const cambio = (valores[valores.length-1] - valores[0]);
+  // Cambio total en el rango visible (de fin del primer mes a fin del último)
+  const cambio = (fines[fines.length-1] - fines[0]);
   const cambioTxt = (cambio > 0 ? '+' : '') + cambio.toFixed(1) + ' kg';
   const cambioColor = cambio > 0 ? 'var(--green)' : cambio < 0 ? 'var(--red)' : 'var(--text3)';
 
@@ -4337,11 +4348,59 @@ function cardEvolucionPeso(c){
       <div style="${secTitle}">Evolución del peso</div>
       <span style="font-size:11px;color:${cambioColor};font-weight:600">${cambioTxt}</span>
     </div>
-    <div style="height:48px;display:flex;align-items:flex-end;gap:5px">
+    <div style="height:48px;display:flex;align-items:flex-end;gap:5px"
+      onmouseover="mostrarTooltipPeso(event)" onmouseout="ocultarTooltipPeso(event)">
       ${barras}
     </div>
   </div>`;
 }
+
+// Tooltip de la barra de peso: muestra peso inicio/fin del mes al pasar el ratón
+function mostrarTooltipPeso(ev){
+  const bar = ev.target.closest('.peso-bar');
+  if (!bar) return;
+  let tip = document.getElementById('peso-tooltip');
+  if (!tip){
+    tip = document.createElement('div');
+    tip.id = 'peso-tooltip';
+    tip.style.cssText = 'position:fixed;z-index:400;background:var(--text);color:#fff;'
+      + 'border-radius:9px;padding:8px 11px;font-size:11px;line-height:1.5;pointer-events:none;'
+      + 'box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(tip);
+  }
+  const mes = bar.getAttribute('data-mes');
+  const inicio = parseFloat(bar.getAttribute('data-inicio'));
+  const fin = parseFloat(bar.getAttribute('data-fin'));
+  const n = parseInt(bar.getAttribute('data-n'), 10);
+
+  let cuerpo;
+  if (n <= 1){
+    // Un solo registro ese mes: no hay "inicio" y "fin" distintos
+    cuerpo = `<div style="opacity:.7;font-size:10px">Registro único</div>`
+           + `<div><b>${fin}</b> kg</div>`;
+  } else {
+    const dif = fin - inicio;
+    const difTxt = (dif > 0 ? '+' : '') + dif.toFixed(1) + ' kg';
+    const difColor = dif > 0 ? '#4ade80' : dif < 0 ? '#f87171' : '#bbb';
+    cuerpo = `<div style="display:flex;justify-content:space-between;gap:14px"><span style="opacity:.7">Inicio de mes</span><b>${inicio} kg</b></div>`
+           + `<div style="display:flex;justify-content:space-between;gap:14px"><span style="opacity:.7">Último registro</span><b>${fin} kg</b></div>`
+           + `<div style="display:flex;justify-content:space-between;gap:14px;margin-top:2px;border-top:1px solid rgba(255,255,255,.15);padding-top:3px"><span style="opacity:.7">Variación</span><b style="color:${difColor}">${difTxt}</b></div>`;
+  }
+  tip.innerHTML = `<div style="font-weight:700;margin-bottom:3px">${mes}</div>${cuerpo}`;
+  tip.style.display = 'block';
+
+  // Posicionar encima de la barra
+  const r = bar.getBoundingClientRect();
+  tip.style.left = (r.left + r.width/2) + 'px';
+  tip.style.top  = (r.top - 8) + 'px';
+  tip.style.transform = 'translate(-50%,-100%)';
+}
+
+function ocultarTooltipPeso(ev){
+  const tip = document.getElementById('peso-tooltip');
+  if (tip) tip.style.display = 'none';
+}
+
 
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -932,54 +932,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
     </select>
   </div>
   <div class="client-list" id="client-list">
-    <div class="client-item active" id="ci-1" onclick="selectClient(1)">
-      <div class="cdot dg"></div>
-      <div class="c-av">HM</div>
-      <div class="client-name">Hugo Mengual Hernández</div>
-      <div class="client-tag">5/5</div>
-    </div>
-    <div class="client-item" id="ci-2" onclick="selectClient(2)">
-      <div class="cdot dg"></div>
-      <div class="c-av">MP</div>
-      <div class="client-name">Marta Puig</div>
-      <div class="client-tag">4/4</div>
-    </div>
-    <div class="client-item" id="ci-3" onclick="selectClient(3)">
-      <div class="cdot da"></div>
-      <div class="c-av">JV</div>
-      <div class="client-name">Jordi Valls</div>
-      <div class="client-tag">2/4</div>
-    </div>
-    <div class="client-item" id="ci-4" onclick="selectClient(4)">
-      <div class="cdot dr"></div>
-      <div class="c-av">PF</div>
-      <div class="client-name">Pau Ferrer</div>
-      <div class="client-tag">0/4</div>
-    </div>
-    <div class="client-item" id="ci-5" onclick="selectClient(5)">
-      <div class="cdot dg"></div>
-      <div class="c-av">LS</div>
-      <div class="client-name">Laia Serra</div>
-      <div class="client-tag">5/5</div>
-    </div>
-    <div class="client-item" id="ci-6" onclick="selectClient(6)">
-      <div class="cdot dg"></div>
-      <div class="c-av">NC</div>
-      <div class="client-name">Núria Costa</div>
-      <div class="client-tag">3/3</div>
-    </div>
-    <div class="client-item" id="ci-7" onclick="selectClient(7)">
-      <div class="cdot da"></div>
-      <div class="c-av">AR</div>
-      <div class="client-name">Alex Romero</div>
-      <div class="client-tag">3/4</div>
-    </div>
-    <div class="client-item" id="ci-8" onclick="selectClient(8)">
-      <div class="cdot dg"></div>
-      <div class="c-av">SG</div>
-      <div class="client-name">Sandra Gil</div>
-      <div class="client-tag">4/4</div>
-    </div></div>
+  </div>
   <div class="sb-footer"><span id="active-count">5</span> activos · <span id="total-count">8</span> total</div>
   <!-- MINI SIDEBAR (collapsed state) -->
   <div class="sidebar-mini" id="sidebar-mini">
@@ -997,31 +950,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
     <!-- 4. Divider -->
     <div class="mini-divider"></div>
     <!-- 5. Client avatars -->
-    <div id="mini-client-list" style="display:flex;flex-direction:column;align-items:center;gap:5px;overflow-y:auto;flex:1;width:100%;scrollbar-width:none;padding-bottom:8px"><div class="mini-av active-mini" style="background:#dcfce7;color:#16a34a" onclick="selectClient(1)" title="Hugo Mengual Hernández">
-      HM
-      <div class="mini-dot" style="background:var(--green)"></div>
-    </div><div class="mini-av" style="background:#ede9fe;color:#7c3aed" onclick="selectClient(2)" title="Marta Puig">
-      MP
-      <div class="mini-dot" style="background:var(--green)"></div>
-    </div><div class="mini-av" style="background:#fef3c7;color:#d97706" onclick="selectClient(3)" title="Jordi Valls">
-      JV
-      <div class="mini-dot" style="background:var(--amber)"></div>
-    </div><div class="mini-av" style="background:#fee2e2;color:#dc2626" onclick="selectClient(4)" title="Pau Ferrer">
-      PF
-      <div class="mini-dot" style="background:var(--red)"></div>
-    </div><div class="mini-av" style="background:#d1fae5;color:#059669" onclick="selectClient(5)" title="Laia Serra">
-      LS
-      <div class="mini-dot" style="background:var(--green)"></div>
-    </div><div class="mini-av" style="background:#e0f2fe;color:#0284c7" onclick="selectClient(6)" title="Núria Costa">
-      NC
-      <div class="mini-dot" style="background:var(--green)"></div>
-    </div><div class="mini-av" style="background:#fef3c7;color:#d97706" onclick="selectClient(7)" title="Alex Romero">
-      AR
-      <div class="mini-dot" style="background:var(--amber)"></div>
-    </div><div class="mini-av" style="background:#fce7f3;color:#be185d" onclick="selectClient(8)" title="Sandra Gil">
-      SG
-      <div class="mini-dot" style="background:var(--green)"></div>
-    </div></div>
+    <div id="mini-client-list" style="display:flex;flex-direction:column;align-items:center;gap:5px;overflow-y:auto;flex:1;width:100%;scrollbar-width:none;padding-bottom:8px"></div>
   </div>
 </aside>
 
@@ -1594,6 +1523,8 @@ function lgEnterApp(nombre){
   }
 
   markStep(steps[0], false);
+  // Cargar el dashboard real en paralelo mientras corre la animación
+  initDashboard();
   setTimeout(() => { fill.style.width = '35%'; pct.textContent = '35%'; markStep(steps[0], true); markStep(steps[1], false); }, 350);
   setTimeout(() => { fill.style.width = '75%'; pct.textContent = '75%'; markStep(steps[1], true); markStep(steps[2], false); }, 1000);
   setTimeout(() => { fill.style.width = '100%'; pct.textContent = '100%'; markStep(steps[2], true); }, 1650);
@@ -1839,6 +1770,7 @@ function lgApplyError(msg){
       if (ok){
         // Entrar directo, sin animación larga
         lgApplyCoachToDashboard();
+        await initDashboard();
         document.getElementById('login-layer').classList.add('hidden');
         return;
       } else {
@@ -2367,6 +2299,129 @@ let currentOpcionTab = 0;
 const DIAS_KEY  = ['L','M','X','J','V','S','D'];
 const DIAS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 2 — CLIENTES REALES DESDE SUPABASE
+// Carga los clientes del coach autenticado y los convierte a objetos con la
+// MISMA forma que los del array CLIENTS demo, para no romper el dashboard.
+// Los campos que aún no se conectan (week, diet, planEntrenamiento...) se
+// rellenan con valores neutros; se irán conectando en bloques posteriores.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Paletas de avatar reutilizadas para clientes reales (mismo estilo que el demo)
+const CLIENT_PALETTE = [
+  {color:'#16a34a',colorBg:'#dcfce7'}, {color:'#7c3aed',colorBg:'#ede9fe'},
+  {color:'#d97706',colorBg:'#fef3c7'}, {color:'#dc2626',colorBg:'#fee2e2'},
+  {color:'#059669',colorBg:'#d1fae5'}, {color:'#0284c7',colorBg:'#e0f2fe'},
+  {color:'#be185d',colorBg:'#fce7f3'},
+];
+
+function clientInitials(name){
+  return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+
+function ageFromBirthdate(bd){
+  if (!bd) return 0;
+  const d = new Date(bd);
+  if (isNaN(d)) return 0;
+  const diff = Date.now() - d.getTime();
+  return Math.floor(diff / 31557600000); // ms en un año
+}
+
+// Calcula el estado de color a partir de la fecha de la última sesión completada.
+// verde: entrenó esta semana · ámbar: +7 días sin entrenar · rojo: +14 días o nunca.
+function statusFromLastSession(lastSessionDate){
+  if (!lastSessionDate) return 'red';
+  const last = new Date(lastSessionDate);
+  if (isNaN(last)) return 'red';
+  const days = Math.floor((Date.now() - last.getTime()) / 86400000);
+  if (days <= 7)  return 'green';
+  if (days <= 14) return 'amber';
+  return 'red';
+}
+
+// Construye un objeto cliente con la forma que espera el dashboard.
+// Mezcla datos reales (clients) con una plantilla neutra para los campos
+// que todavía no están conectados.
+function buildClientObject(row, index, lastSessionDate){
+  const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
+  const status = statusFromLastSession(lastSessionDate);
+  return {
+    // ── Datos reales de la tabla clients ──
+    id: row.id,
+    name: row.name || 'Cliente',
+    initials: clientInitials(row.name),
+    color: pal.color, colorBg: pal.colorBg,
+    status: status,
+    goal: row.goal || '—',
+    peso: row.weight_kg || 0,
+    altura: row.height_cm || 0,
+    edad: ageFromBirthdate(row.birth_date),
+    revisionCadaSemanas: row.revision_every_weeks || 2,
+    ultimaRevision: row.last_revision || null,
+    // Guardamos también los campos crudos por si hacen falta luego
+    _raw: row,
+    _lastSessionDate: lastSessionDate || null,
+    // ── Campos aún no conectados — plantilla neutra (bloques posteriores) ──
+    weeks: 0, mesoWeeks: 12,
+    alerts: [],
+    weekReorganization: {},
+    stats: { sessions:0, sessionGoal:5, weight:row.weight_kg||0, weightChange:0, stepsAvg:0, cheats:0 },
+    week: DIAS_KEY.map(d => ({day:d, trained:false, session:'OFF'})),
+    weekHistory: {},
+    todayMetrics: { steps:0, sleep:0, weight:row.weight_kg||0, activity:0 },
+    actividades: [],
+    lastWorkout: null,
+    diet: { day:'', kcalGoal:0, kcalReal:0, meals:[] },
+    cheats: [],
+    cuestionario: null,
+    planEntrenamiento: [],
+  };
+}
+
+// Carga la lista de clientes reales del coach desde Supabase.
+// Reemplaza el contenido del array CLIENTS manteniendo la misma referencia.
+async function loadRealClients(){
+  if (!coachData){
+    console.warn('loadRealClients: sin coachData');
+    return;
+  }
+  try {
+    // 1. Clientes del coach
+    const { data: clients, error } = await sb
+      .from('clients')
+      .select('*')
+      .eq('coach_id', coachData.id);
+
+    if (error){ console.error('loadRealClients error:', error); return; }
+
+    const rows = clients || [];
+
+    // 2. Para cada cliente, su última sesión completada (para el estado de color).
+    //    Una sola consulta para todas las sesiones de todos los clientes.
+    let lastByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: sessions } = await sb
+        .from('workout_sessions')
+        .select('client_id, session_date, completed')
+        .in('client_id', ids)
+        .eq('completed', true)
+        .order('session_date', { ascending:false });
+      (sessions || []).forEach(s => {
+        if (!lastByClient[s.client_id]) lastByClient[s.client_id] = s.session_date;
+      });
+    }
+
+    // 3. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    const built = rows.map((row, i) => buildClientObject(row, i, lastByClient[row.id]));
+    CLIENTS.length = 0;
+    built.forEach(c => CLIENTS.push(c));
+
+  } catch(e){
+    console.error('loadRealClients exception:', e);
+  }
+}
+
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
 function loadStorage() {
   try {
@@ -2548,21 +2603,36 @@ let pendingRequests = [...PENDING_REQUESTS];
 // ── SIDEBAR ───────────────────────────────────────────────────────────────
 function renderSidebar() {
   const list = document.getElementById('client-list');
+  const dotColors = {green:'dg', amber:'da', red:'dr'};
+
+  // Caso: el coach aún no tiene clientes
+  if (!CLIENTS.length) {
+    list.innerHTML = `
+      <div style="padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">Aún no tienes clientes</div>
+        <div style="font-size:11.5px;color:var(--text3);line-height:1.5">Cuando añadas clientes,<br>aparecerán aquí.</div>
+      </div>`;
+    document.getElementById('active-count').textContent = '0';
+    document.getElementById('total-count').textContent  = '0';
+    updatePendingBadge();
+    renderMiniSidebar();
+    return;
+  }
+
   list.innerHTML = CLIENTS.map(c => {
-    // Dynamic dot: green=active/on-track, amber=some days missing, red=5+ days inactive
-    const dotClass = c.stats.sessions === 0 ? 'dr'
-                   : c.stats.sessions < Math.ceil(c.stats.sessionGoal * 0.5) ? 'dr'
-                   : c.stats.sessions < c.stats.sessionGoal ? 'da'
-                   : 'dg';
+    const dot = getDotClass(c);
     return `
     <div class="client-item" id="ci-${c.id}" onclick="selectClient(${c.id})">
-      <div class="cdot ${dotClass}"></div>
+      <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
       <div class="client-name">${c.name}</div>
       <div class="client-tag">${c.stats.sessions}/${c.stats.sessionGoal}</div>
     </div>`;
   }).join('');
-  document.getElementById('active-count').textContent = CLIENTS.filter(c => c.status==='green').length;
+  document.getElementById('active-count').textContent = CLIENTS.filter(c => getDotClass(c)==='green').length;
   document.getElementById('total-count').textContent  = CLIENTS.length;
   updatePendingBadge();
   renderMiniSidebar();
@@ -2818,6 +2888,11 @@ function setFilter(f) {
 }
 
 function getDotClass(c) {
+  // Si el cliente trae un estado real (calculado desde Supabase), usarlo.
+  if (c.status === 'green' || c.status === 'amber' || c.status === 'red') {
+    return c.status;
+  }
+  // Fallback (clientes demo sin estado real): derivar de las sesiones.
   return c.stats.sessions === 0 ? 'red'
        : c.stats.sessions < Math.ceil(c.stats.sessionGoal * 0.5) ? 'red'
        : c.stats.sessions < c.stats.sessionGoal ? 'amber' : 'green';
@@ -2999,6 +3074,25 @@ function marcarRevision(clientId) {
 // ── MAIN PANEL ────────────────────────────────────────────────────────────
 function renderClientPanel() {
   const c = currentClient;
+
+  // Coach sin ningún cliente seleccionado (p.ej. entrenador nuevo sin clientes)
+  if (!c) {
+    const panel = document.getElementById('main-panel');
+    if (panel) {
+      panel.innerHTML = `
+        <div style="height:100%;display:flex;align-items:center;justify-content:center;padding:40px">
+          <div style="text-align:center;max-width:340px">
+            <div style="width:56px;height:56px;border-radius:15px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px">Aún no tienes clientes</div>
+            <div style="font-size:13px;color:var(--text3);line-height:1.6">Cuando empieces a trabajar con clientes, aparecerán en la barra lateral y podrás gestionar sus planes desde aquí.</div>
+          </div>
+        </div>`;
+    }
+    return;
+  }
+
   const statusLabel = {green:'Al día', amber:'Atención', red:'Inactivo'};
   const statusPill  = {green:'pill-g', amber:'pill-a', red:'pill-r'};
   const smartAlerts = getSmartAlerts(c);
@@ -5402,7 +5496,6 @@ if (!_hugoDs.opciones) {
 }
 
 renderSidebar();
-selectClient(1);
 // Color status filter buttons
 setTimeout(()=>{
   const colors = {green:'var(--green)', amber:'var(--amber)', red:'var(--red)'};
@@ -5411,6 +5504,25 @@ setTimeout(()=>{
     if (btn) btn.style.color = colors[k];
   });
 },0);
+
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 2 — Arranque del dashboard con clientes reales
+// initDashboard() lo llama el login (lgEnterApp / autologin) una vez que
+// hay un coach verificado. Carga los clientes reales y renderiza el sidebar.
+// ══════════════════════════════════════════════════════════════════════════
+let _dashboardInited = false;
+async function initDashboard(){
+  if (_dashboardInited) return;
+  _dashboardInited = true;
+  await loadRealClients();
+  renderSidebar();
+  if (CLIENTS.length){
+    selectClient(CLIENTS[0].id);
+  } else {
+    // Sin clientes: dejar el panel principal con un estado vacío
+    renderClientPanel();
+  }
+}
 
 </script>
 

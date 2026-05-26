@@ -3078,6 +3078,7 @@ function selectClient(id) {
   currentOpcionTab = 0;
   editPlan = null;
   weekOffset = 0;
+  segWeekOffset = 0;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3921,6 +3922,163 @@ function renderDietCard(op, c) {
 }
 
 // ── TAB: SEGUIMIENTO ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 4A — SEGUIMIENTO · Sección de Métricas
+// 3 gráficos (pasos, sueño, peso) de una semana, con navegación de semanas.
+// Datos desde daily_metrics (ya cargada en c._metrics).
+// ══════════════════════════════════════════════════════════════════════════
+
+// Offset de semana en el tab Seguimiento: 0 = semana actual, 1 = anterior, ...
+let segWeekOffset = 0;
+
+// Devuelve el lunes (00:00) de la semana con el offset dado respecto a hoy.
+function lunesDeSemana(offset){
+  const hoy = new Date();
+  const js = hoy.getDay();               // 0=domingo
+  const haciaLunes = js === 0 ? 6 : js-1;
+  const lunes = new Date(hoy);
+  lunes.setHours(0,0,0,0);
+  lunes.setDate(lunes.getDate() - haciaLunes - offset*7);
+  return lunes;
+}
+
+// Construye un mini-gráfico de línea SVG a partir de una serie de valores.
+// puntos: array de {label, valor|null}. color en hex.
+function miniLineChart(puntos, color, sufijo){
+  const W = 260, H = 64, padX = 8, padY = 12;
+  const valores = puntos.map(p => p.valor).filter(v => v != null);
+  if (!valores.length){
+    return `<div style="height:64px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text3)">Sin registros esta semana</div>`;
+  }
+  const min = Math.min(...valores);
+  const max = Math.max(...valores);
+  const rango = (max - min) || 1;
+  const n = puntos.length;
+  const x = i => padX + (i/(n-1)) * (W - padX*2);
+  const y = v => padY + (1 - (v - min)/rango) * (H - padY*2);
+
+  // Puntos con valor (para la línea); los null se saltan
+  const conValor = puntos.map((p,i)=>({i,v:p.valor})).filter(o=>o.v!=null);
+  const linePts = conValor.map(o => `${x(o.i).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
+  const lastO = conValor[conValor.length-1];
+
+  const circles = conValor.map((o,idx) => {
+    const esUlt = idx === conValor.length-1;
+    return `<circle cx="${x(o.i).toFixed(1)}" cy="${y(o.v).toFixed(1)}" r="${esUlt?4:3}"
+      fill="${esUlt?color:'white'}" stroke="${esUlt?'white':color}" stroke-width="1.5"/>`;
+  }).join('');
+
+  const lastLabel = lastO
+    ? `<text x="${x(lastO.i).toFixed(1)}" y="${(y(lastO.v)-8).toFixed(1)}" font-size="9" font-weight="700" fill="${color}" text-anchor="middle" font-family="system-ui">${lastO.v}${sufijo||''}</text>`
+    : '';
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="64" style="display:block;margin-top:6px">
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    ${circles}
+    ${lastLabel}
+  </svg>`;
+}
+
+// Una tarjeta de métrica
+function metricaCard(emoji, titulo, valorTxt, valorColor, subTxt, subColor, chartHtml, ejeIni, ejeFin){
+  return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
+    <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">${emoji} ${titulo}</div>
+    <div style="display:flex;align-items:baseline;gap:6px">
+      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:${valorColor||'var(--text)'}">${valorTxt}</div>
+      ${subTxt?`<div style="font-size:11px;color:${subColor||'var(--text3)'};font-weight:600">${subTxt}</div>`:''}
+    </div>
+    ${chartHtml}
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+      <span>${ejeIni}</span><span>${ejeFin}</span>
+    </div>
+  </div>`;
+}
+
+// Sección completa de Métricas para el tab Seguimiento
+function seccionMetricas(c){
+  const metrics = c._metrics || [];
+  const lunes = lunesDeSemana(segWeekOffset);
+  const DIAS = ['L','M','X','J','V','S','D'];
+
+  // Construir los 7 días de la semana seleccionada
+  const dias = [];
+  for (let i=0;i<7;i++){
+    const d = new Date(lunes);
+    d.setDate(d.getDate()+i);
+    const key = d.toISOString().slice(0,10);
+    const reg = metrics.find(m => String(m.date).slice(0,10) === key);
+    dias.push({
+      label: DIAS[i],
+      steps: reg && reg.steps != null ? Number(reg.steps) : null,
+      sleep: reg && reg.sleep_hours != null ? Number(reg.sleep_hours) : null,
+      weight: reg && reg.weight_kg != null ? Number(reg.weight_kg) : null,
+    });
+  }
+
+  // Medias de la semana (solo días con dato)
+  const media = (arr) => {
+    const v = arr.filter(x => x != null);
+    return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
+  };
+  const mSteps  = media(dias.map(d=>d.steps));
+  const mSleep  = media(dias.map(d=>d.sleep));
+  const mWeight = media(dias.map(d=>d.weight));
+
+  const fmtSteps = mSteps != null ? (mSteps>=1000 ? (mSteps/1000).toFixed(1)+'k' : Math.round(mSteps)) : '—';
+  const fmtSleep = mSleep != null ? mSleep.toFixed(1)+'h' : '—';
+  const fmtWeight = mWeight != null ? mWeight.toFixed(1)+' kg' : '—';
+
+  // Rótulo del rango de la semana
+  const finSemana = new Date(lunes); finSemana.setDate(finSemana.getDate()+6);
+  const fmtCorto = d => d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+  const rotulo = segWeekOffset === 0 ? 'Esta semana'
+    : segWeekOffset === 1 ? 'Semana pasada'
+    : `Hace ${segWeekOffset} semanas`;
+  const rangoTxt = `${fmtCorto(lunes)} – ${fmtCorto(finSemana)}`;
+
+  const cards =
+    metricaCard('🦶','Pasos · media/día', fmtSteps, 'var(--green)', '', '',
+      miniLineChart(dias.map(d=>({label:d.label,valor:d.steps})), '#16a34a', ''),
+      'Lun','Dom') +
+    metricaCard('🌙','Sueño · media/noche', fmtSleep, '#7c3aed', '', '',
+      miniLineChart(dias.map(d=>({label:d.label,valor:d.sleep})), '#7c3aed', 'h'),
+      'Lun','Dom') +
+    metricaCard('⚖️','Peso · media semanal', fmtWeight, 'var(--text)', '', '',
+      miniLineChart(dias.map(d=>({label:d.label,valor:d.weight})), '#1a1a18', ''),
+      'Lun','Dom');
+
+  // Navegación de semanas. No se puede ir al futuro (offset 0 es el tope).
+  const btnStyle = 'width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center';
+  const btnDisabled = 'opacity:.35;cursor:not-allowed';
+
+  return `<div style="margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text)">Métricas</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="cambiarSemanaSeg(1)" style="${btnStyle}" title="Semana anterior">‹</button>
+        <div style="text-align:center;min-width:130px">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text)">${rotulo}</div>
+          <div style="font-size:10px;color:var(--text3)">${rangoTxt}</div>
+        </div>
+        <button onclick="cambiarSemanaSeg(-1)" style="${btnStyle}${segWeekOffset===0?';'+btnDisabled:''}" title="Semana siguiente" ${segWeekOffset===0?'disabled':''}>›</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      ${cards}
+    </div>
+  </div>`;
+}
+
+// Cambia la semana mostrada en el tab Seguimiento. delta=+1 atrás, -1 adelante.
+function cambiarSemanaSeg(delta){
+  const nuevo = segWeekOffset + delta;
+  if (nuevo < 0) return;       // no se puede ir al futuro
+  if (nuevo > 520) return;     // límite de seguridad (~10 años)
+  segWeekOffset = nuevo;
+  renderClientPanel();
+}
+
+
 function renderSeguimiento() {
   const c  = currentClient;
   const ds = getDietState(c.id);
@@ -4015,6 +4173,7 @@ function renderSeguimiento() {
       </div>`;
 
   return `
+    ${seccionMetricas(c)}
     <div class="two-col" style="align-items:start">
       <div>
         <div class="section-title">Opciones escogidas por el cliente</div>

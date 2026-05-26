@@ -2625,7 +2625,7 @@ function renderSidebar() {
   list.innerHTML = CLIENTS.map(c => {
     const dot = getDotClass(c);
     return `
-    <div class="client-item" id="ci-${c.id}" onclick="selectClient(${c.id})">
+    <div class="client-item" id="ci-${c.id}" onclick="selectClient('${c.id}')">
       <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
       <div class="client-name">${c.name}</div>
@@ -2936,7 +2936,7 @@ function renderClientList() {
   list.innerHTML = clients.map(c => {
     const dot = getDotClass(c);
     const isActive = currentClient && currentClient.id === c.id;
-    return `<div class="client-item${isActive?' active':''}" id="ci-${c.id}" onclick="selectClient(${c.id})">
+    return `<div class="client-item${isActive?' active':''}" id="ci-${c.id}" onclick="selectClient('${c.id}')">
       <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
       <div class="client-name">${c.name}</div>
@@ -2983,7 +2983,7 @@ function renderMiniSidebar() {
     const isActive = currentClient && currentClient.id === c.id;
     return `<div class="mini-av${isActive?' active-mini':''}"
       style="background:${c.colorBg};color:${c.color}"
-      onclick="selectClient(${c.id})"
+      onclick="selectClient('${c.id}')"
       title="${c.name}">
       ${c.initials}
       <div class="mini-dot" style="background:${dotColor[dot]}"></div>
@@ -4490,7 +4490,7 @@ function renderOverview() {
     const stepsAvg=stepsArr.length?Math.round(stepsArr.reduce((a,b)=>a+b,0)/stepsArr.length):0;
     const alertCount=getSmartAlerts(c).filter(a=>a.type==='warning').length;
     const dotColor=alertCount>0?'var(--red)':doneDays>=trainDays?'var(--green)':'var(--amber)';
-    return '<tr style="cursor:pointer" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'" onclick="selectClientById('+c.id+')">'+
+    return '<tr style="cursor:pointer" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'" onclick="selectClientById(\''+c.id+'\')">'+
       '<td style="padding:10px 14px"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+dotColor+';flex-shrink:0"></div><span style="font-size:13px;font-weight:500;color:var(--text)">'+c.name+'</span></div></td>'+
       '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px;font-weight:600;color:'+(doneDays>=trainDays?'var(--green)':'var(--amber)')+'">'+doneDays+'/'+trainDays+'</span></td>'+
       '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px">'+pesoHoy+'kg</span>'+(pesoDiff!==null?'<span style="font-size:10px;color:'+(pesoDiff<0?'var(--green)':pesoDiff>0?'var(--amber)':'var(--text3)')+';margin-left:4px">'+(pesoDiff>0?'+':'')+pesoDiff+'</span>':'')+'</td>'+
@@ -4513,7 +4513,7 @@ function renderOverview() {
     '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Estado</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
-function selectClientById(id){const c=CLIENTS.find(x=>x.id===id);if(c){currentClient=c;currentTab='resumen';renderClientPanel();}}
+function selectClientById(id){ selectClient(id); }
 
 // ── ENTRENO SECTION ───────────────────────────────────────────────────────────
 function renderEntrenoSection() {

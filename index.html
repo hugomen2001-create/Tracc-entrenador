@@ -2447,17 +2447,19 @@ async function loadRealClients(){
     }
 
     // 5. Métricas diarias de cada cliente (tabla daily_metrics) — para la
-    //    evolución del peso. Solo traemos fecha y peso, ordenadas por fecha.
+    //    evolución del peso y las métricas de Seguimiento (pasos, sueño, peso).
     let metricsByClient = {};
     if (rows.length){
       const ids = rows.map(r => r.id);
       const { data: metrics } = await sb
         .from('daily_metrics')
-        .select('client_id, date, weight_kg')
+        .select('client_id, date, weight_kg, steps, sleep_hours')
         .in('client_id', ids)
         .order('date', { ascending:true });
       (metrics || []).forEach(m => {
-        if (m.weight_kg == null) return;
+        // Descartar solo si el registro está completamente vacío.
+        // Un día puede tener pasos/sueño aunque no tenga peso (y viceversa).
+        if (m.weight_kg == null && m.steps == null && m.sleep_hours == null) return;
         (metricsByClient[m.client_id] = metricsByClient[m.client_id] || []).push(m);
       });
     }
@@ -4459,9 +4461,11 @@ function cardEvolucionPeso(c){
   }
 
   // Agrupar por mes (YYYY-MM): guardamos el PRIMER y el ÚLTIMO registro del mes.
-  // metrics viene ordenado por fecha ascendente.
+  // metrics viene ordenado por fecha ascendente. Solo cuentan los días con peso
+  // (un registro puede tener pasos/sueño pero no peso).
   const meses = {};
   metrics.forEach(m => {
+    if (m.weight_kg == null) return;
     const key = String(m.date).slice(0,7); // YYYY-MM
     const peso = Number(m.weight_kg);
     if (!meses[key]){
@@ -4473,6 +4477,18 @@ function cardEvolucionPeso(c){
     }
   });
   const claves = Object.keys(meses).sort();
+  // Si no hay ningún registro con peso, mostrar aviso (puede haber métricas
+  // de pasos/sueño pero ningún peso registrado)
+  if (!claves.length){
+    return `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="${secTitle}">Evolución del peso</div>
+      </div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
+        Aún no hay registros de peso de este cliente.
+      </div>
+    </div>`;
+  }
   // Mostrar como máximo los últimos 6 meses
   const visibles = claves.slice(-6);
   // Para la altura usamos el peso de fin de mes

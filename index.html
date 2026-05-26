@@ -4132,12 +4132,15 @@ function ansChip(text, soft){
 
 // Tarjeta marcada como pendiente de conectar (Bloque 3B)
 function cardPendiente(titulo, texto){
-  return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">${titulo}</div>
-      <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 7px">Próximamente</span>
+  return `<div style="background:var(--bg2);border:1.5px dashed var(--border2);border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+    <div style="width:34px;height:34px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     </div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.6">${texto}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)">${titulo}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${texto}</div>
+    </div>
+    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 7px;flex-shrink:0">Próximamente</span>
   </div>`;
 }
 
@@ -4284,23 +4287,43 @@ function renderPerfil() {
     </div>
   </div>`;
 
-  // ── Ensamblado: 3 columnas + filas inferiores ──
-  return `<div style="display:flex;flex-direction:column;gap:14px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start">
+  // ── Ensamblado: 3 columnas equilibradas + filas inferiores ──
+  let gridHtml;
+  if (q) {
+    // Con cuestionario: reparto equilibrado de las 3 columnas
+    //  Col 1: Datos básicos (grande) + Entreno y descanso (media)
+    //  Col 2: Salud y alimentación (la más alta)
+    //  Col 3: Objetivo y experiencia (media) + 2 tarjetas compactas
+    gridHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardDatos}
-        ${cardPendiente('Evolución del peso', 'El histórico de peso del cliente se mostrará aquí cuando conectemos las métricas de seguimiento.')}
-        ${cardPendiente('Mesociclo actual', 'El mesociclo y su progreso se mostrarán aquí cuando conectemos los planes de entrenamiento.')}
+        ${cardEntreno}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardObjetivo}
         ${cardSalud}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardEntreno}
+        ${cardObjetivo}
+        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
+        ${cardPendiente('Mesociclo actual', 'Plan y progreso del mesociclo')}
       </div>
-    </div>
-    ${cardPendiente('Fotos de progreso', 'El entrenador podrá subir aquí las fotos de cada revisión (frontal, lateral, espalda), organizadas por semana. Se activará en una fase posterior.')}
+    </div>`;
+  } else {
+    // Sin cuestionario: Datos básicos a la izquierda, aviso + pendientes a la derecha
+    gridHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        ${cardDatos}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        ${cardObjetivo}
+        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
+        ${cardPendiente('Mesociclo actual', 'Plan y progreso del mesociclo')}
+      </div>
+    </div>`;
+  }
+  return `<div style="display:flex;flex-direction:column;gap:14px">
+    ${gridHtml}
+    ${cardPendiente('Fotos de progreso', 'Fotos de cada revisión organizadas por semana')}
     ${cardCuenta}
   </div>`;
 }

@@ -492,6 +492,7 @@ canvas{width:100%!important}
   align-items:center;justify-content:center;
   padding:40px 44px;background:#fff;
   position:relative;
+  overflow-y:auto;
 }
 .lg-form-tag{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#a3a39e;margin-bottom:6px}
 .lg-form-title{font-family:'DM Serif Display',serif;font-size:26px;color:#1a1a18;letter-spacing:-.4px;margin-bottom:4px;line-height:1.15}
@@ -517,6 +518,8 @@ canvas{width:100%!important}
 .lg-inp.error{border-color:#dc2626;background:#fee2e2}
 .lg-inp.ok{border-color:#16a34a;background:#fff}
 .lg-inp:disabled{opacity:.6;cursor:not-allowed}
+select.lg-inp{padding-right:32px}
+textarea.lg-inp{line-height:1.5;min-height:56px}
 .lg-inp-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:14px;cursor:pointer;user-select:none;color:#a3a39e}
 .lg-inp-icon.ok{pointer-events:none}
 
@@ -683,6 +686,10 @@ canvas{width:100%!important}
             <span>¿Eres cliente? <a id="lg-mytracc-link" href="#" target="_blank" rel="noopener">Usa MyTracc</a></span>
             <div class="lg-divider-line"></div>
           </div>
+          <div style="text-align:center;font-size:12px;color:#a3a39e;margin-bottom:14px">
+            ¿Eres entrenador y aún no tienes cuenta?
+            <a onclick="lgGoto('apply')" style="color:#16a34a;font-weight:600;cursor:pointer">Solicita acceso</a>
+          </div>
           <div class="lg-support">¿Problemas para acceder? Contacta con<br><b>soporte@tracc.app</b></div>
         </div>
       </div>
@@ -782,6 +789,80 @@ canvas{width:100%!important}
           <button class="lg-btn" id="lg-newpwd-btn" onclick="lgDoNewPwd()">
             <span id="lg-newpwd-btn-label">Guardar contraseña</span>
           </button>
+        </div>
+      </div>
+
+      <!-- ── ESTADO: SOLICITAR ACCESO — formulario de entrenador ── -->
+      <div class="lg-screen" id="lg-screen-apply">
+        <div style="width:100%;max-width:320px">
+          <div class="lg-back" onclick="lgGoto('login')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Volver al inicio de sesión
+          </div>
+          <div class="lg-form-tag">Únete a Tracc</div>
+          <div class="lg-form-title">Solicita acceso<br>como entrenador</div>
+          <div class="lg-form-sub">Cuéntanos sobre ti y te contactaremos</div>
+        </div>
+        <div class="lg-form">
+          <div class="lg-field">
+            <div class="lg-field-lbl">Nombre completo</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="text" id="lg-apply-name" placeholder="Tu nombre y apellidos" autocomplete="name" oninput="lgValidateApply()">
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Email de contacto</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="email" id="lg-apply-email" placeholder="tu@email.com" autocomplete="email" oninput="lgValidateApply()">
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Teléfono</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="tel" id="lg-apply-phone" placeholder="+34 600 000 000" autocomplete="tel" oninput="lgValidateApply()">
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">¿Cuántos clientes quieres gestionar?</div>
+            <div class="lg-inp-wrap">
+              <select class="lg-inp" id="lg-apply-clients" onchange="lgValidateApply()" style="cursor:pointer;appearance:none;-webkit-appearance:none">
+                <option value="">Selecciona un rango</option>
+                <option value="1-5">Entre 1 y 5</option>
+                <option value="6-15">Entre 6 y 15</option>
+                <option value="16-30">Entre 16 y 30</option>
+                <option value="31-50">Entre 31 y 50</option>
+                <option value="50+">Más de 50</option>
+              </select>
+              <span class="lg-inp-icon ok" style="pointer-events:none">▾</span>
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Cuéntanos sobre ti <span style="font-weight:400;color:#a3a39e">(opcional)</span></div>
+            <div class="lg-inp-wrap">
+              <textarea class="lg-inp" id="lg-apply-about" rows="2" placeholder="Tu experiencia, dónde trabajas, qué buscas..." style="resize:none;font-family:'Geist',sans-serif"></textarea>
+            </div>
+          </div>
+          <div style="height:6px"></div>
+          <button class="lg-btn" id="lg-apply-btn" onclick="lgDoApply()">
+            <span id="lg-apply-btn-label">Enviar solicitud</span>
+          </button>
+          <div style="text-align:center;font-size:11.5px;color:#a3a39e;margin-top:-6px">Revisaremos tu solicitud y te escribiremos pronto</div>
+        </div>
+      </div>
+
+      <!-- ── ESTADO: SOLICITUD ENVIADA ── -->
+      <div class="lg-screen" id="lg-screen-applied">
+        <div class="lg-success">
+          <div class="lg-success-ring">✓</div>
+          <div class="lg-success-title" style="font-size:23px">Solicitud enviada</div>
+          <div style="font-size:13px;color:#a3a39e;margin-top:4px;text-align:center;line-height:1.5">Gracias por tu interés en Tracc.<br>Hemos recibido tu solicitud correctamente.</div>
+          <div class="lg-info-card">
+            <div class="lg-info-card-tag">Qué pasa ahora</div>
+            <div class="lg-info-card-txt">1. Revisamos tu solicitud<br>2. Te contactamos para conocerte mejor<br>3. Te damos acceso a tu panel Tracc</div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="lg-btn" style="width:auto;height:34px;padding:0 18px;font-size:12px;margin-bottom:0" onclick="lgGoto('login')">← Volver al inicio</button>
+          </div>
         </div>
       </div>
 
@@ -1553,6 +1634,65 @@ function lgDoNewPwd(){
     lgValidateNewPwd();
     lgGoto('login');
   }, 1000);
+}
+
+// ── Solicitar acceso (entrenador nuevo) — FASE A: sin Supabase ──
+// En Fase B esto guardará la solicitud en la tabla coach_applications.
+function lgValidateApply(){
+  const name = document.getElementById('lg-apply-name').value.trim();
+  const email = document.getElementById('lg-apply-email').value.trim();
+  const phone = document.getElementById('lg-apply-phone').value.trim();
+  const clients = document.getElementById('lg-apply-clients').value;
+
+  const nameOk = name.length >= 3;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const phoneOk = phone.replace(/[^0-9]/g, '').length >= 7;
+  const clientsOk = clients !== '';
+
+  const allOk = nameOk && emailOk && phoneOk && clientsOk;
+  document.getElementById('lg-apply-btn').classList.toggle('ready', allOk);
+  return { nameOk, emailOk, phoneOk, clientsOk, allOk };
+}
+
+function lgDoApply(){
+  const v = lgValidateApply();
+  const fields = [
+    ['lg-apply-name', v.nameOk],
+    ['lg-apply-email', v.emailOk],
+    ['lg-apply-phone', v.phoneOk],
+    ['lg-apply-clients', v.clientsOk],
+  ];
+  // Marcar en rojo los campos que faltan
+  let firstBad = null;
+  fields.forEach(([id, ok]) => {
+    const el = document.getElementById(id);
+    el.classList.toggle('error', !ok);
+    if (!ok && !firstBad) firstBad = el;
+  });
+  if (!v.allOk){
+    if (firstBad) firstBad.focus();
+    return;
+  }
+
+  const btn = document.getElementById('lg-apply-btn');
+  btn.classList.add('loading');
+  document.getElementById('lg-apply-btn-label').innerHTML =
+    '<span class="lg-spin" style="margin-right:2px"></span>Enviando...';
+
+  // FASE A: simulamos el envío. En Fase B se inserta en coach_applications.
+  setTimeout(() => {
+    btn.classList.remove('loading');
+    document.getElementById('lg-apply-btn-label').textContent = 'Enviar solicitud';
+    // Limpiar formulario
+    ['lg-apply-name','lg-apply-email','lg-apply-phone','lg-apply-about'].forEach(id => {
+      document.getElementById(id).value = '';
+      document.getElementById(id).classList.remove('error');
+    });
+    document.getElementById('lg-apply-clients').value = '';
+    document.getElementById('lg-apply-clients').classList.remove('error');
+    btn.classList.remove('ready');
+    lgGoto('applied');
+  }, 1100);
 }
 
 /* Detección del enlace de recuperación en la URL.

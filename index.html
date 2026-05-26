@@ -2342,7 +2342,7 @@ function statusFromLastSession(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2367,6 +2367,8 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     _mesocycle: mesoRow || null,
     // Histórico de métricas diarias [{date, weight_kg}, ...] ordenado por fecha
     _metrics: metricsRows || [],
+    // Revisiones con fotos de progreso [{revision_week, revision_date, ...}, ...]
+    _photos: photosRows || [],
     // ── Campos aún no conectados — plantilla neutra (bloques posteriores) ──
     weeks: 0, mesoWeeks: 12,
     alerts: [],
@@ -2460,10 +2462,26 @@ async function loadRealClients(){
       });
     }
 
-    // 6. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    // 6. Fotos de progreso de cada cliente (tabla progress_photos).
+    //    Cada fila es una revisión con hasta 3 fotos. Ordenadas por semana desc.
+    let photosByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: photos } = await sb
+        .from('progress_photos')
+        .select('*')
+        .in('client_id', ids)
+        .order('revision_week', { ascending:false });
+      (photos || []).forEach(p => {
+        (photosByClient[p.client_id] = photosByClient[p.client_id] || []).push(p);
+      });
+    }
+
+    // 7. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
-                        mesoByClient[row.id], metricsByClient[row.id]));
+                        mesoByClient[row.id], metricsByClient[row.id],
+                        photosByClient[row.id]));
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
@@ -3197,6 +3215,8 @@ function switchTab(tab) {
   currentTab = tab;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
+  // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
+  if (tab === 'perfil') setTimeout(hydratePhotoUrls, 0);
 }
 
 function renderTab() {
@@ -4313,14 +4333,370 @@ function cardEvolucionPeso(c){
   const cambioColor = cambio > 0 ? 'var(--green)' : cambio < 0 ? 'var(--red)' : 'var(--text3)';
 
   return `<div style="${cardStyle}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="${secTitle}">Evolución del peso</div>
       <span style="font-size:11px;color:${cambioColor};font-weight:600">${cambioTxt}</span>
     </div>
-    <div style="height:48px;display:flex;align-items:flex-end;gap:5px;margin-top:8px">
+    <div style="height:48px;display:flex;align-items:flex-end;gap:5px">
       ${barras}
     </div>
   </div>`;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 3C — FOTOS DE PROGRESO
+// Bucket privado 'progress-photos'. Las fotos se guardan en Supabase Storage
+// y la tabla progress_photos guarda la RUTA de cada foto. Para mostrarlas
+// se generan URLs firmadas temporales (createSignedUrl).
+// ══════════════════════════════════════════════════════════════════════════
+
+const PHOTOS_BUCKET = 'progress-photos';
+// Tipos de foto de cada revisión y su columna en la tabla
+const PHOTO_SLOTS = [
+  { key:'front', col:'photo_front_url', label:'Frontal' },
+  { key:'side',  col:'photo_side_url',  label:'Lateral' },
+  { key:'back',  col:'photo_back_url',  label:'Espalda' },
+];
+
+// Genera una URL firmada (válida 1h) para mostrar una foto privada.
+async function signedPhotoUrl(path){
+  if (!path) return null;
+  try {
+    const { data, error } = await sb.storage
+      .from(PHOTOS_BUCKET)
+      .createSignedUrl(path, 3600);
+    if (error){ console.error('signedUrl error:', error); return null; }
+    return data ? data.signedUrl : null;
+  } catch(e){
+    console.error('signedUrl exception:', e);
+    return null;
+  }
+}
+
+// ── TARJETA: Fotos de progreso ──
+// Se renderiza con marcos (placeholders) y luego hydratePhotoUrls() rellena
+// las imágenes de forma asíncrona.
+function cardFotosProgreso(c){
+  const secTitle = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
+  const revisiones = (c._photos || []);
+
+  // Botón para crear una revisión nueva
+  const btnNueva = `<button onclick="abrirModalNuevaRevision()" style="height:30px;padding:0 14px;border-radius:9px;background:var(--green);border:none;font-size:12px;font-weight:600;color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    Nueva revisión
+  </button>`;
+
+  let cuerpo;
+  if (!revisiones.length){
+    cuerpo = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6;background:var(--bg);border:1px dashed var(--border2);border-radius:13px">
+      Aún no hay fotos de revisión.<br>Pulsa <b>Nueva revisión</b> para subir las primeras.
+    </div>`;
+  } else {
+    const cols = revisiones.map(rev => revisionColumna(c, rev)).join('');
+    cuerpo = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">${cols}</div>`;
+  }
+
+  return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="${secTitle}">Fotos de progreso</div>
+        <span style="font-size:11px;color:var(--text3)">El cliente envía las fotos por WhatsApp · el entrenador las sube aquí</span>
+      </div>
+      ${btnNueva}
+    </div>
+    ${cuerpo}
+  </div>`;
+}
+
+// Una columna = una revisión, con sus 3 marcos de foto
+function revisionColumna(c, rev){
+  const fecha = fmtFecha(rev.revision_date);
+  const peso = rev.weight_kg != null ? rev.weight_kg + ' kg' : '';
+  const cabFecha = [fecha, peso].filter(Boolean).join(' · ');
+
+  const slots = PHOTO_SLOTS.map(slot => {
+    const path = rev[slot.col];
+    if (path){
+      // Marco con foto: se rellenará por hydratePhotoUrls.
+      // Lleva una cruz roja en la esquina para borrar la foto.
+      return `<div style="display:flex;flex-direction:column;gap:4px">
+        <div style="position:relative">
+          <div class="photo-slot" data-path="${escHtml(path)}"
+            style="aspect-ratio:3/4;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden">
+            <div style="font-size:9px;color:var(--text3)">Cargando…</div>
+          </div>
+          <button onclick="event.stopPropagation();borrarFotoRevision('${rev.id}','${slot.key}')"
+            title="Borrar esta foto"
+            style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--red);border:1.5px solid #fff;color:#fff;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3)">✕</button>
+        </div>
+        <div style="font-size:9px;color:var(--text3);text-align:center">${slot.label}</div>
+      </div>`;
+    }
+    // Marco vacío: botón para subir esta foto
+    return `<div style="display:flex;flex-direction:column;gap:4px">
+      <div onclick="subirFotoRevision('${rev.id}','${slot.key}')"
+        style="aspect-ratio:3/4;border-radius:8px;background:var(--bg2);border:1.5px dashed var(--border2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <div style="font-size:9px;color:var(--green)">Subir</div>
+      </div>
+      <div style="font-size:9px;color:var(--text3);text-align:center">${slot.label}</div>
+    </div>`;
+  }).join('');
+
+  return `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
+    <div style="padding:9px 12px;background:var(--bg);display:flex;align-items:center;justify-content:between">
+      <div style="flex:1">
+        <div style="font-size:11.5px;font-weight:700;color:var(--text)">Semana ${rev.revision_week ?? '—'}</div>
+        <div style="font-size:10px;color:var(--text3)">${cabFecha || 'Sin fecha'}</div>
+      </div>
+    </div>
+    <div style="padding:10px 12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${slots}</div>
+    </div>
+  </div>`;
+}
+
+// Rellena los marcos de foto con las imágenes firmadas (asíncrono).
+// Se llama después de pintar el tab Perfil.
+async function hydratePhotoUrls(){
+  const slots = document.querySelectorAll('.photo-slot[data-path]');
+  for (const el of slots){
+    const path = el.getAttribute('data-path');
+    if (!path || el.dataset.loaded === '1') continue;
+    const url = await signedPhotoUrl(path);
+    if (url){
+      el.dataset.loaded = '1';
+      el.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover" alt="Foto de progreso">`;
+      el.onclick = () => verFotoGrande(url);
+    } else {
+      el.innerHTML = `<div style="font-size:9px;color:var(--red);text-align:center;padding:4px">No se pudo cargar</div>`;
+    }
+  }
+}
+
+// Lightbox: ver una foto en grande
+function verFotoGrande(url){
+  let lb = document.getElementById('photo-lightbox');
+  if (!lb){
+    lb = document.createElement('div');
+    lb.id = 'photo-lightbox';
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:center;justify-content:center;padding:40px;cursor:zoom-out';
+    lb.onclick = () => { lb.style.display = 'none'; };
+    document.body.appendChild(lb);
+  }
+  lb.innerHTML = `<img src="${url}" style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)" alt="Foto de progreso">`;
+  lb.style.display = 'flex';
+}
+
+// ── Crear una revisión nueva ──
+function abrirModalNuevaRevision(){
+  if (!currentClient){ return; }
+  let modal = document.getElementById('modal-nueva-revision');
+  if (!modal){
+    modal = document.createElement('div');
+    modal.id = 'modal-nueva-revision';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:250;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(modal);
+  }
+  const hoy = new Date().toISOString().slice(0,10);
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:18px;width:380px;max-width:100%;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">Nueva revisión</div>
+        <button onclick="document.getElementById('modal-nueva-revision').style.display='none'" style="width:28px;height:28px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);cursor:pointer;color:var(--text3);font-size:14px">✕</button>
+      </div>
+      <div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">Nº de semana</div>
+          <input id="rev-week" type="number" min="1" placeholder="Ej: 8" style="width:100%;height:36px;padding:0 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">Fecha de la revisión</div>
+          <input id="rev-date" type="date" value="${hoy}" style="width:100%;height:36px;padding:0 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">Peso <span style="font-weight:400;color:var(--text3)">(opcional)</span></div>
+          <input id="rev-weight" type="number" step="0.1" placeholder="Ej: 69.4" style="width:100%;height:36px;padding:0 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box">
+        </div>
+        <div id="rev-error" style="display:none;font-size:11.5px;color:var(--red)"></div>
+        <button id="rev-save-btn" onclick="guardarNuevaRevision()" style="height:38px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">Crear revisión</button>
+        <div style="font-size:11px;color:var(--text3);text-align:center">Después podrás subir las fotos de esta revisión</div>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+async function guardarNuevaRevision(){
+  const week = parseInt(document.getElementById('rev-week').value, 10);
+  const date = document.getElementById('rev-date').value;
+  const weightRaw = document.getElementById('rev-weight').value;
+  const errEl = document.getElementById('rev-error');
+  const btn = document.getElementById('rev-save-btn');
+
+  errEl.style.display = 'none';
+  if (!week || week < 1){ errEl.textContent = 'Indica un número de semana válido.'; errEl.style.display='block'; return; }
+  if (!date){ errEl.textContent = 'Indica la fecha de la revisión.'; errEl.style.display='block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creando...';
+  try {
+    const fila = {
+      client_id: currentClient.id,
+      coach_id: coachData.id,
+      revision_week: week,
+      revision_date: date,
+    };
+    if (weightRaw) fila.weight_kg = parseFloat(weightRaw);
+
+    const { data, error } = await sb
+      .from('progress_photos')
+      .insert(fila)
+      .select()
+      .single();
+
+    if (error){
+      console.error('crear revisión error:', error);
+      errEl.textContent = 'No se pudo crear la revisión. Inténtalo de nuevo.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Crear revisión';
+      return;
+    }
+
+    // Añadir la revisión al cliente en memoria y refrescar
+    currentClient._photos = currentClient._photos || [];
+    currentClient._photos.unshift(data);
+    currentClient._photos.sort((a,b)=>(b.revision_week||0)-(a.revision_week||0));
+    document.getElementById('modal-nueva-revision').style.display = 'none';
+    renderClientPanel();
+    hydratePhotoUrls();
+    showToast('✓ Revisión creada');
+  } catch(e){
+    console.error('guardarNuevaRevision exception:', e);
+    errEl.textContent = 'Error de conexión. Inténtalo de nuevo.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Crear revisión';
+  }
+}
+
+// ── Subir una foto a una revisión existente ──
+function subirFotoRevision(revisionId, slotKey){
+  // Crear un input de archivo invisible y disparar el selector
+  let input = document.getElementById('photo-file-input');
+  if (input) input.remove();
+  input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.id = 'photo-file-input';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (file) procesarSubidaFoto(revisionId, slotKey, file);
+    input.remove();
+  };
+  input.click();
+}
+
+async function procesarSubidaFoto(revisionId, slotKey, file){
+  const slot = PHOTO_SLOTS.find(s => s.key === slotKey);
+  if (!slot) return;
+
+  showToast('Subiendo foto...');
+  try {
+    // Ruta: clientId/revisionId/slot-timestamp.ext
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${currentClient.id}/${revisionId}/${slotKey}-${Date.now()}.${ext}`;
+
+    const { error: upErr } = await sb.storage
+      .from(PHOTOS_BUCKET)
+      .upload(path, file, { upsert:true });
+
+    if (upErr){
+      console.error('upload error:', upErr);
+      showToast('✕ No se pudo subir la foto');
+      return;
+    }
+
+    // Guardar la ruta en la columna correspondiente de progress_photos
+    const update = {};
+    update[slot.col] = path;
+    const { error: dbErr } = await sb
+      .from('progress_photos')
+      .update(update)
+      .eq('id', revisionId);
+
+    if (dbErr){
+      console.error('update progress_photos error:', dbErr);
+      showToast('✕ Foto subida pero no se pudo guardar la referencia');
+      return;
+    }
+
+    // Actualizar el cliente en memoria y refrescar
+    const rev = (currentClient._photos || []).find(r => r.id === revisionId);
+    if (rev) rev[slot.col] = path;
+    renderClientPanel();
+    hydratePhotoUrls();
+    showToast('✓ Foto subida');
+  } catch(e){
+    console.error('procesarSubidaFoto exception:', e);
+    showToast('✕ Error al subir la foto');
+  }
+}
+
+// ── Borrar una foto de una revisión ──
+// Pide confirmación, borra el archivo de Storage y limpia la referencia
+// en la tabla progress_photos.
+async function borrarFotoRevision(revisionId, slotKey){
+  const slot = PHOTO_SLOTS.find(s => s.key === slotKey);
+  if (!slot) return;
+
+  const rev = (currentClient._photos || []).find(r => r.id === revisionId);
+  if (!rev) return;
+  const path = rev[slot.col];
+  if (!path) return;
+
+  // Confirmación: el borrado no se puede deshacer
+  const ok = window.confirm(
+    '¿Seguro que quieres borrar esta foto (' + slot.label.toLowerCase() + ')?\n' +
+    'Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+
+  showToast('Borrando foto...');
+  try {
+    // 1. Borrar el archivo del Storage
+    const { error: rmErr } = await sb.storage
+      .from(PHOTOS_BUCKET)
+      .remove([path]);
+    if (rmErr){
+      console.error('remove storage error:', rmErr);
+      showToast('✕ No se pudo borrar la foto');
+      return;
+    }
+
+    // 2. Limpiar la referencia en progress_photos (poner la columna a null)
+    const update = {};
+    update[slot.col] = null;
+    const { error: dbErr } = await sb
+      .from('progress_photos')
+      .update(update)
+      .eq('id', revisionId);
+    if (dbErr){
+      console.error('update progress_photos (borrado) error:', dbErr);
+      showToast('✕ Foto borrada pero no se pudo actualizar la referencia');
+      return;
+    }
+
+    // 3. Actualizar en memoria y refrescar
+    rev[slot.col] = null;
+    renderClientPanel();
+    hydratePhotoUrls();
+    showToast('✓ Foto borrada');
+  } catch(e){
+    console.error('borrarFotoRevision exception:', e);
+    showToast('✕ Error al borrar la foto');
+  }
 }
 
 
@@ -4505,7 +4881,7 @@ function renderPerfil() {
   }
   return `<div style="display:flex;flex-direction:column;gap:14px">
     ${gridHtml}
-    ${cardPendiente('Fotos de progreso', 'Fotos de cada revisión organizadas por semana')}
+    ${cardFotosProgreso(c)}
     ${cardCuenta}
   </div>`;
 }

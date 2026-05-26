@@ -2342,7 +2342,7 @@ function statusFromLastSession(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2363,6 +2363,10 @@ function buildClientObject(row, index, lastSessionDate, questRow){
     _lastSessionDate: lastSessionDate || null,
     // Cuestionario inicial real (fila de client_questionnaire) o null si no existe
     _questionnaire: questRow || null,
+    // Mesociclo activo real (fila de mesocycles) o null
+    _mesocycle: mesoRow || null,
+    // Histórico de métricas diarias [{date, weight_kg}, ...] ordenado por fecha
+    _metrics: metricsRows || [],
     // ── Campos aún no conectados — plantilla neutra (bloques posteriores) ──
     weeks: 0, mesoWeeks: 12,
     alerts: [],
@@ -2425,9 +2429,41 @@ async function loadRealClients(){
       (quests || []).forEach(q => { questByClient[q.client_id] = q; });
     }
 
-    // 4. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    // 4. Mesociclo activo de cada cliente (tabla mesocycles)
+    let mesoByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: mesos } = await sb
+        .from('mesocycles')
+        .select('*')
+        .in('client_id', ids)
+        .eq('is_active', true);
+      (mesos || []).forEach(m => {
+        // si hubiera varios activos por error, nos quedamos con el primero
+        if (!mesoByClient[m.client_id]) mesoByClient[m.client_id] = m;
+      });
+    }
+
+    // 5. Métricas diarias de cada cliente (tabla daily_metrics) — para la
+    //    evolución del peso. Solo traemos fecha y peso, ordenadas por fecha.
+    let metricsByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: metrics } = await sb
+        .from('daily_metrics')
+        .select('client_id, date, weight_kg')
+        .in('client_id', ids)
+        .order('date', { ascending:true });
+      (metrics || []).forEach(m => {
+        if (m.weight_kg == null) return;
+        (metricsByClient[m.client_id] = metricsByClient[m.client_id] || []).push(m);
+      });
+    }
+
+    // 6. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
-      buildClientObject(row, i, lastByClient[row.id], questByClient[row.id]));
+      buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
+                        mesoByClient[row.id], metricsByClient[row.id]));
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
@@ -4144,6 +4180,150 @@ function cardPendiente(titulo, texto){
   </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 3B — Tarjetas reales de Mesociclo y Evolución del peso
+// ══════════════════════════════════════════════════════════════════════════
+
+// Calcula la semana actual del mesociclo y el progreso.
+// Devuelve null si no hay mesociclo.
+function mesoProgreso(meso){
+  if (!meso || !meso.start_date) return null;
+  const inicio = new Date(meso.start_date);
+  if (isNaN(inicio)) return null;
+  const total = meso.total_weeks || 0;
+  const dias = Math.floor((Date.now() - inicio.getTime()) / 86400000);
+  let semana = Math.floor(dias / 7) + 1;
+  if (semana < 1) semana = 1;
+  if (total && semana > total) semana = total;
+  const pct = total ? Math.round((semana / total) * 100) : 0;
+  return { semana, total, pct, inicio };
+}
+
+// Peso inicial del mesociclo: primer registro de daily_metrics cuya fecha
+// sea >= la fecha de inicio del meso. Devuelve null si no se puede calcular.
+function pesoInicialMeso(metrics, meso){
+  if (!meso || !meso.start_date || !metrics || !metrics.length) return null;
+  const inicio = new Date(meso.start_date);
+  if (isNaN(inicio)) return null;
+  // metrics viene ordenado por fecha ascendente
+  for (const m of metrics){
+    if (new Date(m.date) >= inicio && m.weight_kg != null){
+      return Number(m.weight_kg);
+    }
+  }
+  return null;
+}
+
+// ── TARJETA: Mesociclo actual ──
+function cardMesociclo(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
+  const datoStyle = 'background:var(--bg);border-radius:12px;padding:12px 14px';
+  const lblStyle  = 'font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px';
+  const valStyle  = 'font-size:14px;font-weight:600;color:var(--text);line-height:1.3';
+  const secTitle  = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
+
+  const meso = c._mesocycle;
+  const prog = mesoProgreso(meso);
+
+  if (!meso || !prog){
+    return `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="${secTitle}">Mesociclo actual</div>
+      </div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
+        Este cliente no tiene un mesociclo activo asignado.
+      </div>
+    </div>`;
+  }
+
+  return `<div style="${cardStyle}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="${secTitle}">Mesociclo actual</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="${datoStyle}"><div style="${lblStyle}">Nombre</div><div style="${valStyle}">${escHtml(meso.name||'Mesociclo')}</div></div>
+      <div style="${datoStyle}"><div style="${lblStyle}">Progreso</div><div style="${valStyle};color:var(--green)">Semana ${prog.semana} de ${prog.total}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="${datoStyle}"><div style="${lblStyle}">Fecha de inicio</div><div style="${valStyle}">${fmtFecha(meso.start_date)}</div></div>
+      <div style="${datoStyle}"><div style="${lblStyle}">Fecha de fin</div><div style="${valStyle}">${fmtFecha(meso.end_date)}</div></div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--text3)">Progreso del meso</span>
+        <span style="font-size:11px;font-weight:700;color:var(--green)">${prog.pct}%</span>
+      </div>
+      <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${prog.pct}%;background:var(--green);border-radius:3px"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── TARJETA: Evolución del peso ──
+// Agrupa las métricas por mes y dibuja un mini-gráfico de barras.
+function cardEvolucionPeso(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
+  const secTitle  = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
+
+  const metrics = c._metrics || [];
+
+  if (!metrics.length){
+    return `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="${secTitle}">Evolución del peso</div>
+      </div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
+        Aún no hay registros de peso de este cliente.
+      </div>
+    </div>`;
+  }
+
+  // Agrupar por mes (YYYY-MM): nos quedamos con el último peso de cada mes
+  const meses = {};
+  metrics.forEach(m => {
+    const key = String(m.date).slice(0,7); // YYYY-MM
+    meses[key] = Number(m.weight_kg); // como están ordenadas, el último gana
+  });
+  const claves = Object.keys(meses).sort();
+  // Mostrar como máximo los últimos 6 meses
+  const visibles = claves.slice(-6);
+  const valores = visibles.map(k => meses[k]);
+  const min = Math.min(...valores);
+  const max = Math.max(...valores);
+  const rango = (max - min) || 1;
+
+  const NOMBRES_MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  const barras = visibles.map((k, i) => {
+    const peso = valores[i];
+    const esUltimo = i === visibles.length - 1;
+    // altura proporcional: entre 16px y 38px
+    const altura = 16 + Math.round(((peso - min) / rango) * 22);
+    const mesNum = parseInt(k.slice(5,7), 10) - 1;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="height:${altura}px;width:100%;border-radius:4px 4px 0 0;background:${esUltimo?'var(--green)':'var(--bg3)'}"></div>
+      <div style="font-size:8.5px;color:${esUltimo?'var(--green)':'var(--text3)'};font-weight:${esUltimo?'700':'400'};text-align:center;line-height:1.2">${NOMBRES_MES[mesNum]||''}<br>${peso}</div>
+    </div>`;
+  }).join('');
+
+  // Cambio total en el rango visible
+  const cambio = (valores[valores.length-1] - valores[0]);
+  const cambioTxt = (cambio > 0 ? '+' : '') + cambio.toFixed(1) + ' kg';
+  const cambioColor = cambio > 0 ? 'var(--green)' : cambio < 0 ? 'var(--red)' : 'var(--text3)';
+
+  return `<div style="${cardStyle}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="${secTitle}">Evolución del peso</div>
+      <span style="font-size:11px;color:${cambioColor};font-weight:600">${cambioTxt}</span>
+    </div>
+    <div style="height:48px;display:flex;align-items:flex-end;gap:5px;margin-top:8px">
+      ${barras}
+    </div>
+  </div>`;
+}
+
+
 function renderPerfil() {
   const c = currentClient;
   const raw = c._raw || {};
@@ -4163,8 +4343,7 @@ function renderPerfil() {
   // ── TARJETA: Datos básicos ──
   const edadTxt = c.edad ? ` <span style="font-size:11px;color:var(--text3)">(${c.edad} años)</span>` : '';
   const meses = mesesDesde(raw.member_since);
-  const mesesTxt = meses !== null ? ` <span style="font-size:11px;color:var(--text3)">(${meses} ${meses===1?'mes':'meses'})</span>` : '';
-  const generoMap = { male:'Hombre', female:'Mujer', hombre:'Hombre', mujer:'Mujer', otro:'Otro', other:'Otro' };
+  const mesesTxt = meses !== null ? ` <span style="font-size:11px;color:var(--text3)">(${meses} ${meses===1?'mes':'meses'})</span>` : '';  const generoMap = { male:'Hombre', female:'Mujer', hombre:'Hombre', mujer:'Mujer', otro:'Otro', other:'Otro' };
   const genero = raw.gender ? (generoMap[String(raw.gender).toLowerCase()] || escHtml(raw.gender)) : '<span style="color:var(--text3);font-weight:400">Sin datos</span>';
 
   const cardDatos = `<div style="${cardStyle}">
@@ -4175,8 +4354,11 @@ function renderPerfil() {
       <div style="${datoStyle}"><div style="${lblStyle}">Nombre</div><div style="${valStyle}">${escHtml(c.name)}</div></div>
       <div style="${datoStyle}"><div style="${lblStyle}">Fecha de nacimiento</div><div style="${valStyle}">${fmtFecha(raw.birth_date)}${edadTxt}</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
       <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Altura</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${c.altura||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> cm</span></div></div>
+      <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso inicial<br><span style="font-size:8px;color:var(--text3)">del meso</span></div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${
+        (function(){ const pi = pesoInicialMeso(c._metrics, c._mesocycle); return pi != null ? pi : '—'; })()
+      }<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
       <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso actual</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--green)">${c.peso||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -4301,11 +4483,11 @@ function renderPerfil() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardSalud}
-        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
+        ${cardEvolucionPeso(c)}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardObjetivo}
-        ${cardPendiente('Mesociclo actual', 'Plan y progreso del mesociclo')}
+        ${cardMesociclo(c)}
       </div>
     </div>`;
   } else {
@@ -4316,8 +4498,8 @@ function renderPerfil() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardObjetivo}
-        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
-        ${cardPendiente('Mesociclo actual', 'Plan y progreso del mesociclo')}
+        ${cardEvolucionPeso(c)}
+        ${cardMesociclo(c)}
       </div>
     </div>`;
   }

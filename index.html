@@ -1382,14 +1382,22 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
-   LOGIN — lógica de la capa de acceso (FASE A: sin Supabase)
-   En esta fase cualquier email/contraseña válidos dejan entrar.
-   La conexión real a Supabase llegará en la Fase B.
+   LOGIN — lógica de la capa de acceso (FASE B · Bloque 1)
+   Conectado a Supabase: autenticación real + verificación de coach.
    ═══════════════════════════════════════════════════════════ */
+
+// ── Conexión a Supabase ──
+const SB_URL = 'https://zniepgmzwhbxpsztpvli.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpuaWVwZ216d2hieHBzenRwdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NzcxMzksImV4cCI6MjA5NTA1MzEzOX0.fYwxr4D6NYYxwSS-R37NoTEmCf_KkInWoOegSJP-rhk';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+// Datos del coach con sesión activa (los rellena el login real)
+let coachData = null;
 
 // URL de MyTracc — cambiar aquí si MyTracc se mueve de sitio
 const MYTRACC_URL = 'https://hugomen2001-create.github.io/MyTracc/mytracc.html';
@@ -1403,7 +1411,6 @@ function lgGoto(screen){
   document.querySelectorAll('.lg-screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('lg-screen-' + screen);
   if (el) el.classList.add('active');
-  // Limpiar errores al cambiar de pantalla
   if (screen === 'login') lgClearLoginError();
 }
 
@@ -1429,18 +1436,15 @@ function lgValidateLogin(){
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim());
   const pwdValid = pwd.value.length >= 1;
 
-  // Quitar estado de error en cuanto el usuario escribe
   email.classList.remove('error');
   pwd.classList.remove('error');
 
-  // Marca verde en email cuando es válido
   if (emailValid){ email.classList.add('ok'); emailOk.style.display = 'block'; }
   else { email.classList.remove('ok'); emailOk.style.display = 'none'; }
 
   if (pwdValid && emailValid) pwd.classList.add('ok');
   else pwd.classList.remove('ok');
 
-  // Halo verde en el botón cuando todo está listo
   btn.classList.toggle('ready', emailValid && pwdValid);
 }
 
@@ -1452,17 +1456,20 @@ function lgClearLoginError(){
   document.getElementById('lg-pwd').classList.remove('error');
 }
 
-function lgShowLoginError(msg){
-  const sub = document.getElementById('lg-login-sub');
-  sub.textContent = 'Revisa tus datos e inténtalo de nuevo';
-  sub.classList.add('err');
+function lgShowLoginError(msg, sub){
+  const subEl = document.getElementById('lg-login-sub');
+  subEl.textContent = 'Revisa tus datos e inténtalo de nuevo';
+  subEl.classList.add('err');
   document.getElementById('lg-login-err-txt').textContent = msg || 'Email o contraseña incorrectos';
-  document.getElementById('lg-login-err').style.display = 'flex';
+  // El subtexto del banner es opcional
+  const errBanner = document.getElementById('lg-login-err');
+  const subNode = errBanner.querySelector('.lg-err-sub');
+  if (subNode) subNode.textContent = sub || 'Comprueba que no hay errores tipográficos';
+  errBanner.style.display = 'flex';
   document.getElementById('lg-email').classList.add('error');
   document.getElementById('lg-pwd').classList.add('error');
   document.getElementById('lg-email').classList.remove('ok');
   document.getElementById('lg-pwd').classList.remove('ok');
-  // Botón vuelve a "Intentar de nuevo"
   const btn = document.getElementById('lg-login-btn');
   btn.classList.remove('loading');
   btn.classList.remove('ready');
@@ -1488,45 +1495,85 @@ function lgClearLoginLoading(){
   document.getElementById('lg-login-btn-label').textContent = 'Entrar al panel';
 }
 
-// ── Acción: iniciar sesión (FASE A — sin verificación real) ──
-function lgDoLogin(){
+// ── Acción: iniciar sesión (REAL — Supabase) ──
+async function lgDoLogin(){
   const email = document.getElementById('lg-email').value.trim();
   const pwd = document.getElementById('lg-pwd').value;
 
-  // Validación de formato — en Fase A esto es lo único que se comprueba
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  if (!emailValid){
-    lgShowLoginError('Introduce un email válido');
-    return;
-  }
-  if (pwd.length < 1){
-    lgShowLoginError('Introduce tu contraseña');
-    return;
-  }
+  if (!emailValid){ lgShowLoginError('Introduce un email válido'); return; }
+  if (pwd.length < 1){ lgShowLoginError('Introduce tu contraseña'); return; }
 
-  // Simular verificación
   lgSetLoginLoading();
-  setTimeout(() => {
+
+  try {
+    // 1. Autenticar contra Supabase
+    const { data: authData, error: authErr } =
+      await sb.auth.signInWithPassword({ email, password: pwd });
+
+    if (authErr){
+      lgClearLoginLoading();
+      // Mensaje claro según el tipo de error
+      if ((authErr.message || '').toLowerCase().includes('invalid')){
+        lgShowLoginError('Email o contraseña incorrectos');
+      } else if ((authErr.message || '').toLowerCase().includes('confirm')){
+        lgShowLoginError('Cuenta sin confirmar', 'Revisa tu email para confirmar la cuenta');
+      } else {
+        lgShowLoginError('No se pudo iniciar sesión', authErr.message || 'Inténtalo de nuevo');
+      }
+      return;
+    }
+
+    // 2. Verificar que el usuario es un entrenador (existe en la tabla coaches)
+    const ok = await lgVerifyCoach(authData.user.id);
+    if (!ok){
+      // No es coach → cerramos la sesión que se acaba de abrir y avisamos
+      await sb.auth.signOut();
+      lgClearLoginLoading();
+      lgShowLoginError('Esta cuenta no es de entrenador',
+        'El acceso a Tracc es solo para entrenadores');
+      return;
+    }
+
+    // 3. Todo correcto → entrar
     lgClearLoginLoading();
-    // FASE A: cualquier credencial con formato correcto entra.
-    // El nombre que se muestra se deriva del email (provisional).
-    const nombre = lgNameFromEmail(email);
-    lgEnterApp(nombre);
-  }, 1100);
+    lgEnterApp(coachData.name);
+
+  } catch(e){
+    console.error('Login error:', e);
+    lgClearLoginLoading();
+    lgShowLoginError('Error de conexión', 'Comprueba tu conexión a internet');
+  }
 }
 
-function lgNameFromEmail(email){
-  // pol@tracc.app -> "Pol"  ·  hugo.mengual@x.com -> "Hugo"
-  const local = (email.split('@')[0] || 'Entrenador').split(/[._-]/)[0];
-  return local.charAt(0).toUpperCase() + local.slice(1);
+// Verifica que el user_id corresponde a un coach. Rellena coachData.
+async function lgVerifyCoach(userId){
+  try {
+    const { data, error } = await sb
+      .from('coaches')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error){ console.error('verifyCoach error:', error); return false; }
+    if (!data) return false;
+    coachData = data;
+    return true;
+  } catch(e){
+    console.error('verifyCoach exception:', e);
+    return false;
+  }
 }
 
 // ── Transición de éxito → dashboard ──
 function lgEnterApp(nombre){
-  document.getElementById('lg-success-title').textContent = '¡Hola, ' + nombre + '!';
+  // Primer nombre para el saludo
+  const primer = (nombre || 'Entrenador').split(' ')[0];
+  document.getElementById('lg-success-title').textContent = '¡Hola, ' + primer + '!';
   lgGoto('success');
 
-  // Animar barra de progreso y los 3 pasos
+  // Reflejar el nombre real del coach en el dashboard
+  lgApplyCoachToDashboard();
+
   const fill = document.getElementById('lg-progress');
   const pct = document.getElementById('lg-progress-pct');
   const steps = [
@@ -1555,9 +1602,24 @@ function lgEnterApp(nombre){
   }, 2150);
 }
 
+// Vuelca el nombre real del coach en la tarjeta del sidebar
+function lgApplyCoachToDashboard(){
+  if (!coachData) return;
+  const nameEl = document.querySelector('.coach-name');
+  const avEl = document.querySelector('.coach-card .avatar');
+  if (nameEl) nameEl.textContent = coachData.name || 'Entrenador';
+  if (avEl){
+    const initials = (coachData.name || 'E').split(' ')
+      .map(w => w[0]).slice(0,2).join('').toUpperCase();
+    avEl.textContent = initials;
+  }
+}
+
 // ── Cerrar sesión → vuelve al login ──
-function lgLogout(){
-  // Reset del formulario de login
+async function lgLogout(){
+  try { await sb.auth.signOut(); } catch(e){ console.error('signOut error:', e); }
+  coachData = null;
+
   document.getElementById('lg-email').value = '';
   document.getElementById('lg-pwd').value = '';
   document.getElementById('lg-email').classList.remove('ok','error');
@@ -1566,21 +1628,18 @@ function lgLogout(){
   lgClearLoginError();
   document.getElementById('lg-login-btn').classList.remove('ready');
   document.getElementById('lg-login-btn-label').textContent = 'Entrar al panel';
-  // Reset progreso de éxito
   document.getElementById('lg-progress').style.width = '0%';
   document.getElementById('lg-progress-pct').textContent = '0%';
-  // Volver a mostrar la capa en la pantalla de login
   lgGoto('login');
   document.getElementById('login-layer').classList.remove('hidden');
 }
 
-// ── Recuperar contraseña — paso 1 ──
-function lgDoRecover(isResend){
+// ── Recuperar contraseña — paso 1 (REAL) ──
+async function lgDoRecover(isResend){
   const email = document.getElementById('lg-recover-email').value.trim();
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   if (!emailValid && !isResend){
-    const inp = document.getElementById('lg-recover-email');
-    inp.classList.add('error');
+    document.getElementById('lg-recover-email').classList.add('error');
     return;
   }
   const btn = document.getElementById('lg-recover-btn');
@@ -1589,14 +1648,25 @@ function lgDoRecover(isResend){
     document.getElementById('lg-recover-btn-label').innerHTML =
       '<span class="lg-spin" style="margin-right:2px"></span>Enviando...';
   }
-  setTimeout(() => {
-    if (btn){
-      btn.classList.remove('loading');
-      document.getElementById('lg-recover-btn-label').textContent = 'Enviar enlace de recuperación';
-    }
-    document.getElementById('lg-recover-email-shown').textContent = email || 'tu email';
-    lgGoto('recover2');
-  }, 900);
+
+  try {
+    // Supabase envía el email con un enlace que vuelve a esta misma app.
+    // redirectTo debe estar dado de alta en Authentication → URL Configuration.
+    await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+  } catch(e){
+    console.error('resetPassword error:', e);
+    // Por seguridad no revelamos si el email existe o no:
+    // siempre mostramos la pantalla de "email enviado".
+  }
+
+  if (btn){
+    btn.classList.remove('loading');
+    document.getElementById('lg-recover-btn-label').textContent = 'Enviar enlace de recuperación';
+  }
+  document.getElementById('lg-recover-email-shown').textContent = email || 'tu email';
+  lgGoto('recover2');
 }
 
 // ── Nueva contraseña — validadores ──
@@ -1619,25 +1689,47 @@ function lgValidateNewPwd(){
   return allOk;
 }
 
-function lgDoNewPwd(){
+// ── Guardar nueva contraseña (REAL) ──
+async function lgDoNewPwd(){
   if (!lgValidateNewPwd()) return;
   const btn = document.getElementById('lg-newpwd-btn');
+  const label = document.getElementById('lg-newpwd-btn-label');
   btn.classList.add('loading');
-  document.getElementById('lg-newpwd-btn-label').innerHTML =
-    '<span class="lg-spin" style="margin-right:2px"></span>Guardando...';
-  setTimeout(() => {
+  label.innerHTML = '<span class="lg-spin" style="margin-right:2px"></span>Guardando...';
+
+  try {
+    const newPwd = document.getElementById('lg-new-pwd').value;
+    const { error } = await sb.auth.updateUser({ password: newPwd });
     btn.classList.remove('loading');
-    document.getElementById('lg-newpwd-btn-label').textContent = 'Guardar contraseña';
-    // Tras guardar, volver al login
+    if (error){
+      label.textContent = 'Guardar contraseña';
+      lgNewPwdError(error.message || 'No se pudo guardar. El enlace puede haber caducado.');
+      return;
+    }
+    label.textContent = 'Guardar contraseña';
+    // Limpiar el token de recuperación de la URL y volver al login
     document.getElementById('lg-new-pwd').value = '';
     document.getElementById('lg-new-pwd2').value = '';
     lgValidateNewPwd();
+    history.replaceState(null, '', window.location.pathname);
     lgGoto('login');
-  }, 1000);
+    // Aviso de éxito
+    const sub = document.getElementById('lg-login-sub');
+    sub.textContent = 'Contraseña actualizada · ya puedes entrar';
+  } catch(e){
+    console.error('updateUser error:', e);
+    btn.classList.remove('loading');
+    label.textContent = 'Guardar contraseña';
+    lgNewPwdError('Error de conexión. Inténtalo de nuevo.');
+  }
 }
 
-// ── Solicitar acceso (entrenador nuevo) — FASE A: sin Supabase ──
-// En Fase B esto guardará la solicitud en la tabla coach_applications.
+function lgNewPwdError(msg){
+  const sub = document.querySelector('#lg-screen-newpwd .lg-form-sub');
+  if (sub){ sub.textContent = msg; sub.classList.add('err'); }
+}
+
+// ── Solicitar acceso (entrenador nuevo) — REAL: tabla coach_applications ──
 function lgValidateApply(){
   const name = document.getElementById('lg-apply-name').value.trim();
   const email = document.getElementById('lg-apply-email').value.trim();
@@ -1654,7 +1746,7 @@ function lgValidateApply(){
   return { nameOk, emailOk, phoneOk, clientsOk, allOk };
 }
 
-function lgDoApply(){
+async function lgDoApply(){
   const v = lgValidateApply();
   const fields = [
     ['lg-apply-name', v.nameOk],
@@ -1662,28 +1754,38 @@ function lgDoApply(){
     ['lg-apply-phone', v.phoneOk],
     ['lg-apply-clients', v.clientsOk],
   ];
-  // Marcar en rojo los campos que faltan
   let firstBad = null;
   fields.forEach(([id, ok]) => {
     const el = document.getElementById(id);
     el.classList.toggle('error', !ok);
     if (!ok && !firstBad) firstBad = el;
   });
-  if (!v.allOk){
-    if (firstBad) firstBad.focus();
-    return;
-  }
+  if (!v.allOk){ if (firstBad) firstBad.focus(); return; }
 
   const btn = document.getElementById('lg-apply-btn');
+  const label = document.getElementById('lg-apply-btn-label');
   btn.classList.add('loading');
-  document.getElementById('lg-apply-btn-label').innerHTML =
-    '<span class="lg-spin" style="margin-right:2px"></span>Enviando...';
+  label.innerHTML = '<span class="lg-spin" style="margin-right:2px"></span>Enviando...';
 
-  // FASE A: simulamos el envío. En Fase B se inserta en coach_applications.
-  setTimeout(() => {
+  try {
+    const { error } = await sb.from('coach_applications').insert({
+      name:  document.getElementById('lg-apply-name').value.trim(),
+      email: document.getElementById('lg-apply-email').value.trim(),
+      phone: document.getElementById('lg-apply-phone').value.trim(),
+      clients_range: document.getElementById('lg-apply-clients').value,
+      about: document.getElementById('lg-apply-about').value.trim() || null
+    });
+
     btn.classList.remove('loading');
-    document.getElementById('lg-apply-btn-label').textContent = 'Enviar solicitud';
-    // Limpiar formulario
+    label.textContent = 'Enviar solicitud';
+
+    if (error){
+      console.error('apply insert error:', error);
+      lgApplyError('No se pudo enviar la solicitud. Inténtalo de nuevo.');
+      return;
+    }
+
+    // Limpiar formulario y mostrar confirmación
     ['lg-apply-name','lg-apply-email','lg-apply-phone','lg-apply-about'].forEach(id => {
       document.getElementById(id).value = '';
       document.getElementById(id).classList.remove('error');
@@ -1692,20 +1794,66 @@ function lgDoApply(){
     document.getElementById('lg-apply-clients').classList.remove('error');
     btn.classList.remove('ready');
     lgGoto('applied');
-  }, 1100);
+
+  } catch(e){
+    console.error('apply exception:', e);
+    btn.classList.remove('loading');
+    label.textContent = 'Enviar solicitud';
+    lgApplyError('Error de conexión. Comprueba tu conexión a internet.');
+  }
 }
 
-/* Detección del enlace de recuperación en la URL.
-   En Fase B, Supabase añade un token tipo #type=recovery a la URL;
-   aquí dejamos preparado el gancho para mostrar la pantalla de nueva
-   contraseña directamente. De momento solo reacciona a ?screen=newpwd
-   para poder probar esa pantalla manualmente. */
-(function lgCheckRecoveryLink(){
+function lgApplyError(msg){
+  const sub = document.querySelector('#lg-screen-apply .lg-form-sub');
+  if (sub){ sub.textContent = msg; sub.classList.add('err'); }
+}
+
+// ── Arranque del login ──
+// 1. Si la URL trae un token de recuperación → pantalla de nueva contraseña.
+// 2. Si hay sesión activa y es coach → autologin (entra directo).
+// 3. Si no → pantalla de login normal.
+(async function lgBoot(){
+  // 1. ¿Enlace de recuperación de contraseña?
+  //    Supabase devuelve el token en el hash de la URL (#...type=recovery...)
+  const hash = window.location.hash || '';
+  const isRecovery = hash.includes('type=recovery');
+
+  // Atajo de prueba manual de la pantalla (?screen=newpwd)
   const params = new URLSearchParams(window.location.search);
   if (params.get('screen') === 'newpwd'){
     lgGoto('newpwd');
+    return;
   }
+
+  if (isRecovery){
+    // Supabase abre una sesión temporal con el token; mostramos "nueva contraseña"
+    lgGoto('newpwd');
+    return;
+  }
+
+  // 2. ¿Sesión ya activa? → autologin
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user){
+      const ok = await lgVerifyCoach(session.user.id);
+      if (ok){
+        // Entrar directo, sin animación larga
+        lgApplyCoachToDashboard();
+        document.getElementById('login-layer').classList.add('hidden');
+        return;
+      } else {
+        // Hay sesión pero no es coach → cerrarla
+        await sb.auth.signOut();
+      }
+    }
+  } catch(e){
+    console.error('autologin error:', e);
+  }
+
+  // 3. Login normal
+  lgGoto('login');
 })();
+
 
 
 // ── CONFIG ────────────────────────────────────────────────────────────────

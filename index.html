@@ -4445,11 +4445,15 @@ function revisionColumna(c, rev){
   }).join('');
 
   return `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
-    <div style="padding:9px 12px;background:var(--bg);display:flex;align-items:center;justify-content:between">
-      <div style="flex:1">
+    <div style="padding:9px 12px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="flex:1;min-width:0">
         <div style="font-size:11.5px;font-weight:700;color:var(--text)">Semana ${rev.revision_week ?? '—'}</div>
         <div style="font-size:10px;color:var(--text3)">${cabFecha || 'Sin fecha'}</div>
       </div>
+      <button onclick="eliminarRevision('${rev.id}')" title="Eliminar esta revisión"
+        style="flex-shrink:0;width:24px;height:24px;border-radius:7px;background:var(--bg2);border:1.5px solid var(--border);color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </button>
     </div>
     <div style="padding:10px 12px">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">${slots}</div>
@@ -4696,6 +4700,65 @@ async function borrarFotoRevision(revisionId, slotKey){
   } catch(e){
     console.error('borrarFotoRevision exception:', e);
     showToast('✕ Error al borrar la foto');
+  }
+}
+
+// ── Eliminar una revisión completa ──
+// Pide confirmación, borra del Storage las fotos que tenga y elimina la
+// fila de progress_photos. Borrado en cascada: revisión + sus fotos.
+async function eliminarRevision(revisionId){
+  const rev = (currentClient._photos || []).find(r => r.id === revisionId);
+  if (!rev) return;
+
+  // Reunir las rutas de fotos que tenga esta revisión
+  const rutas = PHOTO_SLOTS
+    .map(s => rev[s.col])
+    .filter(Boolean);
+
+  const nFotos = rutas.length;
+  const msgFotos = nFotos > 0
+    ? `\nSe borrarán también sus ${nFotos} ${nFotos===1?'foto':'fotos'}.`
+    : '';
+  const ok = window.confirm(
+    `¿Eliminar la revisión de la semana ${rev.revision_week ?? '—'}?` +
+    msgFotos +
+    `\nEsta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+
+  showToast('Eliminando revisión...');
+  try {
+    // 1. Borrar del Storage las fotos de la revisión (si tiene)
+    if (rutas.length){
+      const { error: rmErr } = await sb.storage
+        .from(PHOTOS_BUCKET)
+        .remove(rutas);
+      if (rmErr){
+        console.error('remove storage (revisión) error:', rmErr);
+        showToast('✕ No se pudieron borrar las fotos de la revisión');
+        return;
+      }
+    }
+
+    // 2. Borrar la fila de progress_photos
+    const { error: dbErr } = await sb
+      .from('progress_photos')
+      .delete()
+      .eq('id', revisionId);
+    if (dbErr){
+      console.error('delete progress_photos error:', dbErr);
+      showToast('✕ No se pudo eliminar la revisión');
+      return;
+    }
+
+    // 3. Quitar la revisión de la memoria y refrescar
+    currentClient._photos = (currentClient._photos || []).filter(r => r.id !== revisionId);
+    renderClientPanel();
+    hydratePhotoUrls();
+    showToast('✓ Revisión eliminada');
+  } catch(e){
+    console.error('eliminarRevision exception:', e);
+    showToast('✕ Error al eliminar la revisión');
   }
 }
 

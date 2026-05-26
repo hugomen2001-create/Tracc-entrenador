@@ -2342,7 +2342,7 @@ function statusFromLastSession(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2369,6 +2369,8 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     _metrics: metricsRows || [],
     // Revisiones con fotos de progreso [{revision_week, revision_date, ...}, ...]
     _photos: photosRows || [],
+    // Plan de nutrición real: { plan:{...}, options:[...] } o null si no tiene
+    _nutrition: nutrition || null,
     // ── Campos aún no conectados — plantilla neutra (bloques posteriores) ──
     weeks: 0, mesoWeeks: 12,
     alerts: [],
@@ -2479,11 +2481,44 @@ async function loadRealClients(){
       });
     }
 
-    // 7. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    // 7. Plan de nutrición activo de cada cliente + sus opciones de dieta.
+    //    nutrition_plans = el plan (macros, kcal); nutrition_options = las
+    //    opciones de dieta de ese plan (cada una con sus comidas en 'meals').
+    let nutritionByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: nplans } = await sb
+        .from('nutrition_plans')
+        .select('*')
+        .in('client_id', ids)
+        .eq('is_active', true);
+      const planList = nplans || [];
+      // Opciones de todos esos planes, en una sola consulta
+      let optsByPlan = {};
+      if (planList.length){
+        const planIds = planList.map(p => p.id);
+        const { data: nopts } = await sb
+          .from('nutrition_options')
+          .select('*')
+          .in('nutrition_plan_id', planIds)
+          .order('option_number', { ascending:true });
+        (nopts || []).forEach(o => {
+          (optsByPlan[o.nutrition_plan_id] = optsByPlan[o.nutrition_plan_id] || []).push(o);
+        });
+      }
+      planList.forEach(p => {
+        // si por error hubiera más de un plan activo, nos quedamos con el primero
+        if (!nutritionByClient[p.client_id]){
+          nutritionByClient[p.client_id] = { plan:p, options: optsByPlan[p.id] || [] };
+        }
+      });
+    }
+
+    // 8. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
-                        photosByClient[row.id]));
+                        photosByClient[row.id], nutritionByClient[row.id]));
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
@@ -3081,6 +3116,7 @@ function selectClient(id) {
   editPlan = null;
   weekOffset = 0;
   segWeekOffset = 0;
+  editNutriOpcion = 0;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -5735,18 +5771,173 @@ function saveChanges() {
 }
 
 // ── TAB: EDITAR ───────────────────────────────────────────────────────────
-function renderEditar() {
-  const c  = currentClient;
-  const ds = getDietState(c.id);
-  const ts = getTrainState(c.id);
-  if (!ds.params) ds.params = { kcal:c.diet?.kcalGoal||2000, ch:245, g:40, p:155, preferencias:'', restricciones:'' };
-  if (!editPlan)  editPlan  = JSON.parse(JSON.stringify(c.planEntrenamiento));
-  if (!ts.split.length) initSplit(c.id, ts.splitDays||7);
-  const dbTotal = ts.exerciseDB && typeof ts.exerciseDB === 'object' ? Object.values(ts.exerciseDB).flat().length : 0;
-  const today = new Date().toISOString().split('T')[0];
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 5A — EDITAR PLAN · Sección Plan Nutricional (lectura)
+// Lee el plan de nutrición real del cliente desde Supabase:
+//   c._nutrition = { plan:{...}, options:[{option_number, name, meals, ...}] }
+// 'meals' es un objeto { Desayuno:{items:[...]}, Comida:{...}, ... }
+// Cada item: { name, grams, kcal, protein, carbs, fat }
+// ══════════════════════════════════════════════════════════════════════════
 
-  return `
-    <!-- NOTAS DE REVISIÓN -->
+// Qué opción de dieta está seleccionada en el tab Editar plan (índice)
+let editNutriOpcion = 0;
+
+const COMIDAS_ORDEN = ['Desayuno','Comida','Merienda','Cena'];
+
+// Suma kcal y macros de todos los alimentos de una opción de dieta.
+function totalesOpcion(opt){
+  const t = { kcal:0, protein:0, carbs:0, fat:0, nItems:0 };
+  const meals = opt && opt.meals ? opt.meals : {};
+  Object.keys(meals).forEach(comida => {
+    const items = (meals[comida] && meals[comida].items) || [];
+    items.forEach(it => {
+      t.kcal    += Number(it.kcal)    || 0;
+      t.protein += Number(it.protein) || 0;
+      t.carbs   += Number(it.carbs)   || 0;
+      t.fat     += Number(it.fat)     || 0;
+      t.nItems++;
+    });
+  });
+  return t;
+}
+
+// Sección completa de Plan Nutricional para el tab Editar plan
+function seccionPlanNutricional(c){
+  const nut = c._nutrition;
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px';
+  const secTitle  = 'font-size:13px;font-weight:700;color:var(--text)';
+
+  // Sin plan de nutrición
+  if (!nut || !nut.plan){
+    return `<div style="${cardStyle};margin-bottom:18px">
+      <div style="${secTitle};margin-bottom:6px">🥗 Plan nutricional</div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
+        Este cliente todavía no tiene un plan de nutrición.
+      </div>
+    </div>`;
+  }
+
+  const plan = nut.plan;
+  const opciones = nut.options || [];
+
+  // ── Objetivos (macros / kcal del plan) ──
+  const objetivo = (lbl, val, unidad, color) => `
+    <div style="background:var(--bg);border-radius:11px;padding:10px 12px;text-align:center;flex:1">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:3px">${lbl}</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${color||'var(--text)'}">${val ?? '—'}<span style="font-size:11px;font-weight:400;color:var(--text3)">${unidad||''}</span></div>
+    </div>`;
+
+  const objetivosHtml = `<div style="display:flex;gap:8px;margin-bottom:6px">
+    ${objetivo('Calorías', plan.kcal_goal, ' kcal', 'var(--green)')}
+    ${objetivo('Proteína', plan.protein_g, ' g', 'var(--text)')}
+    ${objetivo('Carbohid.', plan.carbs_g, ' g', 'var(--text)')}
+    ${objetivo('Grasa', plan.fat_g, ' g', 'var(--text)')}
+  </div>`;
+
+  // Estilo / preferencias / restricciones
+  const meta = [];
+  if (plan.style)        meta.push(`<span style="opacity:.6">Estilo:</span> ${escHtml(plan.style)}`);
+  if (plan.preferences)  meta.push(`<span style="opacity:.6">Preferencias:</span> ${escHtml(plan.preferences)}`);
+  if (plan.restrictions) meta.push(`<span style="opacity:.6">Restricciones:</span> ${escHtml(plan.restrictions)}`);
+  const metaHtml = meta.length
+    ? `<div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:14px">${meta.join('')}</div>`
+    : '';
+
+  // ── Opciones de dieta ──
+  let opcionesHtml;
+  if (!opciones.length){
+    opcionesHtml = `<div style="font-size:12px;color:var(--text3);padding:12px;background:var(--bg);border-radius:11px">
+      El plan aún no tiene opciones de dieta.
+    </div>`;
+  } else {
+    // Acotar el índice seleccionado por si cambió de cliente
+    if (editNutriOpcion >= opciones.length) editNutriOpcion = 0;
+
+    // Pestañas: "Opción 1, 2, 3..." (usamos option_number, no el name)
+    const pills = opciones.map((o,i) => {
+      const activa = i === editNutriOpcion;
+      return `<button onclick="seleccionarOpcionNutri(${i})" style="
+        height:30px;padding:0 13px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;
+        border:1.5px solid ${activa?'var(--green)':'var(--border)'};
+        background:${activa?'var(--green)':'var(--bg2)'};
+        color:${activa?'#fff':'var(--text2)'}">Opción ${o.option_number ?? (i+1)}</button>`;
+    }).join('');
+
+    // Contenido de la opción seleccionada
+    const opt = opciones[editNutriOpcion];
+    const tot = totalesOpcion(opt);
+    const meals = opt.meals || {};
+
+    // Comidas en orden; primero las conocidas, luego cualquier otra que haya
+    const clavesComida = COMIDAS_ORDEN.filter(k => meals[k])
+      .concat(Object.keys(meals).filter(k => !COMIDAS_ORDEN.includes(k)));
+
+    const comidasHtml = clavesComida.map(comida => {
+      const items = (meals[comida] && meals[comida].items) || [];
+      const kcalComida = items.reduce((s,it)=>s+(Number(it.kcal)||0),0);
+      const filas = items.map(it => `
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--text)">${escHtml(it.name||'—')}</span>
+          <span style="font-size:12px;color:var(--text3);white-space:nowrap;padding-left:10px">${it.grams!=null?escHtml(it.grams)+' g':''}</span>
+        </div>`).join('') || `<div style="font-size:11px;color:var(--text3);padding:5px 0">Sin alimentos</div>`;
+      return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+          <span style="font-size:11.5px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--green)">${kcalComida} kcal</span>
+        </div>
+        ${filas}
+      </div>`;
+    }).join('');
+
+    opcionesHtml = `
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1;background:var(--gl);border-radius:10px;padding:8px 11px;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--green);opacity:.8">Total opción</div>
+          <div style="font-size:16px;font-weight:700;color:var(--green)">${tot.kcal} kcal</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Proteína</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.protein)} g</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Carbohid.</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.carbs)} g</div>
+        </div>
+        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Grasa</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.fat)} g</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${comidasHtml}</div>`;
+  }
+
+  return `<div style="${cardStyle};margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="${secTitle}">🥗 Plan nutricional</div>
+      <span style="font-size:10px;color:var(--text3)">${opciones.length} ${opciones.length===1?'opción':'opciones'} de dieta</span>
+    </div>
+    ${objetivosHtml}
+    ${metaHtml}
+    <div style="height:1px;background:var(--border);margin:14px 0"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Opciones de dieta</div>
+    ${opcionesHtml}
+  </div>`;
+}
+
+// Cambia la opción de dieta mostrada
+function seleccionarOpcionNutri(i){
+  editNutriOpcion = i;
+  renderClientPanel();
+}
+
+
+function renderEditar() {
+  const c = currentClient;
+
+  // ── Notas de revisión (se mantienen con su lógica demo; se conectarán
+  //    a Supabase en un bloque posterior) ──
+  const notasHtml = `
     <div class="edit-section" style="margin-bottom:20px">
       <div class="edit-section-hdr">
         <div class="edit-section-title">📋 Notas de revisión</div>
@@ -5771,116 +5962,27 @@ function renderEditar() {
           }
         </div>
       </div>
-    </div>
-
-    <!-- PLAN NUTRICIONAL -->
-    <div class="edit-section" style="margin-bottom:20px">
-      <div class="edit-section-hdr">
-        <div class="edit-section-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:5px"><path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.375a3.75 3.75 0 0 0 3.75-3.75v-1.5a3.75 3.75 0 0 0-3.75-3.75h-.375v-1.5h.375a1.875 1.875 0 0 0 0-3.75h-.375V2.25h.375Zm-9.75 0c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.375a3.75 3.75 0 0 0 3.75-3.75v-1.5a3.75 3.75 0 0 0-3.75-3.75h-.375v-1.5h.375a1.875 1.875 0 0 0 0-3.75h-.375V2.25h.375ZM5.25 6.375a1.875 1.875 0 0 1 3.75 0v.75h-3.75v-.75Zm13.5 0a1.875 1.875 0 0 1 3.75 0v.75h-3.75v-.75Z"/></svg>
-          Plan nutricional
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${ds.opciones?.length ? `<span style="font-size:11px;color:var(--green);font-weight:500">✓ ${ds.opciones.length} opciones generadas</span>` : ''}
-        </div>
-      </div>
-      <div class="diet-setup" style="margin-bottom:14px">
-        <div class="diet-setup-title">
-          <span style="width:20px;height:20px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
-          Objetivos nutricionales
-        </div>
-        <div class="diet-params">
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Kcal/día <span style="color:var(--text3);font-weight:400">(opcional — se calcula de los macros)</span></div>
-            <input class="edit-input" type="number" id="dp-kcal" value="${ds.params.kcal||''}" placeholder="Auto" style="width:100%">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Carbos (g)</div>
-            <input class="edit-input" type="number" id="dp-ch" value="${ds.params.ch}" style="width:100%">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Grasa (g)</div>
-            <input class="edit-input" type="number" id="dp-g" value="${ds.params.g}" style="width:100%">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Proteína (g)</div>
-            <input class="edit-input" type="number" id="dp-p" value="${ds.params.p}" style="width:100%">
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Preferencias alimentarias</div>
-            <input class="edit-input" id="dp-pref" value="${ds.params.preferencias||''}" placeholder="Ej: sin gluten, vegetariano..." style="width:100%">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Restricciones / alergias</div>
-            <input class="edit-input" id="dp-rest" value="${ds.params.restricciones||''}" placeholder="Ej: alergia a frutos secos..." style="width:100%">
-          </div>
-        </div>
-        <button class="ai-btn" id="gen-diet-btn" onclick="generateDietWithAI()" style="width:100%">
-          ✦ Generar plan nutricional con IA
-        </button>
-      </div>
-      ${ds.opciones?.length ? renderDietOpciones(ds) : renderDietEmpty()}
-    </div>
-
-    <!-- PLAN DE ENTRENAMIENTO -->
-    <div class="edit-section">
-      <div class="edit-section-hdr">
-        <div class="edit-section-title"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:5px"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43Z"/></svg> Plan de entrenamiento</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${dbTotal>0?`<span style="font-size:11px;color:var(--green);font-weight:500">✓ ${dbTotal} ejercicios importados</span>`:''}
-          <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="openTemplatesModal()">📋 Plantillas</button>
-          <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="openImportModal()"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M7.502 6h7.128A3.375 3.375 0 0 1 18 9.375v9.375a3 3 0 0 0 3-3V6.108c0-1.505-1.125-2.811-2.664-2.94a48.972 48.972 0 0 0-.673-.05A3 3 0 0 0 15 1.5h-1.5a3 3 0 0 0-2.663 1.618c-.225.015-.45.032-.673.05C8.662 3.295 7.554 4.542 7.502 6ZM13.5 3A1.5 1.5 0 0 0 12 4.5h4.5A1.5 1.5 0 0 0 15 3h-1.5Z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M3 9.375C3 8.339 3.84 7.5 4.875 7.5h9.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V9.375Zm9.586 4.594a.75.75 0 0 0-1.172-.938l-2.476 3.096-.908-.907a.75.75 0 0 0-1.06 1.06l1.5 1.5a.75.75 0 0 0 1.116-.062l3-3.75Z" clip-rule="evenodd"/></svg> Importar lista</button>
-          <button class="ai-btn" style="font-size:11px;padding:5px 10px" onclick="generateAllDaysAI()">✦ Generar todo con IA</button>
-        </div>
-      </div>
-      <div class="diet-setup" style="margin-bottom:14px">
-        <div class="diet-setup-title">
-          <span style="width:20px;height:20px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
-          Duración del split
-        </div>
-        <div class="split-picker">
-          ${[7,10,12].map(d=>`<button class="split-btn${ts.splitDays===d?' active':''}" onclick="changeSplitDays(${d})">${d} días</button>`).join('')}
-        </div>
-      </div>
-      <div class="diet-setup" style="margin-bottom:14px">
-        <div class="diet-setup-title">
-          <span style="width:20px;height:20px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
-          Distribución del split
-        </div>
-        <div class="split-grid" style="grid-template-columns:repeat(${ts.splitDays<=7?1:2},1fr);gap:6px">
-          ${ts.split.map((d,i)=>renderSplitDayRow(d,i,c.id)).join('')}
-        </div>
-      </div>
-      ${ts.openDay !== null ? renderDayDetail(ts, c) : renderDayListSummary(ts, c)}
-    </div>
-
-    <!-- BOTONES GUARDAR -->
-    <div style="margin-top:20px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <button onclick="saveTemplate()" style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'Geist',sans-serif;display:flex;align-items:center;gap:5px">
-          💾 Guardar como plantilla
-        </button>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center">
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">Programar activación</div>
-        <input type="date" id="apply-date" class="edit-input" style="width:100%;max-width:200px">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Deja vacío para activar hoy</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        <button class="ai-btn secondary" style="padding:9px 16px;font-size:13px" onclick="saveChanges()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;margin-right:5px"><path d="M12 2.25a.75.75 0 0 1 .75.75v11.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 1 1 1.06-1.06l3.22 3.22V3a.75.75 0 0 1 .75-.75Zm-9 13.5a.75.75 0 0 1 .75.75v2.25a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5a.75.75 0 0 1 1.5 0v2.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V16.5a.75.75 0 0 1 .75-.75Z"/></svg>
-          Guardar y notificar cliente
-        </button>
-        <button class="ai-btn" style="padding:9px 16px;font-size:13px" onclick="applyNow()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;margin-right:5px"><path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clip-rule="evenodd"/></svg>
-          Actualizar ahora
-        </button>
-      </div>
     </div>`;
+
+  // ── Plan de entreno — se conecta en el Bloque 5B ──
+  const entrenoPendiente = `
+    <div style="background:var(--bg2);border:1.5px dashed var(--border2);border-radius:16px;padding:18px;display:flex;align-items:center;gap:14px">
+      <div style="width:38px;height:38px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">🏋️ Plan de entreno</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">Se conectará en el siguiente bloque, con el plan de entrenamiento real del cliente.</div>
+      </div>
+      <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px">Próximamente</span>
+    </div>`;
+
+  return `
+    ${notasHtml}
+    ${seccionPlanNutricional(c)}
+    ${entrenoPendiente}`;
 }
+
 
 function renderSplitDayRow(d, i, clientId) {
   const color = SPLIT_COLORS[d.type] || '#a3a39e';

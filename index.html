@@ -3946,7 +3946,9 @@ function lunesDeSemana(offset){
 
 // Construye un mini-gráfico de línea SVG a partir de una serie de valores.
 // puntos: array de {label, valor|null}. color en hex.
-function miniLineChart(puntos, color, sufijo){
+// Mini-gráfico de línea SVG. puntos: [{label, fechaTxt, valor|null}].
+// unidad: texto que se añade al valor en el tooltip (' pasos', ' h', ' kg').
+function miniLineChart(puntos, color, sufijo, unidad){
   const W = 260, H = 64, padX = 8, padY = 12;
   const valores = puntos.map(p => p.valor).filter(v => v != null);
   if (!valores.length){
@@ -3960,25 +3962,57 @@ function miniLineChart(puntos, color, sufijo){
   const y = v => padY + (1 - (v - min)/rango) * (H - padY*2);
 
   // Puntos con valor (para la línea); los null se saltan
-  const conValor = puntos.map((p,i)=>({i,v:p.valor})).filter(o=>o.v!=null);
+  const conValor = puntos.map((p,i)=>({i,v:p.valor,p:p})).filter(o=>o.v!=null);
   const linePts = conValor.map(o => `${x(o.i).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
   const lastO = conValor[conValor.length-1];
 
   const circles = conValor.map((o,idx) => {
     const esUlt = idx === conValor.length-1;
-    return `<circle cx="${x(o.i).toFixed(1)}" cy="${y(o.v).toFixed(1)}" r="${esUlt?4:3}"
-      fill="${esUlt?color:'white'}" stroke="${esUlt?'white':color}" stroke-width="1.5"/>`;
+    const cx = x(o.i).toFixed(1), cy = y(o.v).toFixed(1);
+    const valTxt = (o.v) + (unidad||'');
+    // círculo transparente grande = área fácil de apuntar con el ratón
+    return `<circle cx="${cx}" cy="${cy}" r="9" fill="transparent" style="cursor:pointer"
+        class="metric-pt" data-dia="${escHtml(o.p.fechaTxt||o.p.label||'')}" data-val="${escHtml(valTxt)}"
+        onmouseover="mostrarTooltipPunto(event)" onmouseout="ocultarTooltipPunto()"></circle>
+      <circle cx="${cx}" cy="${cy}" r="${esUlt?4:3}" fill="${esUlt?color:'white'}" stroke="${esUlt?'white':color}" stroke-width="1.5" style="pointer-events:none"/>`;
   }).join('');
 
   const lastLabel = lastO
-    ? `<text x="${x(lastO.i).toFixed(1)}" y="${(y(lastO.v)-8).toFixed(1)}" font-size="9" font-weight="700" fill="${color}" text-anchor="middle" font-family="system-ui">${lastO.v}${sufijo||''}</text>`
+    ? `<text x="${x(lastO.i).toFixed(1)}" y="${(y(lastO.v)-8).toFixed(1)}" font-size="9" font-weight="700" fill="${color}" text-anchor="middle" font-family="system-ui" style="pointer-events:none">${lastO.v}${sufijo||''}</text>`
     : '';
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="64" style="display:block;margin-top:6px">
-    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="64" style="display:block;margin-top:6px;overflow:visible">
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"/>
     ${circles}
     ${lastLabel}
   </svg>`;
+}
+
+// Tooltip de un punto del mini-gráfico de métricas
+function mostrarTooltipPunto(ev){
+  const c = ev.target;
+  let tip = document.getElementById('metric-tooltip');
+  if (!tip){
+    tip = document.createElement('div');
+    tip.id = 'metric-tooltip';
+    tip.style.cssText = 'position:fixed;z-index:400;background:var(--text);color:#fff;'
+      + 'border-radius:8px;padding:6px 10px;font-size:11px;line-height:1.4;pointer-events:none;'
+      + 'box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(tip);
+  }
+  const dia = c.getAttribute('data-dia');
+  const val = c.getAttribute('data-val');
+  tip.innerHTML = `<div style="opacity:.7">${dia}</div><div style="font-weight:700">${val}</div>`;
+  tip.style.display = 'block';
+  const r = c.getBoundingClientRect();
+  tip.style.left = (r.left + r.width/2) + 'px';
+  tip.style.top  = (r.top - 6) + 'px';
+  tip.style.transform = 'translate(-50%,-100%)';
+}
+
+function ocultarTooltipPunto(){
+  const tip = document.getElementById('metric-tooltip');
+  if (tip) tip.style.display = 'none';
 }
 
 // Una tarjeta de métrica
@@ -4001,6 +4035,7 @@ function seccionMetricas(c){
   const metrics = c._metrics || [];
   const lunes = lunesDeSemana(segWeekOffset);
   const DIAS = ['L','M','X','J','V','S','D'];
+  const DIAS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
   // Construir los 7 días de la semana seleccionada
   const dias = [];
@@ -4009,8 +4044,10 @@ function seccionMetricas(c){
     d.setDate(d.getDate()+i);
     const key = d.toISOString().slice(0,10);
     const reg = metrics.find(m => String(m.date).slice(0,10) === key);
+    const fechaTxt = DIAS_FULL[i] + ' ' + d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
     dias.push({
       label: DIAS[i],
+      fechaTxt: fechaTxt,
       steps: reg && reg.steps != null ? Number(reg.steps) : null,
       sleep: reg && reg.sleep_hours != null ? Number(reg.sleep_hours) : null,
       weight: reg && reg.weight_kg != null ? Number(reg.weight_kg) : null,
@@ -4040,13 +4077,13 @@ function seccionMetricas(c){
 
   const cards =
     metricaCard('🦶','Pasos · media/día', fmtSteps, 'var(--green)', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,valor:d.steps})), '#16a34a', ''),
+      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.steps})), '#16a34a', '', ' pasos'),
       'Lun','Dom') +
     metricaCard('🌙','Sueño · media/noche', fmtSleep, '#7c3aed', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,valor:d.sleep})), '#7c3aed', 'h'),
+      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.sleep})), '#7c3aed', 'h', ' h'),
       'Lun','Dom') +
     metricaCard('⚖️','Peso · media semanal', fmtWeight, 'var(--text)', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,valor:d.weight})), '#1a1a18', ''),
+      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.weight})), '#1a1a18', '', ' kg'),
       'Lun','Dom');
 
   // Navegación de semanas. No se puede ir al futuro (offset 0 es el tope).

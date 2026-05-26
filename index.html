@@ -4292,8 +4292,8 @@ function renderPerfil() {
   if (q) {
     // Con cuestionario: reparto equilibrado de las 3 columnas
     //  Col 1: Datos básicos (grande) + Entreno y descanso (media)
-    //  Col 2: Salud y alimentación (la más alta)
-    //  Col 3: Objetivo y experiencia (media) + 2 tarjetas compactas
+    //  Col 2: Salud y alimentación (la más alta) + Evolución del peso (compacta)
+    //  Col 3: Objetivo y experiencia (media) + Mesociclo (compacta)
     gridHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start">
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardDatos}
@@ -4301,10 +4301,10 @@ function renderPerfil() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardSalud}
+        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px">
         ${cardObjetivo}
-        ${cardPendiente('Evolución del peso', 'Histórico de peso del cliente')}
         ${cardPendiente('Mesociclo actual', 'Plan y progreso del mesociclo')}
       </div>
     </div>`;

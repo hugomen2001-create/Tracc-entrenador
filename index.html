@@ -3191,6 +3191,7 @@ function selectClient(id) {
   editSesionEntreno = 0;
   editandoObjetivos = false;
   editandoEjercicioId = null;
+  editandoComida = null;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3328,6 +3329,7 @@ function switchTab(tab) {
   currentTab = tab;
   editandoObjetivos = false;  // salir de modo edición al cambiar de tab
   editandoEjercicioId = null;
+  editandoComida = null;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -5859,6 +5861,8 @@ function saveChanges() {
 let editNutriOpcion = 0;
 // Bloque 6A — modo edición de los objetivos nutricionales
 let editandoObjetivos = false;
+// Bloque 6C — nombre de la comida que se está editando (null = ninguna)
+let editandoComida = null;
 
 const COMIDAS_ORDEN = ['Desayuno','Comida','Merienda','Cena'];
 
@@ -5991,6 +5995,42 @@ function seccionPlanNutricional(c){
     const comidasHtml = clavesComida.map(comida => {
       const items = (meals[comida] && meals[comida].items) || [];
       const kcalComida = items.reduce((s,it)=>s+(Number(it.kcal)||0),0);
+      const enEdicion = editandoComida === comida;
+
+      if (enEdicion){
+        // ── Comida en modo edición: cada alimento con inputs ──
+        const inp = (id, val, ancho, ph) => `<input id="${id}" value="${val==null?'':escHtml(String(val))}" placeholder="${ph||''}" style="
+          width:${ancho};box-sizing:border-box;border:1.5px solid var(--green);border-radius:6px;
+          padding:4px 6px;background:var(--bg2);color:var(--text);font-size:11px">`;
+        const filasEd = items.map((it,idx) => `
+          <div style="padding:7px 0;border-bottom:1px solid var(--border)">
+            <div style="margin-bottom:4px">${inp('al-'+comida+'-'+idx+'-name', it.name, '100%', 'Nombre del alimento')}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              ${inp('al-'+comida+'-'+idx+'-grams', it.grams, '52px', 'g')}
+              ${inp('al-'+comida+'-'+idx+'-kcal', it.kcal, '56px', 'kcal')}
+              ${inp('al-'+comida+'-'+idx+'-protein', it.protein, '48px', 'P')}
+              ${inp('al-'+comida+'-'+idx+'-carbs', it.carbs, '48px', 'CH')}
+              ${inp('al-'+comida+'-'+idx+'-fat', it.fat, '48px', 'G')}
+            </div>
+          </div>`).join('') || `<div style="font-size:11px;color:var(--text3);padding:5px 0">Sin alimentos</div>`;
+        return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;border:1.5px solid var(--green)">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:6px">${escHtml(comida)}</div>
+          <div style="font-size:8.5px;color:var(--text3);margin-bottom:4px;display:flex;gap:4px">
+            <span style="width:52px">gramos</span><span style="width:56px">kcal</span><span style="width:48px">prot.</span><span style="width:48px">carb.</span><span style="width:48px">grasa</span>
+          </div>
+          ${filasEd}
+          <div style="display:flex;gap:6px;margin-top:9px">
+            <button onclick="guardarComida('${escHtml(comida)}')" style="
+              flex:1;height:30px;border:none;border-radius:7px;cursor:pointer;
+              background:var(--green);color:#fff;font-size:11.5px;font-weight:700">Guardar</button>
+            <button onclick="cancelarComida()" style="
+              height:30px;padding:0 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:600">Cancelar</button>
+          </div>
+        </div>`;
+      }
+
+      // ── Comida en modo lectura ──
       const filas = items.map(it => `
         <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:12px;color:var(--text)">${escHtml(it.name||'—')}</span>
@@ -5999,7 +6039,10 @@ function seccionPlanNutricional(c){
       return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
           <span style="font-size:11.5px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
-          <span style="font-size:11px;font-weight:700;color:var(--green)">${kcalComida} kcal</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:700;color:var(--green)">${kcalComida} kcal</span>
+            <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0">✏️</button>
+          </span>
         </div>
         ${filas}
       </div>`;
@@ -6044,6 +6087,7 @@ function seccionPlanNutricional(c){
 // Cambia la opción de dieta mostrada
 function seleccionarOpcionNutri(i){
   editNutriOpcion = i;
+  editandoComida = null;  // al cambiar de opción, salir de edición de comida
   renderClientPanel();
 }
 
@@ -6107,6 +6151,79 @@ async function guardarObjetivosNutri(){
   editandoObjetivos = false;
   renderClientPanel();
 }
+
+// ── Bloque 6C — edición de los alimentos de una comida ──
+function editarComida(comida){
+  editandoComida = comida;
+  renderClientPanel();
+}
+
+function cancelarComida(){
+  editandoComida = null;
+  renderClientPanel();
+}
+
+async function guardarComida(comida){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.options) return;
+  const opt = c._nutrition.options[editNutriOpcion];
+  if (!opt || !opt.meals || !opt.meals[comida]) return;
+
+  const items = opt.meals[comida].items || [];
+
+  // Leer un campo numérico (vacío => 0, inválido => NaN)
+  const numCampo = (idc) => {
+    const el = document.getElementById(idc);
+    if (!el) return 0;
+    const v = el.value.trim();
+    if (v === "") return 0;
+    const n = Number(v);
+    return (isNaN(n) || n < 0) ? NaN : n;
+  };
+
+  // Construir la nueva lista de alimentos a partir de los inputs
+  const nuevosItems = [];
+  for (let idx = 0; idx < items.length; idx++){
+    const nameEl = document.getElementById("al-"+comida+"-"+idx+"-name");
+    const name = nameEl ? nameEl.value.trim() : (items[idx].name || "");
+    const grams   = numCampo("al-"+comida+"-"+idx+"-grams");
+    const kcal    = numCampo("al-"+comida+"-"+idx+"-kcal");
+    const protein = numCampo("al-"+comida+"-"+idx+"-protein");
+    const carbs   = numCampo("al-"+comida+"-"+idx+"-carbs");
+    const fat     = numCampo("al-"+comida+"-"+idx+"-fat");
+    if ([grams,kcal,protein,carbs,fat].some(v => Number.isNaN(v))){
+      alert("Revisa los valores: gramos, kcal y macros deben ser números positivos.");
+      return;
+    }
+    if (!name){
+      alert("Cada alimento debe tener un nombre.");
+      return;
+    }
+    nuevosItems.push({ name, grams, kcal, protein, carbs, fat });
+  }
+
+  // Reconstruir el objeto meals completo con la comida actualizada
+  const nuevoMeals = JSON.parse(JSON.stringify(opt.meals));
+  nuevoMeals[comida].items = nuevosItems;
+
+  // Guardar en Supabase (tabla nutrition_options, columna meals jsonb)
+  const { error } = await sb
+    .from("nutrition_options")
+    .update({ meals: nuevoMeals })
+    .eq("id", opt.id);
+
+  if (error){
+    console.error("guardarComida error:", error);
+    alert("No se pudieron guardar los alimentos. Inténtalo de nuevo.");
+    return;
+  }
+
+  // Actualizar en memoria
+  opt.meals = nuevoMeals;
+  editandoComida = null;
+  renderClientPanel();
+}
+
 
 
 // ══════════════════════════════════════════════════════════════════════════

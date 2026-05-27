@@ -3230,6 +3230,7 @@ function selectClient(id) {
   splitBorrador = null;
   splitDiaNuevo = null;
   mostrandoPlantillas = false;
+  mostrandoMesociclo = false;
   mostrandoBiblioteca = false;
   creandoAlimento = false;
   editandoAlimentoId = null;
@@ -3379,6 +3380,7 @@ function switchTab(tab) {
   splitBorrador = null;
   splitDiaNuevo = null;
   mostrandoPlantillas = false;
+  mostrandoMesociclo = false;
   mostrandoBiblioteca = false;
   creandoAlimento = false;
   editandoAlimentoId = null;
@@ -6900,6 +6902,8 @@ let creandoAlimento = false;             // formulario de nuevo alimento abierto
 let editandoAlimentoId = null;           // id del alimento que se está editando
 // Bloque 6E — modo edición del split
 let editandoSplit = false;
+// Split variable + Mesociclo
+let mostrandoMesociclo = false;          // panel del mesociclo abierto
 let splitBorrador = null;   // copia de trabajo del split mientras se edita
 let splitDiaNuevo = null;   // índice del día que está escribiendo un tipo nuevo (o null)
 
@@ -7026,8 +7030,18 @@ function seccionPlanEntreno(c){
 
       splitHtml = `
         <div style="margin-bottom:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split — ${work.length} días</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:10px;color:var(--text3)">Días del ciclo:</span>
+              <button onclick="cambiarLongitudSplit(-1)" ${work.length<=1?'disabled':''} style="
+                width:24px;height:24px;border:1.5px solid var(--border);border-radius:6px;cursor:${work.length<=1?'default':'pointer'};
+                background:var(--bg2);color:var(--text2);font-size:13px;font-weight:700;padding:0">−</button>
+              <span style="font-size:13px;font-weight:700;color:var(--text);min-width:20px;text-align:center">${work.length}</span>
+              <button onclick="cambiarLongitudSplit(1)" ${work.length>=14?'disabled':''} style="
+                width:24px;height:24px;border:1.5px solid var(--border);border-radius:6px;cursor:${work.length>=14?'default':'pointer'};
+                background:var(--bg2);color:var(--text2);font-size:13px;font-weight:700;padding:0">+</button>
+            </div>
           </div>
           ${filasDias}
           <div style="display:flex;gap:8px;margin-top:9px">
@@ -7180,7 +7194,12 @@ function seccionPlanEntreno(c){
 
   return `<div style="${cardStyle}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="${secTitle}">🏋️ Plan de entreno</div>
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="${secTitle}">🏋️ Plan de entreno</div>
+        <button onclick="abrirMesociclo()" style="
+          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 ${etiquetaBotonMeso(c)}</button>
+      </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
         <button onclick="abrirPlantillas()" style="
@@ -7188,6 +7207,7 @@ function seccionPlanEntreno(c){
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📋 Plantillas</button>
       </div>
     </div>
+    ${panelMesocicloHtml(c)}
     ${panelPlantillasHtml(c)}
     ${splitHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
@@ -7720,6 +7740,151 @@ function editarSplit(){
   splitBorrador = (currentClient && currentClient._training && currentClient._training.split)
     ? currentClient._training.split.slice() : [];
   splitDiaNuevo = null;
+  renderClientPanel();
+}
+
+
+// ── Split variable: cambiar la longitud del ciclo ──
+function cambiarLongitudSplit(delta){
+  if (!splitBorrador) return;
+  const nueva = splitBorrador.length + delta;
+  if (nueva < 1 || nueva > 14) return;
+  if (delta > 0){
+    // Añadir días nuevos al final, en Descanso
+    while (splitBorrador.length < nueva) splitBorrador.push('OFF');
+  } else {
+    // Quitar los últimos días (no se borra ningún ejercicio: solo deja de mostrarse)
+    splitBorrador = splitBorrador.slice(0, nueva);
+  }
+  splitDiaNuevo = null;
+  renderClientPanel();
+}
+
+// ── Mesociclo: fecha de inicio del ciclo ──
+
+// Texto del botón de mesociclo en la cabecera
+function etiquetaBotonMeso(c){
+  const m = c && c._mesocycle;
+  if (m && m.start_date){
+    return 'Mesociclo · ' + formatearFechaCorta(m.start_date);
+  }
+  return 'Mesociclo';
+}
+
+// Formatea una fecha 'YYYY-MM-DD' a 'D mmm YYYY'
+function formatearFechaCorta(fecha){
+  if (!fecha) return '—';
+  const partes = String(fecha).slice(0,10).split('-');
+  if (partes.length !== 3) return fecha;
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const d = parseInt(partes[2],10), mi = parseInt(partes[1],10)-1, a = partes[0];
+  return d + ' ' + (meses[mi]||'') + ' ' + a;
+}
+
+function abrirMesociclo(){ mostrandoMesociclo = true; renderClientPanel(); }
+function cerrarMesociclo(){ mostrandoMesociclo = false; renderClientPanel(); }
+
+// Panel del mesociclo (ver / editar nombre, fecha de inicio, semanas)
+function panelMesocicloHtml(c){
+  if (!mostrandoMesociclo) return '';
+  const m = c && c._mesocycle;
+  // Fecha por defecto si no hay mesociclo: el alta del cliente
+  const fechaAlta = c && (c.member_since || c.created_at) ? String(c.member_since || c.created_at).slice(0,10) : '';
+  const nombre = m ? (m.name || '') : '';
+  const inicio = m && m.start_date ? String(m.start_date).slice(0,10) : fechaAlta;
+  const semanas = m && m.total_weeks != null ? m.total_weeks : '';
+
+  const avisoSinMeso = !m
+    ? `<div style="font-size:10px;color:var(--text3);margin-bottom:8px">Este cliente aún no tiene un mesociclo. Al guardar se creará uno.</div>`
+    : '';
+
+  return `<div style="border:1.5px solid var(--green);border-radius:12px;padding:12px;margin-bottom:14px;background:var(--bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">📅 Mesociclo</div>
+      <button onclick="cerrarMesociclo()" style="
+        height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:10.5px;font-weight:600">Cerrar</button>
+    </div>
+    ${avisoSinMeso}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px">
+      <div style="flex:2;min-width:140px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Nombre</div>
+        <input id="meso-name" value="${escHtml(nombre)}" placeholder="Ej: Volumen · Meso 2" style="
+          width:100%;box-sizing:border-box;border:1.5px solid var(--green);border-radius:7px;
+          padding:5px 8px;background:var(--bg2);color:var(--text);font-size:12px">
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Fecha de inicio</div>
+        <input id="meso-start" type="date" value="${escHtml(inicio)}" style="
+          width:100%;box-sizing:border-box;border:1.5px solid var(--green);border-radius:7px;
+          padding:4px 7px;background:var(--bg2);color:var(--text);font-size:12px">
+      </div>
+      <div style="flex:1;min-width:90px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Semanas</div>
+        <input id="meso-weeks" type="number" min="1" value="${escHtml(String(semanas))}" placeholder="12" style="
+          width:100%;box-sizing:border-box;border:1.5px solid var(--green);border-radius:7px;
+          padding:5px 8px;background:var(--bg2);color:var(--text);font-size:12px">
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text2);background:var(--bg2);border-radius:8px;padding:8px 10px;margin-bottom:9px;line-height:1.5">
+      <strong>ℹ️ Sobre la fecha de inicio:</strong> es el día que se cuenta como "Día 1" del ciclo.
+      Sirve para que el cliente vea en su app en qué día del split se encuentra cuando el ciclo dura
+      más de una semana (8, 10, 12 días...). Si el split es de 7 días, esto no le afecta:
+      el ciclo coincide con la semana normal y se repite cada lunes.
+    </div>
+    <button onclick="guardarMesociclo()" style="
+      height:32px;padding:0 16px;border:none;border-radius:8px;cursor:pointer;
+      background:var(--green);color:#fff;font-size:12px;font-weight:700">Guardar mesociclo</button>
+  </div>`;
+}
+
+async function guardarMesociclo(){
+  const c = currentClient;
+  if (!c) return;
+  const nameEl = document.getElementById('meso-name');
+  const startEl = document.getElementById('meso-start');
+  const weeksEl = document.getElementById('meso-weeks');
+  const nombre = nameEl ? nameEl.value.trim() : '';
+  const inicio = startEl ? startEl.value : '';
+  const semTxt = weeksEl ? weeksEl.value.trim() : '';
+
+  if (!nombre){ alert('El mesociclo necesita un nombre.'); return; }
+  if (!inicio){ alert('El mesociclo necesita una fecha de inicio.'); return; }
+  const semanas = semTxt === '' ? null : Number(semTxt);
+  if (semanas != null && (isNaN(semanas) || semanas < 1)){
+    alert('Las semanas deben ser un número mayor que 0.');
+    return;
+  }
+
+  if (c._mesocycle && c._mesocycle.id){
+    // Actualizar el mesociclo existente
+    const { error } = await sb
+      .from('mesocycles')
+      .update({ name: nombre, start_date: inicio, total_weeks: semanas })
+      .eq('id', c._mesocycle.id);
+    if (error){
+      console.error('guardarMesociclo (update) error:', error);
+      alert('No se pudo guardar el mesociclo. Inténtalo de nuevo.');
+      return;
+    }
+    c._mesocycle.name = nombre;
+    c._mesocycle.start_date = inicio;
+    c._mesocycle.total_weeks = semanas;
+  } else {
+    // Crear un mesociclo nuevo
+    const { data, error } = await sb
+      .from('mesocycles')
+      .insert({ client_id: c.id, name: nombre, start_date: inicio, total_weeks: semanas || 12, is_active: true })
+      .select()
+      .single();
+    if (error || !data){
+      console.error('guardarMesociclo (insert) error:', error);
+      alert('No se pudo crear el mesociclo. Inténtalo de nuevo.');
+      return;
+    }
+    c._mesocycle = data;
+  }
+  mostrandoMesociclo = false;
   renderClientPanel();
 }
 

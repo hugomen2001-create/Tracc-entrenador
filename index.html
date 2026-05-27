@@ -4274,11 +4274,15 @@ function seccionMetricas(c){
   const DIAS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
   // Construir los 7 días de la semana seleccionada
+  // Usamos fechas locales sin pasar por UTC: toISOString() desplaza el día en zonas
+  // horarias adelantadas (en Barcelona las 00:00 locales son las 22:00 UTC del día anterior).
+  const fechaLocalKey = (dt) => dt.getFullYear() + '-' +
+    String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
   const dias = [];
   for (let i=0;i<7;i++){
     const d = new Date(lunes);
     d.setDate(d.getDate()+i);
-    const key = d.toISOString().slice(0,10);
+    const key = fechaLocalKey(d);
     const reg = metrics.find(m => String(m.date).slice(0,10) === key);
     const fechaTxt = DIAS_FULL[i] + ' ' + d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
     dias.push({

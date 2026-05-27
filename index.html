@@ -4313,10 +4313,12 @@ function seccionResumenActividad(c){
   const sesiones = (c._sessions || []);
   const completadas = sesiones.filter(s => s.completed);
 
-  // Hoy y hace 28 días
+  // Hoy y hace 28 días (en fecha local, sin desfase UTC)
+  const fechaLocal = (dt) => dt.getFullYear() + '-' +
+    String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
   const hoy = new Date();
-  const hoyStr = hoy.toISOString().slice(0,10);
-  const hace28 = new Date(hoy.getTime() - 28*86400000).toISOString().slice(0,10);
+  const hoyStr = fechaLocal(hoy);
+  const hace28 = fechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 28));
 
   const ult4sem = completadas.filter(s => s.session_date >= hace28 && s.session_date <= hoyStr);
   const mediaSemana = (ult4sem.length / 4);
@@ -4372,25 +4374,33 @@ function seccionHistorialSesiones(c){
     if (!porFecha[f] || (s.completed && !porFecha[f].completed)) porFecha[f] = s;
   });
 
+  // Fecha local en formato YYYY-MM-DD (sin pasar por UTC, evita desfase de día)
+  const fechaLocalStr = (dt) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth()+1).padStart(2,'0');
+    const d = String(dt.getDate()).padStart(2,'0');
+    return y + '-' + m + '-' + d;
+  };
+
   // Construir 12 semanas hacia atrás (la última columna es la semana actual)
   const SEMANAS = 12;
   const hoy = new Date();
   // Lunes de esta semana
   const diaSem = hoy.getDay() === 0 ? 6 : hoy.getDay() - 1;
-  const lunesEstaSemana = new Date(hoy.getTime() - diaSem*86400000);
+  const lunesEstaSemana = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - diaSem);
   // Lunes de hace 11 semanas
-  const primerLunes = new Date(lunesEstaSemana.getTime() - (SEMANAS-1)*7*86400000);
+  const primerLunes = new Date(lunesEstaSemana.getFullYear(), lunesEstaSemana.getMonth(), lunesEstaSemana.getDate() - (SEMANAS-1)*7);
 
   const DIAS = ['L','M','X','J','V','S','D'];
-  const hoyStr = hoy.toISOString().slice(0,10);
+  const hoyStr = fechaLocalStr(hoy);
 
   // Filas = días de la semana (L..D), columnas = semanas
   let filas = '';
   for (let d = 0; d < 7; d++){
     let celdas = '';
     for (let w = 0; w < SEMANAS; w++){
-      const dia = new Date(primerLunes.getTime() + (w*7 + d)*86400000);
-      const fStr = dia.toISOString().slice(0,10);
+      const dia = new Date(primerLunes.getFullYear(), primerLunes.getMonth(), primerLunes.getDate() + w*7 + d);
+      const fStr = fechaLocalStr(dia);
       const futuro = fStr > hoyStr;
       const ses = porFecha[fStr];
       let bg = 'var(--bg3)', borde = '1px solid var(--border)', contenido = '';

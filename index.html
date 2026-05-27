@@ -3205,6 +3205,8 @@ function selectClient(id) {
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = "";
   editandoSplit = false;
+  splitBorrador = null;
+  splitDiaNuevo = null;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3346,6 +3348,8 @@ function switchTab(tab) {
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = "";
   editandoSplit = false;
+  splitBorrador = null;
+  splitDiaNuevo = null;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6260,6 +6264,8 @@ let mostrandoSelectorEjercicio = false;  // selector de "añadir ejercicio" abie
 let busquedaEjercicio = '';              // texto del buscador del selector
 // Bloque 6E — modo edición del split
 let editandoSplit = false;
+let splitBorrador = null;   // copia de trabajo del split mientras se edita
+let splitDiaNuevo = null;   // índice del día que está escribiendo un tipo nuevo (o null)
 
 // Días de la semana para mostrar el split
 const DIAS_SEMANA_CORTO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
@@ -6320,44 +6326,80 @@ function seccionPlanEntreno(c){
   let splitHtml = '';
   if (split.length){
     if (editandoSplit){
-      // Modo edición: cada día del ciclo es un selector
-      const filasDias = split.map((s,i) => {
+      // ── Modo edición: filas con badge de día + chips de colores ──
+      const work = splitBorrador || split;
+      const tiposChips = SUGERENCIAS_SESION.slice();  // 7 tipos sugeridos
+      const filasDias = work.map((s,i) => {
         const valor = (!s || s === 'OFF') ? 'OFF' : s;
-        const esConocido = valor === 'OFF' || opcionesSesion.includes(valor);
-        const opts = ['<option value="OFF"' + (valor==='OFF'?' selected':'') + '>Descanso</option>']
-          .concat(opcionesSesion.map(t =>
-            `<option value="${escHtml(t)}"${valor===t?' selected':''}>${escHtml(t)}</option>`))
-          .concat([`<option value="__NUEVO__">+ Escribir uno nuevo…</option>`])
-          // si el valor actual no está entre las opciones conocidas, añadirlo
-          .concat(esConocido ? [] : [`<option value="${escHtml(valor)}" selected>${escHtml(valor)}</option>`])
-          .join('');
-        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <div style="width:54px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);flex-shrink:0">Día ${i+1}</div>
-          <select id="split-dia-${i}" onchange="cambioSelectSplit(${i})" style="
-            flex:1;border:1.5px solid var(--green);border-radius:8px;padding:5px 7px;
-            background:var(--bg2);color:var(--text);font-size:12px">${opts}</select>
-          <input id="split-nuevo-${i}" placeholder="Nombre de la sesión" value="${esConocido?'':escHtml(valor)}" style="
-            display:${esConocido?'none':'block'};flex:1;border:1.5px solid var(--green);border-radius:8px;
-            padding:5px 7px;background:var(--bg2);color:var(--text);font-size:12px">
+        const col = colorSesion(valor);
+        // ¿el valor actual es un tipo a mano que no está entre los sugeridos?
+        const esExtra = valor !== 'OFF' && !tiposChips.includes(valor);
+        // Chips de los 7 tipos
+        let chips = tiposChips.map(t => {
+          const act = valor === t;
+          const c2 = colorSesion(t);
+          return `<button onclick="cambiarDiaSplit(${i},'${escHtml(t)}')" style="
+            height:23px;padding:0 9px;border-radius:7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap;
+            border:1.5px solid ${act?c2:'var(--border)'};
+            background:${act?c2:'var(--bg2)'};color:${act?'#fff':'var(--text3)'}">${escHtml(t)}</button>`;
+        }).join('');
+        // Chip del tipo extra a mano (si lo hay)
+        if (esExtra){
+          chips += `<button style="
+            height:23px;padding:0 9px;border-radius:7px;font-size:10px;font-weight:700;white-space:nowrap;
+            border:1.5px solid ${col};background:${col};color:#fff">${escHtml(valor)}</button>`;
+        }
+        // Chip OFF
+        chips += `<button onclick="cambiarDiaSplit(${i},'OFF')" style="
+          height:23px;padding:0 9px;border-radius:7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap;
+          border:1.5px solid ${valor==='OFF'?'var(--text3)':'var(--border)'};
+          background:${valor==='OFF'?'var(--text3)':'var(--bg2)'};color:${valor==='OFF'?'#fff':'var(--text3)'}">OFF</button>`;
+        // Chip "+ Nuevo"
+        chips += `<button onclick="abrirDiaNuevo(${i})" style="
+          height:23px;padding:0 9px;border-radius:7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap;
+          border:1.5px dashed var(--border2);background:var(--bg2);color:var(--text2)">+ Nuevo</button>`;
+
+        const nombreVis = valor === 'OFF' ? 'OFF' : valor;
+        // Campo de texto para escribir un tipo nuevo (solo en el día activo)
+        const campoNuevo = splitDiaNuevo === i ? `
+          <div style="display:flex;gap:6px;margin-top:7px;padding-left:37px">
+            <input id="split-nuevo-input" placeholder="Nombre de la sesión nueva..." style="
+              flex:1;border:1.5px solid var(--green);border-radius:7px;padding:5px 8px;
+              background:var(--bg2);color:var(--text);font-size:11.5px"
+              onkeydown="if(event.key==='Enter')confirmarDiaNuevo(${i})">
+            <button onclick="confirmarDiaNuevo(${i})" style="
+              height:30px;padding:0 12px;border:none;border-radius:7px;cursor:pointer;
+              background:var(--green);color:#fff;font-size:11px;font-weight:700">Añadir</button>
+          </div>` : '';
+
+        return `<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:11px;padding:9px 12px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+              font-size:10.5px;font-weight:700;color:#fff;background:${col}">D${i+1}</div>
+            <div style="font-size:12px;font-weight:700;width:64px;flex-shrink:0;color:${valor==='OFF'?'var(--text3)':col}">${escHtml(nombreVis)}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1">${chips}</div>
+          </div>
+          ${campoNuevo}
         </div>`;
       }).join('');
+
       splitHtml = `
         <div style="margin-bottom:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split — ${split.length} días</div>
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split — ${work.length} días</div>
           </div>
           ${filasDias}
           <div style="display:flex;gap:8px;margin-top:9px">
             <button onclick="guardarSplit()" style="
-              flex:1;height:32px;border:none;border-radius:8px;cursor:pointer;
+              flex:1;height:34px;border:none;border-radius:9px;cursor:pointer;
               background:var(--green);color:#fff;font-size:12px;font-weight:700">Guardar split</button>
             <button onclick="cancelarSplit()" style="
-              height:32px;padding:0 14px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              height:34px;padding:0 16px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;
               background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">Cancelar</button>
           </div>
         </div>`;
     } else {
-      // Modo lectura
+      // ── Modo lectura: filas con badge de día de color ──
       splitHtml = `
         <div style="margin-bottom:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -6369,9 +6411,11 @@ function seccionPlanEntreno(c){
           <div style="display:flex;gap:5px;flex-wrap:wrap">
             ${split.map((s,i) => {
               const off = !s || s === 'OFF';
-              return `<div style="flex:1;min-width:60px;background:${off?'var(--bg)':'var(--gl)'};border:1.5px solid ${off?'var(--border)':'var(--green)'};border-radius:10px;padding:8px 2px;text-align:center">
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Día ${i+1}</div>
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;margin-top:3px;color:${off?'var(--text3)':'var(--green)'}">${off?'Descanso':escHtml(s)}</div>
+              const col = colorSesion(off?'OFF':s);
+              return `<div style="flex:1;min-width:62px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 4px;text-align:center">
+                <div style="width:22px;height:22px;border-radius:6px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
+                  font-size:9px;font-weight:700;color:#fff;background:${col}">D${i+1}</div>
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${off?'var(--text3)':col}">${off?'Descanso':escHtml(s)}</div>
               </div>`;
             }).join('')}
           </div>
@@ -6756,67 +6800,88 @@ async function moverEjercicio(id, dir){
 }
 
 // ── Bloque 6E — edición del split (distribución del ciclo) ──
+
+// Color de cada tipo de sesión (para badges y chips)
+function colorSesion(tipo){
+  const t = (tipo || '').toUpperCase();
+  const mapa = {
+    'PUSH':'#2563eb', 'PULL':'#7c3aed', 'LEG':'#16a34a', 'TORSO':'#d97706',
+    'BRAZO':'#db2777', 'GLÚTEO':'#0891b2', 'GLUTEO':'#0891b2',
+    'CADENA POSTERIOR':'#65a30d', 'OFF':'#aaa',
+  };
+  if (mapa[t]) return mapa[t];
+  if (!t || t === 'OFF') return '#aaa';
+  // Tipo a mano sin color asignado: color neutro de marca
+  return '#0f766e';
+}
+
 function editarSplit(){
   editandoSplit = true;
+  splitBorrador = (currentClient && currentClient._training && currentClient._training.split)
+    ? currentClient._training.split.slice() : [];
+  splitDiaNuevo = null;
   renderClientPanel();
 }
 
 function cancelarSplit(){
   editandoSplit = false;
+  splitBorrador = null;
+  splitDiaNuevo = null;
   renderClientPanel();
 }
 
-// Cuando un selector de día cambia: mostrar/ocultar el campo de texto libre
-function cambioSelectSplit(i){
-  const sel = document.getElementById("split-dia-" + i);
-  const inp = document.getElementById("split-nuevo-" + i);
-  if (!sel || !inp) return;
-  if (sel.value === "__NUEVO__"){
-    inp.style.display = "block";
-    inp.value = "";
-    inp.focus();
-  } else {
-    inp.style.display = "none";
+// Tocar un chip: cambia el tipo de sesión del día en el borrador
+function cambiarDiaSplit(i, tipo){
+  if (!splitBorrador) return;
+  splitBorrador[i] = tipo;
+  splitDiaNuevo = null;
+  renderClientPanel();
+}
+
+// Abrir el campo para escribir un tipo de sesión nuevo en un día
+function abrirDiaNuevo(i){
+  splitDiaNuevo = i;
+  renderClientPanel();
+  const inp = document.getElementById('split-nuevo-input');
+  if (inp) inp.focus();
+}
+
+// Confirmar el tipo nuevo escrito a mano
+function confirmarDiaNuevo(i){
+  if (!splitBorrador) return;
+  const inp = document.getElementById('split-nuevo-input');
+  const valor = inp ? inp.value.trim().toUpperCase() : '';
+  if (!valor){
+    alert('Escribe un nombre para la sesión nueva.');
+    return;
   }
+  splitBorrador[i] = valor;
+  splitDiaNuevo = null;
+  renderClientPanel();
 }
 
 async function guardarSplit(){
   const c = currentClient;
-  if (!c || !c._training || !c._training.plan) return;
-  const split = c._training.split || [];
-
-  // Leer el valor de cada día
-  const nuevoSplit = [];
-  for (let i = 0; i < split.length; i++){
-    const sel = document.getElementById("split-dia-" + i);
-    if (!sel){ nuevoSplit.push(split[i]); continue; }
-    let valor = sel.value;
-    if (valor === "__NUEVO__"){
-      const inp = document.getElementById("split-nuevo-" + i);
-      valor = inp ? inp.value.trim().toUpperCase() : "";
-      if (!valor){
-        alert("Has elegido escribir una sesión nueva en el Día " + (i+1) + " pero no le has puesto nombre.");
-        return;
-      }
-    }
-    nuevoSplit.push(valor);
-  }
+  if (!c || !c._training || !c._training.plan || !splitBorrador) return;
+  const nuevoSplit = splitBorrador.slice();
 
   // Guardar en Supabase (training_plans.split)
   const { error } = await sb
-    .from("training_plans")
+    .from('training_plans')
     .update({ split: nuevoSplit })
-    .eq("id", c._training.plan.id);
+    .eq('id', c._training.plan.id);
 
   if (error){
-    console.error("guardarSplit error:", error);
-    alert("No se pudo guardar el split. Inténtalo de nuevo.");
+    console.error('guardarSplit error:', error);
+    alert('No se pudo guardar el split. Inténtalo de nuevo.');
     return;
   }
 
   // Actualizar en memoria
   c._training.split = nuevoSplit;
   editandoSplit = false;
+  splitBorrador = null;
+  splitDiaNuevo = null;
   renderClientPanel();
 }
 

@@ -2537,17 +2537,19 @@ async function loadRealClients(){
         .eq('is_active', true)
         .order('exercise_order', { ascending:true });
       const cplanList = cplans || [];
-      // 8c. Resolver los nombres de los ejercicios desde la tabla exercises
+      // 8c. Resolver los nombres y valores por defecto desde la tabla exercises
       let exById = {};
       const exIds = [...new Set(cplanList.map(cp => cp.exercise_id).filter(Boolean))];
       if (exIds.length){
         const { data: exRows } = await sb
           .from('exercises')
-          .select('id, name, muscle_group, video_url')
+          .select('id, name, muscle_group, video_url, default_sets, default_reps, default_rest_sec, default_approx')
           .in('id', exIds);
         (exRows || []).forEach(e => { exById[e.id] = e; });
       }
-      // 8d. Agrupar los ejercicios por cliente
+      // 8d. Agrupar los ejercicios por cliente.
+      //     Si client_plans no tiene un valor, se usa el valor por defecto
+      //     de la biblioteca de ejercicios (Opción 1: la biblioteca manda).
       let exByClient = {};
       cplanList.forEach(cp => {
         const ex = exById[cp.exercise_id] || {};
@@ -2555,10 +2557,10 @@ async function loadRealClients(){
           id: cp.id,                       // id de la fila en client_plans (para editar)
           session_type: cp.session_type,
           exercise_order: cp.exercise_order,
-          sets: cp.sets,
-          reps: cp.reps,
-          rest_sec: cp.rest_sec,
-          approx: cp.approx,
+          sets:     cp.sets     != null ? cp.sets     : (ex.default_sets ?? null),
+          reps:    (cp.reps     != null && cp.reps !== '') ? cp.reps : (ex.default_reps ?? null),
+          rest_sec: cp.rest_sec != null ? cp.rest_sec : (ex.default_rest_sec ?? null),
+          approx:   cp.approx   != null ? cp.approx   : (ex.default_approx ?? null),
           name: ex.name || 'Ejercicio',
           muscle_group: ex.muscle_group || null,
           video_url: ex.video_url || null,

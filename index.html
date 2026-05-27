@@ -2552,6 +2552,7 @@ async function loadRealClients(){
       cplanList.forEach(cp => {
         const ex = exById[cp.exercise_id] || {};
         (exByClient[cp.client_id] = exByClient[cp.client_id] || []).push({
+          id: cp.id,                       // id de la fila en client_plans (para editar)
           session_type: cp.session_type,
           exercise_order: cp.exercise_order,
           sets: cp.sets,
@@ -3187,6 +3188,7 @@ function selectClient(id) {
   editNutriOpcion = 0;
   editSesionEntreno = 0;
   editandoObjetivos = false;
+  editandoEjercicioId = null;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3323,6 +3325,7 @@ function renderClientPanel() {
 function switchTab(tab) {
   currentTab = tab;
   editandoObjetivos = false;  // salir de modo edición al cambiar de tab
+  editandoEjercicioId = null;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6114,6 +6117,8 @@ async function guardarObjetivosNutri(){
 
 // Qué sesión de entreno está seleccionada en el tab Editar plan
 let editSesionEntreno = 0;
+// Bloque 6B — id del ejercicio que se está editando (null = ninguno)
+let editandoEjercicioId = null;
 
 // Días de la semana para mostrar el split
 const DIAS_SEMANA_CORTO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
@@ -6201,23 +6206,67 @@ function seccionPlanEntreno(c){
     const lista = (porSesion[tipoSel] || []).slice()
       .sort((a,b) => (a.exercise_order||0) - (b.exercise_order||0));
 
-    const filas = lista.map((ej,idx) => `
-      <div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px">
+    const filas = lista.map((ej,idx) => {
+      const enEdicion = editandoEjercicioId && ej.id === editandoEjercicioId;
+      const numero = `<div style="width:22px;height:22px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${idx+1}</div>`;
+
+      if (enEdicion){
+        // ── Fila en modo edición ──
+        const campo = (lbl, id, val, tipo) => `
+          <div style="flex:1;min-width:70px">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:3px">${lbl}</div>
+            <input id="${id}" type="${tipo}" ${tipo==='number'?'min="0"':''} value="${val==null?'':escHtml(String(val))}" style="
+              width:100%;box-sizing:border-box;border:1.5px solid var(--green);border-radius:7px;
+              padding:5px 7px;background:var(--bg2);color:var(--text);font-size:12px">
+          </div>`;
+        return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px;border:1.5px solid var(--green)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">
+            ${numero}
+            <div style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap">
+            ${campo('Series', 'ej-sets', ej.sets, 'number')}
+            ${campo('Aproxim.', 'ej-approx', ej.approx, 'number')}
+            ${campo('Descanso (s)', 'ej-rest', ej.rest_sec, 'number')}
+          </div>
+          <div style="margin-bottom:10px">
+            ${campo('Repeticiones (ej: 1 x 6-8 / 2 x 8-10)', 'ej-reps', ej.reps, 'text')}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="guardarEjercicio('${escHtml(ej.id)}')" style="
+              flex:1;height:32px;border:none;border-radius:8px;cursor:pointer;
+              background:var(--green);color:#fff;font-size:12px;font-weight:700">Guardar</button>
+            <button onclick="cancelarEjercicio()" style="
+              height:32px;padding:0 14px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">Cancelar</button>
+          </div>
+        </div>`;
+      }
+
+      // ── Fila en modo lectura ──
+      const botonEditar = ej.id
+        ? `<button onclick="editarEjercicio('${escHtml(ej.id)}')" title="Editar" style="
+            background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0">✏️</button>`
+        : '';
+      return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px">
         <div style="display:flex;align-items:flex-start;gap:10px">
-          <div style="width:22px;height:22px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${idx+1}</div>
+          ${numero}
           <div style="flex:1;min-width:0">
             <div style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:10px">
               <span><span style="opacity:.6">Series:</span> ${ej.sets ?? '—'}</span>
               <span><span style="opacity:.6">Reps:</span> ${escHtml(ej.reps || '—')}</span>
               <span><span style="opacity:.6">Descanso:</span> ${fmtDescanso(ej.rest_sec)}</span>
+              ${ej.approx != null ? `<span><span style="opacity:.6">Aprox.:</span> ${ej.approx}</span>` : ''}
             </div>
           </div>
           ${ej.video_url
             ? `<a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;flex-shrink:0;font-weight:600">▶ Vídeo</a>`
             : ''}
+          ${botonEditar}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     sesionesHtml = `
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
@@ -6240,6 +6289,70 @@ function seccionPlanEntreno(c){
 // Cambia la sesión de entreno mostrada
 function seleccionarSesionEntreno(i){
   editSesionEntreno = i;
+  editandoEjercicioId = null;  // al cambiar de sesión, salir de edición
+  renderClientPanel();
+}
+
+// ── Bloque 6B — edición de un ejercicio del plan de entreno ──
+function editarEjercicio(id){
+  editandoEjercicioId = id;
+  renderClientPanel();
+}
+
+function cancelarEjercicio(){
+  editandoEjercicioId = null;
+  renderClientPanel();
+}
+
+async function guardarEjercicio(id){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const ej = (c._training.exercises || []).find(e => e.id === id);
+  if (!ej) return;
+
+  // Leer los inputs
+  const numEl = idc => {
+    const el = document.getElementById(idc);
+    if (!el) return null;
+    const v = el.value.trim();
+    if (v === '') return null;
+    const n = Number(v);
+    return (isNaN(n) || n < 0) ? NaN : Math.round(n);
+  };
+  const sets   = numEl('ej-sets');
+  const approx = numEl('ej-approx');
+  const rest   = numEl('ej-rest');
+  const repsEl = document.getElementById('ej-reps');
+  const reps   = repsEl ? repsEl.value.trim() : '';
+
+  // Validación: series/aproximaciones/descanso deben ser números válidos
+  if ([sets, approx, rest].some(v => Number.isNaN(v))){
+    alert('Revisa los valores: series, aproximaciones y descanso deben ser números positivos.');
+    return;
+  }
+
+  const cambios = {
+    sets: sets, approx: approx, rest_sec: rest, reps: reps || null,
+  };
+
+  // Guardar en Supabase (tabla client_plans)
+  const { error } = await sb
+    .from('client_plans')
+    .update(cambios)
+    .eq('id', id);
+
+  if (error){
+    console.error('guardarEjercicio error:', error);
+    alert('No se pudo guardar el ejercicio. Inténtalo de nuevo.');
+    return;
+  }
+
+  // Actualizar en memoria
+  ej.sets = sets;
+  ej.approx = approx;
+  ej.rest_sec = rest;
+  ej.reps = reps || null;
+  editandoEjercicioId = null;
   renderClientPanel();
 }
 

@@ -5915,28 +5915,30 @@ function parseEtiquetas(txt){
 // Construye la sección de estilo + 3 listas de etiquetas (alergias / enfermedades / no le gustan)
 function seccionPreferenciasNutri(c, plan){
   const q = c._questionnaire || {};
-  const grupo = (titulo, campo, valor, color) => {
+  // origen: "cuest" (client_questionnaire) o "plan" (nutrition_plans.preferences)
+  const grupo = (titulo, campo, valor, color, origen) => {
     const tags = parseEtiquetas(valor);
+    const fnAdd = origen === "plan" ? "anadirEtiquetaPref" : "anadirEtiquetaCuest";
+    const fnDel = origen === "plan" ? "quitarEtiquetaPref" : "quitarEtiquetaCuest";
     const chips = tags.map((t,idx) => `
-      <span style="display:inline-flex;align-items:center;height:24px;border-radius:7px;
-        border:1.5px solid ${color};background:${color}1a;color:var(--text);font-size:11px;font-weight:600;white-space:nowrap">
-        <span style="padding:0 3px 0 9px">${escHtml(t)}</span>
-        <button onclick="quitarEtiquetaCuest('${campo}',${idx})" title="Quitar" style="
-          background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0 6px 0 3px;line-height:1">&#10005;</button>
+      <span style="display:inline-flex;align-items:center;height:23px;border-radius:7px;
+        border:1.5px solid ${color};background:${color}1a;color:var(--text);font-size:10.5px;font-weight:600;white-space:nowrap">
+        <span style="padding:0 2px 0 8px">${escHtml(t)}</span>
+        <button onclick="${fnDel}('${campo}',${idx})" title="Quitar" style="
+          background:none;border:none;cursor:pointer;color:var(--text3);font-size:10px;padding:0 5px 0 2px;line-height:1">&#10005;</button>
       </span>`).join("");
-    const vacio = tags.length ? "" : `<span style="font-size:11px;color:var(--text3)">Sin elementos</span>`;
-    return `<div style="margin-bottom:9px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:5px">${titulo}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-        ${chips}${vacio}
-        <span style="display:inline-flex;gap:4px;align-items:center">
-          <input id="nueva-etq-${campo}" placeholder="Anadir..." onkeydown="if(event.key==='Enter')anadirEtiquetaCuest('${campo}')" style="
-            width:96px;height:24px;border:1.5px dashed var(--border2);border-radius:7px;padding:0 7px;
-            background:var(--bg2);color:var(--text);font-size:11px">
-          <button onclick="anadirEtiquetaCuest('${campo}')" style="
-            height:24px;width:24px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-            background:var(--bg2);color:var(--green);font-size:13px;font-weight:700;padding:0">+</button>
-        </span>
+    const vacio = tags.length ? "" : `<div style="font-size:10.5px;color:var(--text3);margin-bottom:4px">Sin elementos</div>`;
+    return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:9px 10px">
+      <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${color};margin-bottom:6px">${titulo}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
+      ${vacio}
+      <div style="display:flex;gap:4px;align-items:center">
+        <input id="nueva-etq-${campo}" placeholder="Anadir..." onkeydown="if(event.key==='Enter')${fnAdd}('${campo}')" style="
+          flex:1;min-width:0;height:24px;border:1.5px dashed var(--border2);border-radius:7px;padding:0 7px;
+          background:var(--bg);color:var(--text);font-size:10.5px">
+        <button onclick="${fnAdd}('${campo}')" style="
+          height:24px;width:24px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg);color:var(--green);font-size:13px;font-weight:700;padding:0">+</button>
       </div>
     </div>`;
   };
@@ -5947,10 +5949,13 @@ function seccionPreferenciasNutri(c, plan){
 
   return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-top:8px">
     ${estiloHtml}
-    ${grupo("Alergias e intolerancias", "allergies", q.allergies, "#dc2626")}
-    ${grupo("Enfermedades", "diseases", q.diseases, "#d97706")}
-    ${grupo("Alimentos que no le gustan", "disliked_foods", q.disliked_foods, "#6b7280")}
-    <div style="font-size:9.5px;color:var(--text3);margin-top:2px">Estos datos se comparten con el cuestionario del cliente (tab Perfil).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${grupo("Alergias e intolerancias", "allergies", q.allergies, "#dc2626", "cuest")}
+      ${grupo("Enfermedades", "diseases", q.diseases, "#d97706", "cuest")}
+      ${grupo("Alimentos que no le gustan", "disliked_foods", q.disliked_foods, "#6b7280", "cuest")}
+      ${grupo("Preferencias", "preferences", plan ? plan.preferences : null, "#16a34a", "plan")}
+    </div>
+    <div style="font-size:9.5px;color:var(--text3);margin-top:7px">Alergias, enfermedades y alimentos que no le gustan se comparten con el cuestionario del cliente (tab Perfil).</div>
   </div>`;
 }
 
@@ -6001,6 +6006,52 @@ async function guardarEtiquetasCuest(campo, lista){
   c._questionnaire[campo] = texto;
   renderClientPanel();
 }
+
+// ── Etiquetas de "Preferencias" — viven en nutrition_plans.preferences ──
+async function anadirEtiquetaPref(campo){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.plan){
+    alert("Este cliente no tiene plan de nutricion.");
+    return;
+  }
+  const inp = document.getElementById("nueva-etq-" + campo);
+  const valor = inp ? inp.value.trim() : "";
+  if (!valor) return;
+  const lista = parseEtiquetas(c._nutrition.plan.preferences);
+  if (lista.some(t => t.toLowerCase() === valor.toLowerCase())){
+    alert('"' + valor + '" ya esta en la lista.');
+    return;
+  }
+  lista.push(valor);
+  await guardarEtiquetasPref(lista);
+}
+
+async function quitarEtiquetaPref(campo, idx){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.plan) return;
+  const lista = parseEtiquetas(c._nutrition.plan.preferences);
+  if (idx < 0 || idx >= lista.length) return;
+  lista.splice(idx, 1);
+  await guardarEtiquetasPref(lista);
+}
+
+async function guardarEtiquetasPref(lista){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.plan) return;
+  const texto = lista.join(", ") || null;
+  const { error } = await sb
+    .from("nutrition_plans")
+    .update({ preferences: texto })
+    .eq("id", c._nutrition.plan.id);
+  if (error){
+    console.error("guardarEtiquetasPref error:", error);
+    alert("No se pudo guardar. Intentalo de nuevo.");
+    return;
+  }
+  c._nutrition.plan.preferences = texto;
+  renderClientPanel();
+}
+
 
 function seccionPlanNutricional(c){
   const nut = c._nutrition;
@@ -6107,6 +6158,7 @@ function seccionPlanNutricional(c){
       .concat(Object.keys(meals).filter(k => !COMIDAS_ORDEN.includes(k)));
 
     const comidasHtml = clavesComida.map(comida => {
+      const htmlComida = (() => {
       const items = (meals[comida] && meals[comida].items) || [];
       const kcalComida = items.reduce((s,it)=>s+(Number(it.kcal)||0),0);
       const enEdicion = editandoComida === comida;
@@ -6160,6 +6212,9 @@ function seccionPlanNutricional(c){
         </div>
         ${filas}
       </div>`;
+      })();
+      // Cada comida ocupa una columna de ancho fijo dentro de la fila desplazable
+      return `<div style="flex:0 0 240px;min-width:240px">${htmlComida}</div>`;
     }).join('');
 
     opcionesHtml = `
@@ -6182,7 +6237,19 @@ function seccionPlanNutricional(c){
           <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.fat)} g</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${comidasHtml}</div>`;
+      <div style="position:relative">
+        <button onclick="scrollComidas(-1)" aria-label="Anterior" style="
+          position:absolute;left:-6px;top:50%;transform:translateY(-50%);z-index:2;
+          width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:700;
+          display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)">‹</button>
+        <button onclick="scrollComidas(1)" aria-label="Siguiente" style="
+          position:absolute;right:-6px;top:50%;transform:translateY(-50%);z-index:2;
+          width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:700;
+          display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)">›</button>
+        <div id="comidas-scroll" style="display:flex;gap:9px;overflow-x:auto;scroll-behavior:smooth;padding:2px 4px;-webkit-overflow-scrolling:touch">${comidasHtml}</div>
+      </div>`;
   }
 
   return `<div style="${cardStyle};margin-bottom:18px">
@@ -6267,6 +6334,12 @@ async function guardarObjetivosNutri(){
 }
 
 // ── Bloque 6C — edición de los alimentos de una comida ──
+// Desplaza la fila de comidas (dir: -1 izquierda, 1 derecha)
+function scrollComidas(dir){
+  const el = document.getElementById('comidas-scroll');
+  if (el) el.scrollBy({ left: dir * 260, behavior: 'smooth' });
+}
+
 function editarComida(comida){
   editandoComida = comida;
   renderClientPanel();

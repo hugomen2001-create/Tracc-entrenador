@@ -2342,7 +2342,7 @@ function statusFromLastSession(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition, training){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition, training, sessionsRows){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2367,6 +2367,8 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     _mesocycle: mesoRow || null,
     // Histórico de métricas diarias [{date, weight_kg}, ...] ordenado por fecha
     _metrics: metricsRows || [],
+    // Histórico de sesiones de entreno [{session_date, session_type, completed, ...}]
+    _sessions: sessionsRows || [],
     // Revisiones con fotos de progreso [{revision_week, revision_date, ...}, ...]
     _photos: photosRows || [],
     // Plan de nutrición real: { plan:{...}, options:[...] } o null si no tiene
@@ -2408,19 +2410,22 @@ async function loadRealClients(){
 
     const rows = clients || [];
 
-    // 2. Para cada cliente, su última sesión completada (para el estado de color).
-    //    Una sola consulta para todas las sesiones de todos los clientes.
+    // 2. Para cada cliente, su última sesión completada (para el estado de color)
+    //    y el historial completo de sesiones (para el tab Seguimiento).
     let lastByClient = {};
+    let sessionsByClient = {};
     if (rows.length){
       const ids = rows.map(r => r.id);
       const { data: sessions } = await sb
         .from('workout_sessions')
-        .select('client_id, session_date, completed')
+        .select('id, client_id, session_date, session_type, completed, duration_minutes, notes')
         .in('client_id', ids)
-        .eq('completed', true)
         .order('session_date', { ascending:false });
       (sessions || []).forEach(s => {
-        if (!lastByClient[s.client_id]) lastByClient[s.client_id] = s.session_date;
+        // Última sesión COMPLETADA → estado de color
+        if (s.completed && !lastByClient[s.client_id]) lastByClient[s.client_id] = s.session_date;
+        // Historial completo → tab Seguimiento
+        (sessionsByClient[s.client_id] = sessionsByClient[s.client_id] || []).push(s);
       });
     }
 
@@ -2619,7 +2624,7 @@ async function loadRealClients(){
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
                         photosByClient[row.id], nutritionByClient[row.id],
-                        trainingByClient[row.id]));
+                        trainingByClient[row.id], sessionsByClient[row.id]));
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
@@ -4286,112 +4291,231 @@ function cambiarSemanaSeg(delta){
 }
 
 
-function renderSeguimiento() {
-  const c  = currentClient;
-  const ds = getDietState(c.id);
-  const jsDay    = new Date().getDay();
-  const todayIdx = jsDay === 0 ? 6 : jsDay - 1;
+// ════════════════════════════════════════════════════════════
+// TAB SEGUIMIENTO — Bloque S1: resumen de actividad + historial
+// ════════════════════════════════════════════════════════════
 
-  // Has the client personalised their weekly assignment?
-  const clientPersonalised = ds.opciones && ds.clientPersonalised;
+// Color del tipo de sesión (reutiliza el del split)
+function colorTipoSesion(tipo){
+  return colorSesion(tipo);
+}
 
-  // Weekly plan from split cycle
-  const ts_s = getTrainState(c.id);
-  const jsDay_s   = new Date().getDay();
-  const todayIdx_s = jsDay_s === 0 ? 6 : jsDay_s - 1;
-  const weekSched  = ts_s.split && ts_s.split.length
-    ? getWeekSchedule(ts_s, new Date())
-    : null;
+// Días enteros entre dos fechas 'YYYY-MM-DD'
+function diasEntre(fechaA, fechaB){
+  const a = new Date(String(fechaA).slice(0,10) + 'T00:00:00');
+  const b = new Date(String(fechaB).slice(0,10) + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
 
-  const DIAS_FULL_S = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+// Resumen de actividad: sesiones recientes, media semanal, último entreno
+function seccionResumenActividad(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:18px';
+  const sesiones = (c._sessions || []);
+  const completadas = sesiones.filter(s => s.completed);
 
-  const planHtml = weekSched
-    ? weekSched.map((w, i) => {
-        const sd    = w.splitDay;
-        const type  = sd?.type || 'OFF';
-        const isOff = type === 'OFF';
-        const color = SPLIT_COLORS[type] || '#a3a39e';
-        const isToday = i === todayIdx_s;
-        const exs   = sd?.exercises || [];
-        const rowId = `wd-${c.id}-${i}`;
-        const isOpen = isToday && !isOff;
+  // Hoy y hace 28 días
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().slice(0,10);
+  const hace28 = new Date(hoy.getTime() - 28*86400000).toISOString().slice(0,10);
 
-        const exRows = exs.length
-          ? exs.map(e => `
-              <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:6px 14px;border-bottom:1px solid var(--border)">
-                <div style="font-size:12px">${e.nombre}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.series}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.reps}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.descanso}</div>
-              </div>`).join('')
-          : `<div style="padding:10px 14px;font-size:12px;color:var(--text3)">Sin ejercicios asignados aún</div>`;
+  const ult4sem = completadas.filter(s => s.session_date >= hace28 && s.session_date <= hoyStr);
+  const mediaSemana = (ult4sem.length / 4);
 
-        return `<div style="margin-bottom:5px;border:1px solid ${isToday?'var(--gm)':'var(--border)'};border-radius:10px;overflow:hidden;${isToday?'box-shadow:0 0 0 2px var(--gl)':''}">
-          <div ${isOff?'':` onclick="toggleAccordion('${rowId}')"`}
-            style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:${isToday?'var(--gl)':'var(--bg3)'};${isOff?'':'cursor:pointer;'}user-select:none">
-            ${isToday?`<span style="font-size:9px;font-weight:700;background:var(--green);color:#fff;padding:2px 7px;border-radius:20px">HOY</span>`:''}
-            <span style="font-size:12px;font-weight:600;color:${isToday?'var(--green)':'var(--text)'}">${DIAS_FULL_S[i]}</span>
-            ${!isOff?`<span style="font-size:11px;font-weight:700;color:${color};background:${color}18;padding:2px 8px;border-radius:5px">${type}</span>`:''}
-            ${!isOff&&exs.length?`<span style="font-size:11px;color:var(--text3)">${exs.length} ejercicios</span>`:''}
-            ${!isOff?`<button onclick="event.stopPropagation();openEvoModal('${type}')" style="font-size:10.5px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'Geist',sans-serif;margin-left:auto;flex-shrink:0">Ver evolución</button>`:'<span style="margin-left:auto"></span>'}
-            <span style="display:flex;align-items:center;gap:6px">
-              ${isOff
-                ? `<span style="font-size:10px;font-weight:600;color:var(--text3);background:var(--bg2);border:1px solid var(--border);padding:2px 9px;border-radius:5px">OFF</span>`
-                : `<span id="${rowId}-arrow" style="font-size:12px;color:var(--text3);transition:transform .18s;display:inline-block;transform:${isOpen?'rotate(180deg)':'rotate(0deg)'}">▾</span>`}
-            </span>
-          </div>
-          ${!isOff?`<div id="${rowId}" style="display:${isOpen?'block':'none'};border-top:1px solid var(--border)">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:6px 14px;background:var(--bg3);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);border-bottom:1px solid var(--border)">
-              <div>Ejercicio</div><div>Series</div><div>Reps</div><div>Descanso</div>
-            </div>
-            ${exRows}
-          </div>`:''}
-        </div>`;
-      }).join('')
-    : c.planEntrenamiento.map(bloque => `
-        <div style="margin-bottom:12px">
-          <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">${bloque.dia}</div>
-          <div class="edit-card">
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:7px 14px;background:var(--bg3);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">
-              <div>Ejercicio</div><div>Series</div><div>Reps</div><div>Descanso</div>
-            </div>
-            ${bloque.ejercicios.map(e=>`
-              <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:6px 14px;border-bottom:1px solid var(--border)">
-                <div style="font-size:12px">${e.nombre}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.series}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.reps}</div>
-                <div style="font-size:12px;color:var(--text2)">${e.descanso}</div>
-              </div>`).join('')}
-          </div>
-        </div>`).join('');
+  // Último entreno completado
+  const ultimo = completadas[0];  // ya vienen ordenadas desc por fecha
+  let textoUltimo = 'Sin entrenos registrados';
+  if (ultimo){
+    const d = diasEntre(ultimo.session_date, hoyStr);
+    textoUltimo = d <= 0 ? 'Hoy' : d === 1 ? 'Ayer' : 'Hace ' + d + ' días';
+  }
 
-  // Pending badge shown when plan exists but client hasn't personalised yet
-  const pendingBadge = ds.opciones && !clientPersonalised
-    ? `<div style="display:flex;align-items:center;gap:8px;background:var(--al);border:1px solid #fde68a;border-radius:9px;padding:9px 13px;margin-bottom:12px;font-size:12px;color:var(--amber)">
-        <span><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="var(--amber)" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 6a.75.75 0 0 0-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 0 0 0-1.5h-3.75V6Z" clip-rule="evenodd"/></svg></span>
-        <span><b>Pendiente de personalizar por el cliente</b> — el plan nutricional está listo pero el cliente aún no ha elegido su distribución semanal.</span>
-      </div>`
-    : '';
+  // Racha: días consecutivos hacia atrás con al menos un entreno... simplificado:
+  // total de sesiones completadas registradas
+  const totalCompletadas = completadas.length;
 
-  const accordionHtml = ds.opciones
-    ? renderWeekAccordion(c, ds, todayIdx)
-    : `<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--radius)">
-        Sin plan nutricional. <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="switchTab('editar')">Crear plan →</span>
-      </div>`;
+  const tile = (valor, etiqueta, color) => `
+    <div style="flex:1;min-width:0;background:var(--bg);border-radius:11px;padding:11px 12px;text-align:center">
+      <div style="font-size:20px;font-weight:700;color:${color||'var(--text)'}">${valor}</div>
+      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-top:2px">${etiqueta}</div>
+    </div>`;
 
-  return `
-    ${seccionMetricas(c)}
-    <div class="two-col" style="align-items:start">
-      <div>
-        <div class="section-title">Opciones escogidas por el cliente</div>
-        ${pendingBadge}
-        ${accordionHtml}
-      </div>
-      <div>
-        <div class="section-title">Plan de entrenamiento actual</div>
-        ${planHtml}
+  return `<div style="${cardStyle}">
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">📊 Resumen de actividad</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${tile(ult4sem.length, 'Sesiones · últ. 4 sem.', 'var(--green)')}
+      ${tile(mediaSemana.toFixed(1), 'Media por semana', 'var(--text)')}
+      ${tile(textoUltimo, 'Último entreno', 'var(--text)')}
+      ${tile(totalCompletadas, 'Sesiones totales', 'var(--text)')}
+    </div>
+  </div>`;
+}
+
+// Historial de sesiones de entreno reales del cliente
+function seccionHistorialSesiones(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:18px';
+  const sesiones = (c._sessions || []);
+
+  if (!sesiones.length){
+    return `<div style="${cardStyle}">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🗓️ Historial de sesiones</div>
+      <div style="font-size:12px;color:var(--text3);padding:8px 0">
+        Este cliente todavía no ha registrado ninguna sesión de entreno.
       </div>
     </div>`;
+  }
+
+  // Índice de sesiones por fecha (YYYY-MM-DD => sesión)
+  const porFecha = {};
+  sesiones.forEach(s => {
+    const f = String(s.session_date).slice(0,10);
+    // Si hay varias el mismo día, prioriza la completada
+    if (!porFecha[f] || (s.completed && !porFecha[f].completed)) porFecha[f] = s;
+  });
+
+  // Construir 12 semanas hacia atrás (la última columna es la semana actual)
+  const SEMANAS = 12;
+  const hoy = new Date();
+  // Lunes de esta semana
+  const diaSem = hoy.getDay() === 0 ? 6 : hoy.getDay() - 1;
+  const lunesEstaSemana = new Date(hoy.getTime() - diaSem*86400000);
+  // Lunes de hace 11 semanas
+  const primerLunes = new Date(lunesEstaSemana.getTime() - (SEMANAS-1)*7*86400000);
+
+  const DIAS = ['L','M','X','J','V','S','D'];
+  const hoyStr = hoy.toISOString().slice(0,10);
+
+  // Filas = días de la semana (L..D), columnas = semanas
+  let filas = '';
+  for (let d = 0; d < 7; d++){
+    let celdas = '';
+    for (let w = 0; w < SEMANAS; w++){
+      const dia = new Date(primerLunes.getTime() + (w*7 + d)*86400000);
+      const fStr = dia.toISOString().slice(0,10);
+      const futuro = fStr > hoyStr;
+      const ses = porFecha[fStr];
+      let bg = 'var(--bg3)', borde = '1px solid var(--border)', contenido = '';
+      let titulo = formatearFechaCorta(fStr);
+      let onclick = '';
+      if (futuro){
+        bg = 'transparent'; borde = '1px solid transparent';
+      } else if (ses){
+        const col = colorTipoSesion(ses.session_type || '');
+        if (ses.completed){
+          bg = col; borde = '1px solid ' + col;
+        } else {
+          // Sin terminar: apagado, con borde del color
+          bg = col + '33'; borde = '1.5px dashed ' + col;
+        }
+        titulo += ' · ' + (ses.session_type||'') + (ses.completed ? '' : ' (sin terminar)');
+        onclick = ` onclick="abrirDetalleSesion('${ses.id}','${escHtml(fStr)}')" style="cursor:pointer"`;
+      }
+      celdas += `<div title="${escHtml(titulo)}"${onclick ? onclick : ' style=""'}
+        ><div style="width:15px;height:15px;border-radius:3px;background:${bg};border:${borde}"></div></div>`;
+    }
+    filas += `<div style="display:flex;gap:3px;align-items:center;margin-bottom:3px">
+      <div style="width:14px;font-size:8px;color:var(--text3);font-weight:600;text-align:center">${DIAS[d]}</div>
+      ${celdas}
+    </div>`;
+  }
+
+  // Leyenda de colores por tipo de sesión presente
+  const tiposPresentes = [...new Set(sesiones.map(s => s.session_type).filter(Boolean))];
+  const leyenda = tiposPresentes.map(t =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
+      <span style="width:10px;height:10px;border-radius:2px;background:${colorTipoSesion(t)}"></span>${escHtml(t)}</span>`
+  ).join('');
+
+  return `<div style="${cardStyle}">
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">🗓️ Historial de sesiones</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Últimas 12 semanas · pulsa un día para ver el detalle</div>
+    <div style="overflow-x:auto">
+      ${filas}
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
+      ${leyenda}
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
+        <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
+    </div>
+    <div id="detalle-sesion"></div>
+  </div>`;
+}
+
+// Abre el detalle de una sesión: carga sus series desde workout_sets
+async function abrirDetalleSesion(sessionId, fechaStr){
+  const cont = document.getElementById('detalle-sesion');
+  if (!cont) return;
+  cont.innerHTML = `<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:11px;
+    font-size:11px;color:var(--text3);text-align:center">Cargando detalle…</div>`;
+
+  const { data: sets, error } = await sb
+    .from('workout_sets')
+    .select('exercise_name, set_number, reps_done, weight_kg')
+    .eq('session_id', sessionId)
+    .order('exercise_name', { ascending:true })
+    .order('set_number', { ascending:true });
+
+  if (error){
+    console.error('abrirDetalleSesion error:', error);
+    cont.innerHTML = `<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:11px;
+      font-size:11px;color:var(--red)">No se pudo cargar el detalle de la sesión.</div>`;
+    return;
+  }
+
+  const c = currentClient;
+  const ses = (c._sessions || []).find(s => s.id === sessionId);
+  const tipo = ses ? (ses.session_type || '') : '';
+  const col = colorTipoSesion(tipo);
+
+  let cuerpo;
+  if (!sets || !sets.length){
+    cuerpo = `<div style="font-size:11px;color:var(--text3);padding:6px 0">
+      Esta sesión no tiene series registradas.</div>`;
+  } else {
+    // Agrupar por ejercicio
+    const porEj = {};
+    sets.forEach(s => { (porEj[s.exercise_name] = porEj[s.exercise_name] || []).push(s); });
+    cuerpo = Object.keys(porEj).map(nombre => {
+      const series = porEj[nombre].sort((a,b)=>(a.set_number||0)-(b.set_number||0));
+      const seriesTxt = series.map(s =>
+        `<span style="font-size:10.5px;color:var(--text2);background:var(--bg3);border-radius:5px;padding:2px 7px">
+          ${s.reps_done != null ? s.reps_done : '—'}${s.weight_kg != null ? ' × ' + s.weight_kg + 'kg' : ''}</span>`
+      ).join(' ');
+      return `<div style="padding:7px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:4px">${escHtml(nombre)}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">${seriesTxt}</div>
+      </div>`;
+    }).join('');
+  }
+
+  cont.innerHTML = `<div style="margin-top:12px;padding:12px 14px;background:var(--bg);border-radius:11px;border:1.5px solid ${col}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:700;color:#fff;background:${col};padding:2px 9px;border-radius:6px">${escHtml(tipo)}</span>
+        <span style="font-size:11px;color:var(--text3)">${escHtml(formatearFechaCorta(fechaStr))}</span>
+        ${ses && !ses.completed ? '<span style="font-size:9.5px;font-weight:700;color:var(--text3)">Sin terminar</span>' : ''}
+      </div>
+      <button onclick="cerrarDetalleSesion()" style="
+        height:22px;padding:0 9px;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">Cerrar</button>
+    </div>
+    ${ses && ses.notes ? `<div style="font-size:10.5px;color:var(--text3);margin-bottom:6px">${escHtml(ses.notes)}</div>` : ''}
+    ${cuerpo}
+  </div>`;
+}
+
+function cerrarDetalleSesion(){
+  const cont = document.getElementById('detalle-sesion');
+  if (cont) cont.innerHTML = '';
+}
+
+
+function renderSeguimiento() {
+  const c = currentClient;
+  return [
+    seccionMetricas(c),
+    seccionResumenActividad(c),
+    seccionHistorialSesiones(c),
+  ].join('');
 }
 
 function renderWeekAccordion(c, ds, todayIdx) {

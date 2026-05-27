@@ -4275,7 +4275,7 @@ function seccionMetricas(c){
         <button onclick="cambiarSemanaSeg(-1)" style="${btnStyle}${segWeekOffset===0?';'+btnDisabled:''}" title="Semana siguiente" ${segWeekOffset===0?'disabled':''}>›</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div style="display:grid;grid-template-columns:1fr;gap:10px">
       ${cards}
     </div>
   </div>`;
@@ -4420,10 +4420,10 @@ function seccionHistorialSesiones(c){
         onclick = ` onclick="abrirDetalleSesion('${ses.id}','${escHtml(fStr)}')" style="cursor:pointer"`;
       }
       celdas += `<div title="${escHtml(titulo)}"${onclick ? onclick : ' style=""'}
-        ><div style="width:15px;height:15px;border-radius:3px;background:${bg};border:${borde}"></div></div>`;
+        ><div style="width:22px;height:22px;border-radius:4px;background:${bg};border:${borde}"></div></div>`;
     }
-    filas += `<div style="display:flex;gap:3px;align-items:center;margin-bottom:3px">
-      <div style="width:14px;font-size:8px;color:var(--text3);font-weight:600;text-align:center">${DIAS[d]}</div>
+    filas += `<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
+      <div style="width:16px;font-size:9px;color:var(--text3);font-weight:600;text-align:center">${DIAS[d]}</div>
       ${celdas}
     </div>`;
   }
@@ -4446,7 +4446,6 @@ function seccionHistorialSesiones(c){
       <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
         <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
     </div>
-    <div id="detalle-sesion"></div>
   </div>`;
 }
 
@@ -4521,11 +4520,14 @@ function cerrarDetalleSesion(){
 
 function renderSeguimiento() {
   const c = currentClient;
-  return [
-    seccionMetricas(c),
-    seccionResumenActividad(c),
-    seccionHistorialSesiones(c),
-  ].join('');
+  return `
+    ${seccionResumenActividad(c)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:18px">
+      <div>${seccionHistorialSesiones(c)}</div>
+      <div>${seccionMetricas(c)}</div>
+    </div>
+    <div id="detalle-sesion"></div>
+  `;
 }
 
 function renderWeekAccordion(c, ds, todayIdx) {

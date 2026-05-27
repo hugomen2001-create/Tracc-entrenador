@@ -2604,6 +2604,16 @@ async function loadRealClients(){
       TRAINING_TEMPLATES = tplRows || [];
     }
 
+    // 9c. Biblioteca de alimentos del coach (food_library)
+    {
+      const { data: foodRows } = await sb
+        .from('food_library')
+        .select('*')
+        .eq('coach_id', coachData.id)
+        .order('name', { ascending:true });
+      FOOD_LIBRARY = foodRows || [];
+    }
+
     // 10. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
@@ -3218,6 +3228,9 @@ function selectClient(id) {
   splitBorrador = null;
   splitDiaNuevo = null;
   mostrandoPlantillas = false;
+  mostrandoBiblioteca = false;
+  creandoAlimento = false;
+  editandoAlimentoId = null;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3362,6 +3375,9 @@ function switchTab(tab) {
   splitBorrador = null;
   splitDiaNuevo = null;
   mostrandoPlantillas = false;
+  mostrandoBiblioteca = false;
+  creandoAlimento = false;
+  editandoAlimentoId = null;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6060,6 +6076,209 @@ async function guardarEtiquetasPref(lista){
 }
 
 
+
+// ════════════════════════════════════════════════════════════
+// BIBLIOTECA DE ALIMENTOS
+// ════════════════════════════════════════════════════════════
+
+// Tira verde con el resumen y los botones
+function tiraBibliotecaAlimentos(){
+  const n = (FOOD_LIBRARY || []).length;
+  return `<div style="background:var(--gl);border:1.5px solid rgba(22,163,74,.25);border-radius:13px;
+    padding:11px 15px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:12.5px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
+      <div style="font-size:10.5px;color:var(--green);opacity:.75;margin-top:1px">${n} ${n===1?'alimento guardado':'alimentos guardados'} · crea alimentos una vez y reutilízalos en las dietas</div>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button title="Disponible próximamente" disabled style="
+        height:30px;padding:0 13px;border-radius:10px;background:var(--bg2);
+        border:1.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text3);
+        cursor:not-allowed;opacity:.7">✦ Generar con IA</button>
+      <button onclick="abrirBiblioteca()" style="
+        height:30px;padding:0 13px;border-radius:10px;background:var(--green);
+        border:none;font-size:12px;font-weight:600;color:#fff;cursor:pointer">📚 Abrir biblioteca (${n})</button>
+    </div>
+  </div>`;
+}
+
+// Panel/modal con la tabla de alimentos
+function panelBibliotecaHtml(){
+  if (!mostrandoBiblioteca) return '';
+  const foods = FOOD_LIBRARY || [];
+
+  // Cabecera de la tabla
+  const hdr = `<div style="display:grid;grid-template-columns:1.6fr 70px 52px 52px 52px 1fr 56px;gap:6px;
+    padding:5px 8px;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">
+    <div>Alimento</div><div>Kcal/100g</div><div>Prot.</div><div>Carb.</div><div>Grasa</div><div>Grupo</div><div></div></div>`;
+
+  // Filas
+  let filas;
+  if (!foods.length){
+    filas = `<div style="font-size:11px;color:var(--text3);padding:14px;text-align:center">
+      Aún no tienes alimentos. Pulsa "+ Nuevo alimento" para crear el primero.</div>`;
+  } else {
+    filas = foods.map(f => {
+      if (editandoAlimentoId === f.id){
+        return filaAlimentoEdicion(f);
+      }
+      return `<div style="display:grid;grid-template-columns:1.6fr 70px 52px 52px 52px 1fr 56px;gap:6px;
+        padding:7px 8px;border-top:1px solid var(--border);align-items:center;font-size:11.5px;color:var(--text)">
+        <div style="font-weight:600">${escHtml(f.name||'')}</div>
+        <div>${f.kcal_per_100g ?? '—'}</div>
+        <div>${f.protein_g ?? 0} g</div>
+        <div>${f.carbs_g ?? 0} g</div>
+        <div>${f.fat_g ?? 0} g</div>
+        <div style="font-size:10px;color:var(--text2)">${escHtml(f.food_group||'—')}</div>
+        <div style="display:flex;gap:3px;justify-content:flex-end">
+          <button onclick="editarAlimento('${escHtml(f.id)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px">✏️</button>
+          <button onclick="borrarAlimento('${escHtml(f.id)}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px;color:var(--red)">&#10005;</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Fila de creación de alimento nuevo
+  const formNuevo = creandoAlimento ? filaAlimentoEdicion(null) : `
+    <button onclick="crearAlimento()" style="
+      width:100%;margin-top:8px;height:32px;border:1.5px dashed var(--border2);border-radius:9px;
+      cursor:pointer;background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">+ Nuevo alimento</button>`;
+
+  return `<div style="border:1.5px solid var(--green);border-radius:13px;padding:13px;margin-bottom:14px;background:var(--bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+      <div style="font-size:12px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
+      <button onclick="cerrarBiblioteca()" style="
+        height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">Cerrar</button>
+    </div>
+    <div style="background:var(--bg2);border-radius:10px;overflow:hidden">
+      ${hdr}
+      ${filas}
+    </div>
+    ${formNuevo}
+  </div>`;
+}
+
+// Fila editable (para crear o editar un alimento). f=null => creación
+function filaAlimentoEdicion(f){
+  const v = f || {};
+  const pre = f ? ('ed-'+f.id) : 'nuevo';
+  const inp = (campo, val, ph, tipo) => `<input id="alf-${pre}-${campo}" type="${tipo||'text'}" ${tipo==='number'?'min="0"':''}
+    value="${val==null?'':escHtml(String(val))}" placeholder="${ph||''}" style="
+    width:100%;box-sizing:border-box;border:1.5px solid var(--green);border-radius:6px;
+    padding:4px 6px;background:var(--bg);color:var(--text);font-size:11px">`;
+  const guardarFn = f ? `guardarEdicionAlimento('${escHtml(f.id)}')` : 'guardarNuevoAlimento()';
+  const cancelarFn = f ? 'cancelarEdicionAlimento()' : 'cancelarNuevoAlimento()';
+  return `<div style="border-top:1px solid var(--border);padding:9px 8px;background:var(--gl)">
+    <div style="display:grid;grid-template-columns:1.6fr 70px 52px 52px 52px 1fr;gap:6px;margin-bottom:7px">
+      ${inp('name', v.name, 'Nombre')}
+      ${inp('kcal', v.kcal_per_100g, 'kcal', 'number')}
+      ${inp('protein', v.protein_g, 'P', 'number')}
+      ${inp('carbs', v.carbs_g, 'CH', 'number')}
+      ${inp('fat', v.fat_g, 'G', 'number')}
+      ${inp('group', v.food_group, 'Grupo (ej: Proteína)')}
+    </div>
+    <div style="display:flex;gap:6px">
+      <button onclick="${guardarFn}" style="
+        height:28px;padding:0 14px;border:none;border-radius:7px;cursor:pointer;
+        background:var(--green);color:#fff;font-size:11px;font-weight:700">Guardar</button>
+      <button onclick="${cancelarFn}" style="
+        height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function abrirBiblioteca(){ mostrandoBiblioteca = true; renderClientPanel(); }
+function cerrarBiblioteca(){
+  mostrandoBiblioteca = false; creandoAlimento = false; editandoAlimentoId = null;
+  renderClientPanel();
+}
+function crearAlimento(){ creandoAlimento = true; editandoAlimentoId = null; renderClientPanel(); }
+function cancelarNuevoAlimento(){ creandoAlimento = false; renderClientPanel(); }
+function editarAlimento(id){ editandoAlimentoId = id; creandoAlimento = false; renderClientPanel(); }
+function cancelarEdicionAlimento(){ editandoAlimentoId = null; renderClientPanel(); }
+
+// Lee los campos del formulario de alimento. Devuelve null si hay error.
+function leerFormularioAlimento(pre){
+  const g = campo => document.getElementById('alf-'+pre+'-'+campo);
+  const nombre = g('name') ? g('name').value.trim() : '';
+  if (!nombre){ alert('El alimento necesita un nombre.'); return null; }
+  const num = campo => {
+    const el = g(campo);
+    if (!el) return 0;
+    const txt = el.value.trim();
+    if (txt === '') return 0;
+    const n = Number(txt);
+    return (isNaN(n) || n < 0) ? NaN : n;
+  };
+  const kcal = num('kcal'), protein = num('protein'), carbs = num('carbs'), fat = num('fat');
+  if ([kcal,protein,carbs,fat].some(x => Number.isNaN(x))){
+    alert('Revisa los valores: kcal y macros deben ser números positivos.');
+    return null;
+  }
+  const grupoEl = g('group');
+  const grupo = grupoEl ? grupoEl.value.trim() : '';
+  return {
+    name: nombre, kcal_per_100g: Math.round(kcal),
+    protein_g: protein, carbs_g: carbs, fat_g: fat,
+    food_group: grupo || null,
+  };
+}
+
+async function guardarNuevoAlimento(){
+  if (!coachData) return;
+  const datos = leerFormularioAlimento('nuevo');
+  if (!datos) return;
+  const { data, error } = await sb
+    .from('food_library')
+    .insert(Object.assign({ coach_id: coachData.id }, datos))
+    .select()
+    .single();
+  if (error || !data){
+    console.error('guardarNuevoAlimento error:', error);
+    alert('No se pudo guardar el alimento. Inténtalo de nuevo.');
+    return;
+  }
+  FOOD_LIBRARY.push(data);
+  FOOD_LIBRARY.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  creandoAlimento = false;
+  renderClientPanel();
+}
+
+async function guardarEdicionAlimento(id){
+  const datos = leerFormularioAlimento('ed-'+id);
+  if (!datos) return;
+  const { error } = await sb
+    .from('food_library')
+    .update(datos)
+    .eq('id', id);
+  if (error){
+    console.error('guardarEdicionAlimento error:', error);
+    alert('No se pudo guardar. Inténtalo de nuevo.');
+    return;
+  }
+  const f = FOOD_LIBRARY.find(x => x.id === id);
+  if (f) Object.assign(f, datos);
+  FOOD_LIBRARY.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  editandoAlimentoId = null;
+  renderClientPanel();
+}
+
+async function borrarAlimento(id){
+  const f = FOOD_LIBRARY.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm('¿Eliminar "' + (f.name||'') + '" de la biblioteca de alimentos?')) return;
+  const { error } = await sb.from('food_library').delete().eq('id', id);
+  if (error){
+    console.error('borrarAlimento error:', error);
+    alert('No se pudo eliminar el alimento.');
+    return;
+  }
+  FOOD_LIBRARY = FOOD_LIBRARY.filter(x => x.id !== id);
+  renderClientPanel();
+}
+
 function seccionPlanNutricional(c){
   const nut = c._nutrition;
   const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px';
@@ -6255,6 +6474,8 @@ function seccionPlanNutricional(c){
     ${objetivosHtml}
     ${metaHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
+    ${tiraBibliotecaAlimentos()}
+    ${panelBibliotecaHtml()}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Opciones de dieta</div>
     ${opcionesHtml}
   </div>`;
@@ -6421,6 +6642,11 @@ let busquedaEjercicio = '';              // texto del buscador del selector
 // Plantillas de entreno
 let TRAINING_TEMPLATES = [];             // plantillas guardadas del coach
 let mostrandoPlantillas = false;         // panel de plantillas abierto
+// Biblioteca de alimentos
+let FOOD_LIBRARY = [];                   // alimentos guardados del coach
+let mostrandoBiblioteca = false;         // panel de biblioteca de alimentos abierto
+let creandoAlimento = false;             // formulario de nuevo alimento abierto
+let editandoAlimentoId = null;           // id del alimento que se está editando
 // Bloque 6E — modo edición del split
 let editandoSplit = false;
 let splitBorrador = null;   // copia de trabajo del split mientras se edita

@@ -2584,7 +2584,17 @@ async function loadRealClients(){
       });
     }
 
-    // 9. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    // 9. Biblioteca completa de ejercicios (para añadir ejercicios a un plan)
+    {
+      const { data: libRows } = await sb
+        .from('exercises')
+        .select('id, name, muscle_group, video_url, default_sets, default_reps, default_rest_sec, default_approx')
+        .order('muscle_group', { ascending:true })
+        .order('name', { ascending:true });
+      EXERCISE_LIBRARY = libRows || [];
+    }
+
+    // 10. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
@@ -3192,6 +3202,8 @@ function selectClient(id) {
   editandoObjetivos = false;
   editandoEjercicioId = null;
   editandoComida = null;
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = "";
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3330,6 +3342,8 @@ function switchTab(tab) {
   editandoObjetivos = false;  // salir de modo edición al cambiar de tab
   editandoEjercicioId = null;
   editandoComida = null;
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = "";
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6238,6 +6252,10 @@ async function guardarComida(comida){
 let editSesionEntreno = 0;
 // Bloque 6B — id del ejercicio que se está editando (null = ninguno)
 let editandoEjercicioId = null;
+// Bloque 6D — biblioteca completa de ejercicios y estado del selector
+let EXERCISE_LIBRARY = [];
+let mostrandoSelectorEjercicio = false;  // selector de "añadir ejercicio" abierto
+let busquedaEjercicio = '';              // texto del buscador del selector
 
 // Días de la semana para mostrar el split
 const DIAS_SEMANA_CORTO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
@@ -6367,8 +6385,22 @@ function seccionPlanEntreno(c){
         ? `<button onclick="editarEjercicio('${escHtml(ej.id)}')" title="Editar" style="
             background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0">✏️</button>`
         : '';
+      // Flechas para reordenar y botón de quitar (Bloque 6D)
+      const flechas = ej.id ? `
+        <div style="display:flex;flex-direction:column;flex-shrink:0">
+          <button onclick="moverEjercicio('${escHtml(ej.id)}',-1)" title="Subir" ${idx===0?'disabled':''} style="
+            background:none;border:none;cursor:${idx===0?'default':'pointer'};font-size:10px;padding:0 3px;
+            color:${idx===0?'var(--border2)':'var(--text2)'};line-height:1.1">▲</button>
+          <button onclick="moverEjercicio('${escHtml(ej.id)}',1)" title="Bajar" ${idx===lista.length-1?'disabled':''} style="
+            background:none;border:none;cursor:${idx===lista.length-1?'default':'pointer'};font-size:10px;padding:0 3px;
+            color:${idx===lista.length-1?'var(--border2)':'var(--text2)'};line-height:1.1">▼</button>
+        </div>` : '';
+      const botonQuitar = ej.id
+        ? `<button onclick="quitarEjercicio('${escHtml(ej.id)}')" title="Quitar" style="
+            background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;color:var(--red)">✕</button>`
+        : '';
       return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px">
-        <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="display:flex;align-items:flex-start;gap:8px">
           ${numero}
           <div style="flex:1;min-width:0">
             <div style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
@@ -6382,7 +6414,9 @@ function seccionPlanEntreno(c){
           ${ej.video_url
             ? `<a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;flex-shrink:0;font-weight:600">▶ Vídeo</a>`
             : ''}
+          ${flechas}
           ${botonEditar}
+          ${botonQuitar}
         </div>
       </div>`;
     }).join('');
@@ -6390,7 +6424,8 @@ function seccionPlanEntreno(c){
     sesionesHtml = `
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${lista.length} ${lista.length===1?'ejercicio':'ejercicios'} en esta sesión</div>
-      ${filas}`;
+      ${filas}
+      ${selectorEjercicioHtml(tipoSel)}`;
   }
 
   return `<div style="${cardStyle}">
@@ -6409,6 +6444,8 @@ function seccionPlanEntreno(c){
 function seleccionarSesionEntreno(i){
   editSesionEntreno = i;
   editandoEjercicioId = null;  // al cambiar de sesión, salir de edición
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = '';
   renderClientPanel();
 }
 
@@ -6474,6 +6511,190 @@ async function guardarEjercicio(id){
   editandoEjercicioId = null;
   renderClientPanel();
 }
+
+// ── Bloque 6D — añadir / quitar / reordenar ejercicios ──
+
+// HTML del bloque "+ Añadir ejercicio" y el selector de la biblioteca
+function selectorEjercicioHtml(sessionType){
+  if (!mostrandoSelectorEjercicio){
+    return `<button onclick="abrirSelectorEjercicio()" style="
+      width:100%;margin-top:4px;height:36px;border:1.5px dashed var(--border2);border-radius:10px;
+      cursor:pointer;background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">+ Añadir ejercicio</button>`;
+  }
+  // Selector abierto: buscador + lista agrupada por grupo muscular
+  const q = (busquedaEjercicio || "").trim().toLowerCase();
+  const lib = EXERCISE_LIBRARY.filter(e => !q || (e.name||"").toLowerCase().includes(q));
+  // Agrupar por grupo muscular
+  const porGrupo = {};
+  lib.forEach(e => {
+    const g = e.muscle_group || "Otros";
+    (porGrupo[g] = porGrupo[g] || []).push(e);
+  });
+  const grupos = Object.keys(porGrupo).sort();
+  let listaHtml;
+  if (!lib.length){
+    listaHtml = `<div style="font-size:11px;color:var(--text3);padding:14px;text-align:center">Sin ejercicios que coincidan con la búsqueda.</div>`;
+  } else {
+    listaHtml = grupos.map(g => `
+      <div style="margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:4px 2px">${escHtml(g)}</div>
+        ${porGrupo[g].map(e => `
+          <div onclick="anadirEjercicio('${escHtml(e.id)}')" style="
+            display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-radius:8px;
+            cursor:pointer;background:var(--bg2);margin-bottom:3px" onmouseover="this.style.background='var(--gl)'" onmouseout="this.style.background='var(--bg2)'">
+            <span style="font-size:12px;color:var(--text)">${escHtml(e.name||"Ejercicio")}</span>
+            <span style="font-size:13px;color:var(--green)">+</span>
+          </div>`).join("")}
+      </div>`).join("");
+  }
+  return `<div style="margin-top:8px;border:1.5px solid var(--green);border-radius:12px;padding:11px;background:var(--bg)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+      <input id="buscar-ejercicio" value="${escHtml(busquedaEjercicio)}" placeholder="Buscar ejercicio..."
+        oninput="filtrarEjercicios(this.value)" style="
+        flex:1;border:1.5px solid var(--border);border-radius:8px;padding:6px 9px;
+        background:var(--bg2);color:var(--text);font-size:12px">
+      <button onclick="cerrarSelectorEjercicio()" style="
+        height:30px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:600">Cerrar</button>
+    </div>
+    <div style="max-height:280px;overflow-y:auto">${listaHtml}</div>
+  </div>`;
+}
+
+function abrirSelectorEjercicio(){
+  mostrandoSelectorEjercicio = true;
+  busquedaEjercicio = "";
+  renderClientPanel();
+}
+
+function cerrarSelectorEjercicio(){
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = "";
+  renderClientPanel();
+}
+
+function filtrarEjercicios(texto){
+  busquedaEjercicio = texto;
+  // Re-renderizar manteniendo el foco en el buscador
+  renderClientPanel();
+  const inp = document.getElementById("buscar-ejercicio");
+  if (inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+// Añade un ejercicio de la biblioteca a la sesión seleccionada
+async function anadirEjercicio(exerciseId){
+  const c = currentClient;
+  if (!c || !c._training || !coachData) return;
+  const ej = EXERCISE_LIBRARY.find(e => e.id === exerciseId);
+  if (!ej) return;
+
+  // Tipo de sesión actualmente seleccionado
+  const ejercicios = c._training.exercises || [];
+  const split = c._training.split || [];
+  const porSesion = {};
+  ejercicios.forEach(e => { const t=e.session_type||"OTROS"; (porSesion[t]=porSesion[t]||[]).push(e); });
+  const ordenSplit = [];
+  split.forEach(s => { if (s && s!=="OFF" && !ordenSplit.includes(s)) ordenSplit.push(s); });
+  const tiposSesion = ordenSplit.filter(t=>porSesion[t]).concat(Object.keys(porSesion).filter(t=>!ordenSplit.includes(t)));
+  const sessionType = tiposSesion[editSesionEntreno];
+  if (!sessionType){ alert("No hay una sesión seleccionada."); return; }
+
+  // exercise_order = al final de los de esa sesión
+  const ordenMax = (porSesion[sessionType]||[]).reduce((m,e)=>Math.max(m, e.exercise_order||0), 0);
+
+  const nuevaFila = {
+    client_id: c.id,
+    coach_id: coachData.id,
+    exercise_id: exerciseId,
+    session_type: sessionType,
+    exercise_order: ordenMax + 1,
+    sets: ej.default_sets ?? null,
+    reps: ej.default_reps ?? null,
+    rest_sec: ej.default_rest_sec ?? null,
+    approx: ej.default_approx ?? null,
+    is_active: true,
+  };
+
+  const { data, error } = await sb
+    .from("client_plans")
+    .insert(nuevaFila)
+    .select()
+    .single();
+
+  if (error || !data){
+    console.error("anadirEjercicio error:", error);
+    alert("No se pudo añadir el ejercicio. Inténtalo de nuevo.");
+    return;
+  }
+
+  // Añadir en memoria con el formato que usa la vista
+  c._training.exercises.push({
+    id: data.id,
+    session_type: sessionType,
+    exercise_order: nuevaFila.exercise_order,
+    sets: nuevaFila.sets,
+    reps: nuevaFila.reps,
+    rest_sec: nuevaFila.rest_sec,
+    approx: nuevaFila.approx,
+    name: ej.name || "Ejercicio",
+    muscle_group: ej.muscle_group || null,
+    video_url: ej.video_url || null,
+  });
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = "";
+  renderClientPanel();
+}
+
+// Quita un ejercicio de la sesión (con confirmación)
+async function quitarEjercicio(id){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const ej = (c._training.exercises||[]).find(e => e.id === id);
+  if (!ej) return;
+  if (!confirm('¿Seguro que quieres quitar "' + (ej.name||'este ejercicio') + '" del plan?')) return;
+
+  const { error } = await sb.from("client_plans").delete().eq("id", id);
+  if (error){
+    console.error("quitarEjercicio error:", error);
+    alert("No se pudo quitar el ejercicio. Inténtalo de nuevo.");
+    return;
+  }
+  c._training.exercises = c._training.exercises.filter(e => e.id !== id);
+  if (editandoEjercicioId === id) editandoEjercicioId = null;
+  renderClientPanel();
+}
+
+// Mueve un ejercicio una posición arriba (-1) o abajo (+1) dentro de su sesión
+async function moverEjercicio(id, dir){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const ej = (c._training.exercises||[]).find(e => e.id === id);
+  if (!ej) return;
+  // Ejercicios de la misma sesión, ordenados
+  const grupo = c._training.exercises
+    .filter(e => e.session_type === ej.session_type)
+    .sort((a,b)=>(a.exercise_order||0)-(b.exercise_order||0));
+  const pos = grupo.findIndex(e => e.id === id);
+  const destino = pos + dir;
+  if (destino < 0 || destino >= grupo.length) return;  // ya está en el extremo
+
+  // Intercambiar exercise_order con el vecino
+  const otro = grupo[destino];
+  const ordenEj = ej.exercise_order, ordenOtro = otro.exercise_order;
+
+  const r1 = await sb.from("client_plans").update({ exercise_order: ordenOtro }).eq("id", ej.id);
+  const r2 = await sb.from("client_plans").update({ exercise_order: ordenEj }).eq("id", otro.id);
+  if ((r1 && r1.error) || (r2 && r2.error)){
+    console.error("moverEjercicio error:", r1 && r1.error, r2 && r2.error);
+    alert("No se pudo reordenar. Inténtalo de nuevo.");
+    return;
+  }
+  // Actualizar en memoria
+  ej.exercise_order = ordenOtro;
+  otro.exercise_order = ordenEj;
+  renderClientPanel();
+}
+
 
 
 function renderEditar() {

@@ -3204,6 +3204,7 @@ function selectClient(id) {
   editandoComida = null;
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = "";
+  editandoSplit = false;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3344,6 +3345,7 @@ function switchTab(tab) {
   editandoComida = null;
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = "";
+  editandoSplit = false;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6256,6 +6258,8 @@ let editandoEjercicioId = null;
 let EXERCISE_LIBRARY = [];
 let mostrandoSelectorEjercicio = false;  // selector de "añadir ejercicio" abierto
 let busquedaEjercicio = '';              // texto del buscador del selector
+// Bloque 6E — modo edición del split
+let editandoSplit = false;
 
 // Días de la semana para mostrar el split
 const DIAS_SEMANA_CORTO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
@@ -6287,6 +6291,7 @@ function seccionPlanEntreno(c){
 
   const split = nut.split || [];
   const ejercicios = nut.exercises || [];
+  const diasEntreno = split.filter(s => s && s !== 'OFF').length;
 
   // ── Agrupar ejercicios por tipo de sesión ──
   const porSesion = {};
@@ -6303,21 +6308,76 @@ function seccionPlanEntreno(c){
     .filter(t => porSesion[t])
     .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t)));
 
-  // ── Distribución del split (7 días) ──
-  const diasEntreno = split.filter(s => s && s !== 'OFF').length;
-  const splitHtml = split.length ? `
-    <div style="margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Distribución del split</div>
-      <div style="display:flex;gap:5px">
-        ${split.map((s,i) => {
-          const off = !s || s === 'OFF';
-          return `<div style="flex:1;background:${off?'var(--bg)':'var(--gl)'};border:1.5px solid ${off?'var(--border)':'var(--green)'};border-radius:10px;padding:8px 2px;text-align:center">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">${DIAS_SEMANA_CORTO[i]||''}</div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;margin-top:3px;color:${off?'var(--text3)':'var(--green)'}">${off?'Descanso':escHtml(s)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : '';
+  // ── Distribución del split (ciclo de N días) — editable (Bloque 6E) ──
+  // Tipos de sesión sugeridos + los que ya existen en el plan del cliente
+  const SUGERENCIAS_SESION = ['PUSH','PULL','LEG','TORSO','BRAZO','CADENA POSTERIOR','GLÚTEO'];
+  const tiposExistentes = Object.keys(porSesion);
+  const opcionesSesion = [];
+  SUGERENCIAS_SESION.concat(tiposExistentes).forEach(t => {
+    if (t && t !== 'OTROS' && !opcionesSesion.includes(t)) opcionesSesion.push(t);
+  });
+
+  let splitHtml = '';
+  if (split.length){
+    if (editandoSplit){
+      // Modo edición: cada día del ciclo es un selector
+      const filasDias = split.map((s,i) => {
+        const valor = (!s || s === 'OFF') ? 'OFF' : s;
+        const esConocido = valor === 'OFF' || opcionesSesion.includes(valor);
+        const opts = ['<option value="OFF"' + (valor==='OFF'?' selected':'') + '>Descanso</option>']
+          .concat(opcionesSesion.map(t =>
+            `<option value="${escHtml(t)}"${valor===t?' selected':''}>${escHtml(t)}</option>`))
+          .concat([`<option value="__NUEVO__">+ Escribir uno nuevo…</option>`])
+          // si el valor actual no está entre las opciones conocidas, añadirlo
+          .concat(esConocido ? [] : [`<option value="${escHtml(valor)}" selected>${escHtml(valor)}</option>`])
+          .join('');
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="width:54px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);flex-shrink:0">Día ${i+1}</div>
+          <select id="split-dia-${i}" onchange="cambioSelectSplit(${i})" style="
+            flex:1;border:1.5px solid var(--green);border-radius:8px;padding:5px 7px;
+            background:var(--bg2);color:var(--text);font-size:12px">${opts}</select>
+          <input id="split-nuevo-${i}" placeholder="Nombre de la sesión" value="${esConocido?'':escHtml(valor)}" style="
+            display:${esConocido?'none':'block'};flex:1;border:1.5px solid var(--green);border-radius:8px;
+            padding:5px 7px;background:var(--bg2);color:var(--text);font-size:12px">
+        </div>`;
+      }).join('');
+      splitHtml = `
+        <div style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split — ${split.length} días</div>
+          </div>
+          ${filasDias}
+          <div style="display:flex;gap:8px;margin-top:9px">
+            <button onclick="guardarSplit()" style="
+              flex:1;height:32px;border:none;border-radius:8px;cursor:pointer;
+              background:var(--green);color:#fff;font-size:12px;font-weight:700">Guardar split</button>
+            <button onclick="cancelarSplit()" style="
+              height:32px;padding:0 14px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">Cancelar</button>
+          </div>
+        </div>`;
+    } else {
+      // Modo lectura
+      splitHtml = `
+        <div style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split</div>
+            <button onclick="editarSplit()" style="
+              height:26px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">✏️ Editar</button>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            ${split.map((s,i) => {
+              const off = !s || s === 'OFF';
+              return `<div style="flex:1;min-width:60px;background:${off?'var(--bg)':'var(--gl)'};border:1.5px solid ${off?'var(--border)':'var(--green)'};border-radius:10px;padding:8px 2px;text-align:center">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Día ${i+1}</div>
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;margin-top:3px;color:${off?'var(--text3)':'var(--green)'}">${off?'Descanso':escHtml(s)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+  }
 
   // ── Ejercicios por sesión ──
   let sesionesHtml;
@@ -6694,6 +6754,72 @@ async function moverEjercicio(id, dir){
   otro.exercise_order = ordenEj;
   renderClientPanel();
 }
+
+// ── Bloque 6E — edición del split (distribución del ciclo) ──
+function editarSplit(){
+  editandoSplit = true;
+  renderClientPanel();
+}
+
+function cancelarSplit(){
+  editandoSplit = false;
+  renderClientPanel();
+}
+
+// Cuando un selector de día cambia: mostrar/ocultar el campo de texto libre
+function cambioSelectSplit(i){
+  const sel = document.getElementById("split-dia-" + i);
+  const inp = document.getElementById("split-nuevo-" + i);
+  if (!sel || !inp) return;
+  if (sel.value === "__NUEVO__"){
+    inp.style.display = "block";
+    inp.value = "";
+    inp.focus();
+  } else {
+    inp.style.display = "none";
+  }
+}
+
+async function guardarSplit(){
+  const c = currentClient;
+  if (!c || !c._training || !c._training.plan) return;
+  const split = c._training.split || [];
+
+  // Leer el valor de cada día
+  const nuevoSplit = [];
+  for (let i = 0; i < split.length; i++){
+    const sel = document.getElementById("split-dia-" + i);
+    if (!sel){ nuevoSplit.push(split[i]); continue; }
+    let valor = sel.value;
+    if (valor === "__NUEVO__"){
+      const inp = document.getElementById("split-nuevo-" + i);
+      valor = inp ? inp.value.trim().toUpperCase() : "";
+      if (!valor){
+        alert("Has elegido escribir una sesión nueva en el Día " + (i+1) + " pero no le has puesto nombre.");
+        return;
+      }
+    }
+    nuevoSplit.push(valor);
+  }
+
+  // Guardar en Supabase (training_plans.split)
+  const { error } = await sb
+    .from("training_plans")
+    .update({ split: nuevoSplit })
+    .eq("id", c._training.plan.id);
+
+  if (error){
+    console.error("guardarSplit error:", error);
+    alert("No se pudo guardar el split. Inténtalo de nuevo.");
+    return;
+  }
+
+  // Actualizar en memoria
+  c._training.split = nuevoSplit;
+  editandoSplit = false;
+  renderClientPanel();
+}
+
 
 
 

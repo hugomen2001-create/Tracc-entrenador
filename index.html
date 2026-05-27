@@ -5943,12 +5943,7 @@ function seccionPreferenciasNutri(c, plan){
     </div>`;
   };
 
-  const estiloHtml = plan && plan.style
-    ? `<div style="font-size:11px;color:var(--text2);margin-bottom:9px"><span style="opacity:.6">Estilo de dieta:</span> <strong>${escHtml(plan.style)}</strong></div>`
-    : "";
-
   return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-top:8px">
-    ${estiloHtml}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${grupo("Alergias e intolerancias", "allergies", q.allergies, "#dc2626", "cuest")}
       ${grupo("Enfermedades", "diseases", q.diseases, "#d97706", "cuest")}
@@ -6213,8 +6208,8 @@ function seccionPlanNutricional(c){
         ${filas}
       </div>`;
       })();
-      // Cada comida ocupa una columna de ancho fijo dentro de la fila desplazable
-      return `<div style="flex:0 0 240px;min-width:240px">${htmlComida}</div>`;
+      // Cada comida es una columna que se estira para llenar el ancho
+      return `<div style="flex:1;min-width:0">${htmlComida}</div>`;
     }).join('');
 
     opcionesHtml = `
@@ -6237,19 +6232,7 @@ function seccionPlanNutricional(c){
           <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.fat)} g</div>
         </div>
       </div>
-      <div style="position:relative">
-        <button onclick="scrollComidas(-1)" aria-label="Anterior" style="
-          position:absolute;left:-6px;top:50%;transform:translateY(-50%);z-index:2;
-          width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:700;
-          display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)">‹</button>
-        <button onclick="scrollComidas(1)" aria-label="Siguiente" style="
-          position:absolute;right:-6px;top:50%;transform:translateY(-50%);z-index:2;
-          width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:700;
-          display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)">›</button>
-        <div id="comidas-scroll" style="display:flex;gap:9px;overflow-x:auto;scroll-behavior:smooth;padding:2px 4px;-webkit-overflow-scrolling:touch">${comidasHtml}</div>
-      </div>`;
+      <div style="display:flex;gap:9px;align-items:flex-start">${comidasHtml}</div>`;
   }
 
   return `<div style="${cardStyle};margin-bottom:18px">
@@ -6334,12 +6317,6 @@ async function guardarObjetivosNutri(){
 }
 
 // ── Bloque 6C — edición de los alimentos de una comida ──
-// Desplaza la fila de comidas (dir: -1 izquierda, 1 derecha)
-function scrollComidas(dir){
-  const el = document.getElementById('comidas-scroll');
-  if (el) el.scrollBy({ left: dir * 260, behavior: 'smooth' });
-}
-
 function editarComida(comida){
   editandoComida = comida;
   renderClientPanel();

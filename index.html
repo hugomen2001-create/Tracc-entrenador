@@ -6343,11 +6343,16 @@ function seccionPlanEntreno(c){
             border:1.5px solid ${act?c2:'var(--border)'};
             background:${act?c2:'var(--bg2)'};color:${act?'#fff':'var(--text3)'}">${escHtml(t)}</button>`;
         }).join('');
-        // Chip del tipo extra a mano (si lo hay)
+        // Chip del tipo extra a mano (si lo hay) — con cruz para borrarlo
         if (esExtra){
-          chips += `<button style="
-            height:23px;padding:0 9px;border-radius:7px;font-size:10px;font-weight:700;white-space:nowrap;
-            border:1.5px solid ${col};background:${col};color:#fff">${escHtml(valor)}</button>`;
+          chips += `<span style="
+            display:inline-flex;align-items:center;height:23px;border-radius:7px;
+            border:1.5px solid ${col};background:${col};color:#fff;font-size:10px;font-weight:700;white-space:nowrap">
+            <span style="padding:0 4px 0 9px">${escHtml(valor)}</span>
+            <button onclick="borrarTipoSesion('${escHtml(valor)}')" title="Eliminar este tipo de sesión" style="
+              background:none;border:none;cursor:pointer;color:#fff;font-size:11px;padding:0 6px 0 2px;
+              line-height:1;opacity:.85">✕</button>
+          </span>`;
         }
         // Chip OFF
         chips += `<button onclick="cambiarDiaSplit(${i},'OFF')" style="
@@ -6856,6 +6861,20 @@ function confirmarDiaNuevo(i){
     return;
   }
   splitBorrador[i] = valor;
+  splitDiaNuevo = null;
+  renderClientPanel();
+}
+
+// Borra un tipo de sesión personalizado de TODOS los días (los pone en OFF)
+function borrarTipoSesion(tipo){
+  if (!splitBorrador) return;
+  const dias = splitBorrador
+    .map((s,i) => s === tipo ? i : -1)
+    .filter(i => i >= 0);
+  if (!dias.length) return;
+  const txtDias = dias.map(i => 'Día ' + (i+1)).join(', ');
+  if (!confirm('Vas a quitar la sesión "' + tipo + '" de: ' + txtDias + '. Esos días pasarán a Descanso. ¿Continuar?')) return;
+  dias.forEach(i => { splitBorrador[i] = 'OFF'; });
   splitDiaNuevo = null;
   renderClientPanel();
 }

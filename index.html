@@ -2594,6 +2594,16 @@ async function loadRealClients(){
       EXERCISE_LIBRARY = libRows || [];
     }
 
+    // 9b. Plantillas de entreno del coach (training_templates)
+    {
+      const { data: tplRows } = await sb
+        .from('training_templates')
+        .select('*')
+        .eq('coach_id', coachData.id)
+        .order('created_at', { ascending:false });
+      TRAINING_TEMPLATES = tplRows || [];
+    }
+
     // 10. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
@@ -3207,6 +3217,7 @@ function selectClient(id) {
   editandoSplit = false;
   splitBorrador = null;
   splitDiaNuevo = null;
+  mostrandoPlantillas = false;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3350,6 +3361,7 @@ function switchTab(tab) {
   editandoSplit = false;
   splitBorrador = null;
   splitDiaNuevo = null;
+  mostrandoPlantillas = false;
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -6406,6 +6418,9 @@ let editandoEjercicioId = null;
 let EXERCISE_LIBRARY = [];
 let mostrandoSelectorEjercicio = false;  // selector de "añadir ejercicio" abierto
 let busquedaEjercicio = '';              // texto del buscador del selector
+// Plantillas de entreno
+let TRAINING_TEMPLATES = [];             // plantillas guardadas del coach
+let mostrandoPlantillas = false;         // panel de plantillas abierto
 // Bloque 6E — modo edición del split
 let editandoSplit = false;
 let splitBorrador = null;   // copia de trabajo del split mientras se edita
@@ -6676,7 +6691,12 @@ function seccionPlanEntreno(c){
 
     sesionesHtml = `
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${lista.length} ${lista.length===1?'ejercicio':'ejercicios'} en esta sesión</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;color:var(--text3)">${lista.length} ${lista.length===1?'ejercicio':'ejercicios'} en esta sesión</span>
+        ${lista.length ? `<button onclick="guardarSesionComoPlantilla()" style="
+          height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">💾 Guardar sesión como plantilla</button>` : ''}
+      </div>
       ${filas}
       ${selectorEjercicioHtml(tipoSel)}`;
   }
@@ -6684,16 +6704,270 @@ function seccionPlanEntreno(c){
   return `<div style="${cardStyle}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="${secTitle}">🏋️ Plan de entreno</div>
-      <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
+        <button onclick="abrirPlantillas()" style="
+          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📋 Plantillas</button>
+      </div>
     </div>
+    ${panelPlantillasHtml(c)}
     ${splitHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Ejercicios por sesión</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Ejercicios por sesión</div>
+      <button onclick="guardarPlanComoPlantilla()" style="
+        height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">💾 Guardar plan completo</button>
+    </div>
     ${sesionesHtml}
   </div>`;
 }
 
 // Cambia la sesión de entreno mostrada
+
+// ════════════════════════════════════════════════════════════
+// PLANTILLAS DE ENTRENO
+// ════════════════════════════════════════════════════════════
+
+// Devuelve el tipo de sesión actualmente seleccionado para un cliente
+function tipoSesionActual(c){
+  if (!c || !c._training) return null;
+  const ejercicios = c._training.exercises || [];
+  const split = c._training.split || [];
+  const porSesion = {};
+  ejercicios.forEach(e => { const t=e.session_type||'OTROS'; (porSesion[t]=porSesion[t]||[]).push(e); });
+  const ordenSplit = [];
+  split.forEach(s => { if (s && s!=='OFF' && !ordenSplit.includes(s)) ordenSplit.push(s); });
+  const tiposSesion = ordenSplit.filter(t=>porSesion[t])
+    .concat(Object.keys(porSesion).filter(t=>!ordenSplit.includes(t)));
+  return tiposSesion[editSesionEntreno] || null;
+}
+
+// Abre / cierra el panel de plantillas
+function abrirPlantillas(){
+  mostrandoPlantillas = !mostrandoPlantillas;
+  renderClientPanel();
+}
+
+// HTML del panel de plantillas guardadas
+function panelPlantillasHtml(c){
+  if (!mostrandoPlantillas) return '';
+  const tpls = TRAINING_TEMPLATES || [];
+  let lista;
+  if (!tpls.length){
+    lista = `<div style="font-size:11px;color:var(--text3);padding:10px;text-align:center">
+      Aún no tienes plantillas guardadas. Usa "Guardar sesión como plantilla" o "Guardar plan completo".</div>`;
+  } else {
+    lista = tpls.map(t => {
+      const esPlan = Array.isArray(t.split) && t.split.length > 0;
+      const numEj = Array.isArray(t.exercises) ? t.exercises.length : 0;
+      const etiqueta = esPlan
+        ? `Plan completo · ${t.split.length} días · ${numEj} ejercicios`
+        : `Sesión · ${numEj} ejercicios`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border-radius:9px;margin-bottom:5px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(t.name||'Plantilla')}</div>
+          <div style="font-size:9.5px;color:var(--text3);margin-top:1px">${etiqueta}</div>
+        </div>
+        <button onclick="aplicarPlantilla('${escHtml(t.id)}')" style="
+          height:27px;padding:0 12px;border:none;border-radius:7px;cursor:pointer;
+          background:var(--green);color:#fff;font-size:11px;font-weight:700">Aplicar</button>
+        <button onclick="borrarPlantilla('${escHtml(t.id)}')" title="Eliminar plantilla" style="
+          height:27px;width:27px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg);color:var(--red);font-size:12px;padding:0">&#10005;</button>
+      </div>`;
+    }).join('');
+  }
+  return `<div style="border:1.5px solid var(--green);border-radius:12px;padding:11px;margin-bottom:14px;background:var(--bg)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Plantillas guardadas</div>
+      <button onclick="abrirPlantillas()" style="
+        height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:10.5px;font-weight:600">Cerrar</button>
+    </div>
+    ${lista}
+  </div>`;
+}
+
+// Guarda la sesión actual como plantilla
+async function guardarSesionComoPlantilla(){
+  const c = currentClient;
+  if (!c || !c._training || !coachData) return;
+  const tipo = tipoSesionActual(c);
+  if (!tipo){ alert('No hay una sesión seleccionada.'); return; }
+  const ejercicios = (c._training.exercises || [])
+    .filter(e => e.session_type === tipo)
+    .sort((a,b)=>(a.exercise_order||0)-(b.exercise_order||0));
+  if (!ejercicios.length){ alert('Esta sesión no tiene ejercicios que guardar.'); return; }
+
+  const nombre = prompt('Nombre de la plantilla (ej: "Push libre"):', tipo);
+  if (nombre == null) return;
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio){ alert('La plantilla necesita un nombre.'); return; }
+
+  // Guardar los ejercicios necesarios para reconstruir la sesión
+  const exData = ejercicios.map((e,idx) => ({
+    exercise_id: e.exercise_id || null,
+    name: e.name || null,
+    session_type: tipo,
+    exercise_order: idx + 1,
+    sets: e.sets, reps: e.reps, rest_sec: e.rest_sec, approx: e.approx,
+  }));
+
+  const { data, error } = await sb
+    .from('training_templates')
+    .insert({ coach_id: coachData.id, name: nombreLimpio, split: null, split_days: null, exercises: exData })
+    .select()
+    .single();
+  if (error || !data){
+    console.error('guardarSesionComoPlantilla error:', error);
+    alert('No se pudo guardar la plantilla. Inténtalo de nuevo.');
+    return;
+  }
+  TRAINING_TEMPLATES.unshift(data);
+  alert('Plantilla "' + nombreLimpio + '" guardada.');
+  renderClientPanel();
+}
+
+// Guarda el plan de entreno completo (split + todos los ejercicios) como plantilla
+async function guardarPlanComoPlantilla(){
+  const c = currentClient;
+  if (!c || !c._training || !coachData) return;
+  const split = c._training.split || [];
+  const ejercicios = c._training.exercises || [];
+  if (!split.length && !ejercicios.length){ alert('Este plan no tiene nada que guardar.'); return; }
+
+  const nombre = prompt('Nombre de la plantilla de plan completo:', 'Plan ' + (split.length||'') + ' días');
+  if (nombre == null) return;
+  const nombreLimpio = nombre.trim();
+  if (!nombreLimpio){ alert('La plantilla necesita un nombre.'); return; }
+
+  const exData = ejercicios.slice()
+    .sort((a,b)=>(a.exercise_order||0)-(b.exercise_order||0))
+    .map(e => ({
+      exercise_id: e.exercise_id || null,
+      name: e.name || null,
+      session_type: e.session_type,
+      exercise_order: e.exercise_order,
+      sets: e.sets, reps: e.reps, rest_sec: e.rest_sec, approx: e.approx,
+    }));
+
+  const { data, error } = await sb
+    .from('training_templates')
+    .insert({ coach_id: coachData.id, name: nombreLimpio, split: split, split_days: split.length, exercises: exData })
+    .select()
+    .single();
+  if (error || !data){
+    console.error('guardarPlanComoPlantilla error:', error);
+    alert('No se pudo guardar la plantilla. Inténtalo de nuevo.');
+    return;
+  }
+  TRAINING_TEMPLATES.unshift(data);
+  alert('Plantilla "' + nombreLimpio + '" guardada.');
+  renderClientPanel();
+}
+
+// Borra una plantilla (con confirmación)
+async function borrarPlantilla(id){
+  const tpl = (TRAINING_TEMPLATES||[]).find(t => t.id === id);
+  if (!tpl) return;
+  if (!confirm('¿Eliminar la plantilla "' + (tpl.name||'') + '"?')) return;
+  const { error } = await sb.from('training_templates').delete().eq('id', id);
+  if (error){
+    console.error('borrarPlantilla error:', error);
+    alert('No se pudo eliminar la plantilla.');
+    return;
+  }
+  TRAINING_TEMPLATES = TRAINING_TEMPLATES.filter(t => t.id !== id);
+  renderClientPanel();
+}
+
+// Aplica una plantilla al cliente actual
+async function aplicarPlantilla(id){
+  const c = currentClient;
+  if (!c || !c._training || !c._training.plan || !coachData) return;
+  const tpl = (TRAINING_TEMPLATES||[]).find(t => t.id === id);
+  if (!tpl) return;
+  const exData = Array.isArray(tpl.exercises) ? tpl.exercises : [];
+  const esPlan = Array.isArray(tpl.split) && tpl.split.length > 0;
+
+  if (esPlan){
+    // ── Aplicar un plan completo ──
+    if (!confirm('Vas a aplicar la plantilla "' + (tpl.name||'') +
+      '". Esto reemplazará el split y TODOS los ejercicios del plan actual de este cliente. ¿Continuar?')) return;
+    // 1. Borrar todos los ejercicios actuales del cliente
+    const idsBorrar = (c._training.exercises||[]).map(e => e.id);
+    for (const eid of idsBorrar){
+      const { error } = await sb.from('client_plans').delete().eq('id', eid);
+      if (error){ console.error('aplicarPlantilla (borrado) error:', error); alert('Error al aplicar la plantilla.'); return; }
+    }
+    // 2. Insertar los ejercicios de la plantilla
+    const nuevos = [];
+    for (const ex of exData){
+      const fila = {
+        client_id: c.id, coach_id: coachData.id, exercise_id: ex.exercise_id,
+        session_type: ex.session_type, exercise_order: ex.exercise_order || 1,
+        sets: ex.sets, reps: ex.reps, rest_sec: ex.rest_sec, approx: ex.approx, is_active: true,
+      };
+      const { data, error } = await sb.from('client_plans').insert(fila).select().single();
+      if (error || !data){ console.error('aplicarPlantilla (insert) error:', error); alert('Error al aplicar la plantilla.'); return; }
+      nuevos.push(filaAEjercicio(data, ex));
+    }
+    // 3. Aplicar el split
+    const { error: errSplit } = await sb.from('training_plans')
+      .update({ split: tpl.split }).eq('id', c._training.plan.id);
+    if (errSplit){ console.error('aplicarPlantilla (split) error:', errSplit); alert('Error al aplicar el split de la plantilla.'); return; }
+    c._training.split = tpl.split.slice();
+    c._training.exercises = nuevos;
+  } else {
+    // ── Aplicar una plantilla de sesión ──
+    const tipo = tipoSesionActual(c);
+    if (!tipo){ alert('Selecciona primero la sesión donde aplicar la plantilla.'); return; }
+    if (!confirm('Vas a aplicar la plantilla "' + (tpl.name||'') + '" a la sesión ' + tipo +
+      '. Esto reemplazará los ejercicios actuales de esa sesión. ¿Continuar?')) return;
+    // 1. Borrar los ejercicios actuales de esa sesión
+    const idsBorrar = (c._training.exercises||[]).filter(e => e.session_type === tipo).map(e => e.id);
+    for (const eid of idsBorrar){
+      const { error } = await sb.from('client_plans').delete().eq('id', eid);
+      if (error){ console.error('aplicarPlantilla (borrado) error:', error); alert('Error al aplicar la plantilla.'); return; }
+    }
+    // 2. Insertar los de la plantilla, con el tipo de sesión actual
+    const restantes = (c._training.exercises||[]).filter(e => e.session_type !== tipo);
+    const nuevos = [];
+    for (let i = 0; i < exData.length; i++){
+      const ex = exData[i];
+      const fila = {
+        client_id: c.id, coach_id: coachData.id, exercise_id: ex.exercise_id,
+        session_type: tipo, exercise_order: i + 1,
+        sets: ex.sets, reps: ex.reps, rest_sec: ex.rest_sec, approx: ex.approx, is_active: true,
+      };
+      const { data, error } = await sb.from('client_plans').insert(fila).select().single();
+      if (error || !data){ console.error('aplicarPlantilla (insert) error:', error); alert('Error al aplicar la plantilla.'); return; }
+      nuevos.push(filaAEjercicio(data, Object.assign({}, ex, { session_type: tipo, exercise_order: i+1 })));
+    }
+    c._training.exercises = restantes.concat(nuevos);
+  }
+  mostrandoPlantillas = false;
+  alert('Plantilla aplicada.');
+  renderClientPanel();
+}
+
+// Convierte una fila de client_plans + datos de plantilla al formato de ejercicio en memoria
+function filaAEjercicio(data, ex){
+  // Buscar nombre/grupo/video en la biblioteca (o usar el de la plantilla)
+  const lib = (EXERCISE_LIBRARY || []).find(e => e.id === ex.exercise_id) || {};
+  return {
+    id: data.id,
+    session_type: ex.session_type,
+    exercise_order: ex.exercise_order,
+    sets: ex.sets, reps: ex.reps, rest_sec: ex.rest_sec, approx: ex.approx,
+    name: lib.name || ex.name || 'Ejercicio',
+    muscle_group: lib.muscle_group || null,
+    video_url: lib.video_url || null,
+  };
+}
+
 function seleccionarSesionEntreno(i){
   editSesionEntreno = i;
   editandoEjercicioId = null;  // al cambiar de sesión, salir de edición

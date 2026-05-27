@@ -4204,6 +4204,69 @@ function metricaCard(emoji, titulo, valorTxt, valorColor, subTxt, subColor, char
 }
 
 // Sección completa de Métricas para el tab Seguimiento
+// Tarjeta de evolución de peso desde el inicio del mesociclo activo (S2)
+function tarjetaPesoMesociclo(c){
+  const meso = c && c._mesocycle;
+  const metrics = (c && c._metrics) || [];
+
+  // Sin mesociclo → mensaje útil, no romper la columna
+  if (!meso || !meso.start_date){
+    return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
+      <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">⚖️ Peso · evolución</div>
+      <div style="font-size:11px;color:var(--text3);padding:6px 0">
+        Este cliente aún no tiene un mesociclo activo. Asigna uno desde "Editar plan" para ver la evolución del peso.
+      </div>
+    </div>`;
+  }
+
+  const inicio = String(meso.start_date).slice(0,10);
+  const hoyStr = (() => {
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  })();
+
+  // Pesos del cliente entre start_date y hoy, ordenados por fecha
+  const pesos = metrics
+    .filter(m => m.weight_kg != null && String(m.date).slice(0,10) >= inicio && String(m.date).slice(0,10) <= hoyStr)
+    .map(m => ({ fecha: String(m.date).slice(0,10), peso: Number(m.weight_kg) }))
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+
+  if (!pesos.length){
+    return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
+      <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">⚖️ Peso · evolución</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px">${escHtml(meso.name||'Mesociclo')} · desde ${formatearFechaCorta(inicio)}</div>
+      <div style="font-size:11px;color:var(--text3);padding:6px 0">
+        No hay registros de peso en este mesociclo todavía.
+      </div>
+    </div>`;
+  }
+
+  const inicial = pesos[0];
+  const ultimo = pesos[pesos.length-1];
+  const diff = ultimo.peso - inicial.peso;
+  const diffStr = (diff > 0 ? '+' : '') + diff.toFixed(1) + ' kg';
+  const diffColor = diff > 0 ? '#16a34a' : diff < 0 ? '#dc2626' : 'var(--text3)';
+
+  const valorTxt = ultimo.peso.toFixed(1) + ' kg';
+  const puntos = pesos.map(p => ({ label:'', fechaTxt: formatearFechaCorta(p.fecha), valor: p.peso }));
+
+  return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
+    <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">⚖️ Peso · evolución del mesociclo</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px">${escHtml(meso.name||'Mesociclo')} · ${pesos.length} ${pesos.length===1?'registro':'registros'}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--text)">${valorTxt}</div>
+      <div style="font-size:12px;color:${diffColor};font-weight:700">${diffStr}</div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:4px">
+      Inicial: <b>${inicial.peso.toFixed(1)} kg</b> · ${formatearFechaCorta(inicial.fecha)}
+    </div>
+    ${miniLineChart(puntos, '#1a1a18', '', ' kg')}
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+      <span>${formatearFechaCorta(inicial.fecha)}</span><span>${formatearFechaCorta(ultimo.fecha)}</span>
+    </div>
+  </div>`;
+}
+
 function seccionMetricas(c){
   const metrics = c._metrics || [];
   const lunes = lunesDeSemana(segWeekOffset);
@@ -4255,9 +4318,7 @@ function seccionMetricas(c){
     metricaCard('🌙','Sueño · media/noche', fmtSleep, '#7c3aed', '', '',
       miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.sleep})), '#7c3aed', 'h', ' h'),
       'Lun','Dom') +
-    metricaCard('⚖️','Peso · media semanal', fmtWeight, 'var(--text)', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.weight})), '#1a1a18', '', ' kg'),
-      'Lun','Dom');
+    tarjetaPesoMesociclo(c);
 
   // Navegación de semanas. No se puede ir al futuro (offset 0 es el tope).
   const btnStyle = 'width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center';
@@ -4523,10 +4584,12 @@ function renderSeguimiento() {
   return `
     ${seccionResumenActividad(c)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:18px">
-      <div>${seccionHistorialSesiones(c)}</div>
+      <div>
+        ${seccionHistorialSesiones(c)}
+        <div id="detalle-sesion"></div>
+      </div>
       <div>${seccionMetricas(c)}</div>
     </div>
-    <div id="detalle-sesion"></div>
   `;
 }
 

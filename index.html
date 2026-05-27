@@ -2342,7 +2342,7 @@ function statusFromLastSession(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition, training){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2371,6 +2371,8 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     _photos: photosRows || [],
     // Plan de nutrición real: { plan:{...}, options:[...] } o null si no tiene
     _nutrition: nutrition || null,
+    // Plan de entrenamiento real: { plan, split:[...], exercises:[...] } o null
+    _training: training || null,
     // ── Campos aún no conectados — plantilla neutra (bloques posteriores) ──
     weeks: 0, mesoWeeks: 12,
     alerts: [],
@@ -2514,11 +2516,77 @@ async function loadRealClients(){
       });
     }
 
-    // 8. Construir objetos cliente y reemplazar el contenido de CLIENTS
+    // 8. Plan de entrenamiento de cada cliente.
+    //    Los ejercicios viven en client_plans (series/reps/descanso) y el
+    //    nombre/vídeo de cada ejercicio en la tabla exercises. El split
+    //    (qué sesión toca cada día) está en training_plans.split.
+    let trainingByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      // 8a. El plan de entreno activo (para el split)
+      const { data: tplans } = await sb
+        .from('training_plans')
+        .select('*')
+        .in('client_id', ids)
+        .eq('is_active', true);
+      // 8b. Los ejercicios de cada cliente desde client_plans
+      const { data: cplans } = await sb
+        .from('client_plans')
+        .select('*')
+        .in('client_id', ids)
+        .eq('is_active', true)
+        .order('exercise_order', { ascending:true });
+      const cplanList = cplans || [];
+      // 8c. Resolver los nombres de los ejercicios desde la tabla exercises
+      let exById = {};
+      const exIds = [...new Set(cplanList.map(cp => cp.exercise_id).filter(Boolean))];
+      if (exIds.length){
+        const { data: exRows } = await sb
+          .from('exercises')
+          .select('id, name, muscle_group, video_url')
+          .in('id', exIds);
+        (exRows || []).forEach(e => { exById[e.id] = e; });
+      }
+      // 8d. Agrupar los ejercicios por cliente
+      let exByClient = {};
+      cplanList.forEach(cp => {
+        const ex = exById[cp.exercise_id] || {};
+        (exByClient[cp.client_id] = exByClient[cp.client_id] || []).push({
+          session_type: cp.session_type,
+          exercise_order: cp.exercise_order,
+          sets: cp.sets,
+          reps: cp.reps,
+          rest_sec: cp.rest_sec,
+          approx: cp.approx,
+          name: ex.name || 'Ejercicio',
+          muscle_group: ex.muscle_group || null,
+          video_url: ex.video_url || null,
+        });
+      });
+      // 8e. Combinar split + ejercicios por cliente
+      (tplans || []).forEach(tp => {
+        if (!trainingByClient[tp.client_id]){
+          trainingByClient[tp.client_id] = {
+            plan: tp,
+            split: Array.isArray(tp.split) ? tp.split : [],
+            exercises: exByClient[tp.client_id] || [],
+          };
+        }
+      });
+      // Cliente con ejercicios pero sin training_plan activo: igual los guardamos
+      Object.keys(exByClient).forEach(cid => {
+        if (!trainingByClient[cid]){
+          trainingByClient[cid] = { plan:null, split:[], exercises: exByClient[cid] };
+        }
+      });
+    }
+
+    // 9. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) =>
       buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
-                        photosByClient[row.id], nutritionByClient[row.id]));
+                        photosByClient[row.id], nutritionByClient[row.id],
+                        trainingByClient[row.id]));
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
@@ -3117,6 +3185,7 @@ function selectClient(id) {
   weekOffset = 0;
   segWeekOffset = 0;
   editNutriOpcion = 0;
+  editSesionEntreno = 0;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -5932,6 +6001,146 @@ function seleccionarOpcionNutri(i){
 }
 
 
+// ══════════════════════════════════════════════════════════════════════════
+// BLOQUE 5B — EDITAR PLAN · Sección Plan de Entreno (lectura)
+// Lee el plan de entrenamiento real del cliente desde Supabase:
+//   c._training = { plan, split:["OFF","TORSO",...], exercises:[...] }
+// Cada ejercicio: { session_type, exercise_order, sets, reps, rest_sec,
+//                   approx, name, muscle_group, video_url }
+// ══════════════════════════════════════════════════════════════════════════
+
+// Qué sesión de entreno está seleccionada en el tab Editar plan
+let editSesionEntreno = 0;
+
+// Días de la semana para mostrar el split
+const DIAS_SEMANA_CORTO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+// Formatea el descanso en segundos a un texto legible
+function fmtDescanso(seg){
+  if (seg == null) return '—';
+  const s = Number(seg);
+  if (s < 60) return s + ' s';
+  const min = Math.floor(s/60), resto = s % 60;
+  return resto ? (min + ' min ' + resto + ' s') : (min + ' min');
+}
+
+// Sección completa de Plan de Entreno para el tab Editar plan
+function seccionPlanEntreno(c){
+  const nut = c._training;
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px';
+  const secTitle  = 'font-size:13px;font-weight:700;color:var(--text)';
+
+  // Sin plan de entrenamiento
+  if (!nut || (!nut.exercises.length && !nut.split.length)){
+    return `<div style="${cardStyle}">
+      <div style="${secTitle};margin-bottom:6px">🏋️ Plan de entreno</div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
+        Este cliente todavía no tiene un plan de entrenamiento.
+      </div>
+    </div>`;
+  }
+
+  const split = nut.split || [];
+  const ejercicios = nut.exercises || [];
+
+  // ── Agrupar ejercicios por tipo de sesión ──
+  const porSesion = {};
+  ejercicios.forEach(ej => {
+    const t = ej.session_type || 'OTROS';
+    (porSesion[t] = porSesion[t] || []).push(ej);
+  });
+  // Orden de las sesiones: primero según aparecen en el split, luego el resto
+  const ordenSplit = [];
+  split.forEach(s => {
+    if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s);
+  });
+  const tiposSesion = ordenSplit
+    .filter(t => porSesion[t])
+    .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t)));
+
+  // ── Distribución del split (7 días) ──
+  const diasEntreno = split.filter(s => s && s !== 'OFF').length;
+  const splitHtml = split.length ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Distribución del split</div>
+      <div style="display:flex;gap:5px">
+        ${split.map((s,i) => {
+          const off = !s || s === 'OFF';
+          return `<div style="flex:1;background:${off?'var(--bg)':'var(--gl)'};border:1.5px solid ${off?'var(--border)':'var(--green)'};border-radius:10px;padding:8px 2px;text-align:center">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">${DIAS_SEMANA_CORTO[i]||''}</div>
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;margin-top:3px;color:${off?'var(--text3)':'var(--green)'}">${off?'Descanso':escHtml(s)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  // ── Ejercicios por sesión ──
+  let sesionesHtml;
+  if (!tiposSesion.length){
+    sesionesHtml = `<div style="font-size:12px;color:var(--text3);padding:12px;background:var(--bg);border-radius:11px">
+      El plan no tiene ejercicios cargados.
+    </div>`;
+  } else {
+    if (editSesionEntreno >= tiposSesion.length) editSesionEntreno = 0;
+
+    // Pestañas de sesión (TORSO, LEG, PUSH, PULL...)
+    const pills = tiposSesion.map((t,i) => {
+      const activa = i === editSesionEntreno;
+      return `<button onclick="seleccionarSesionEntreno(${i})" style="
+        height:30px;padding:0 13px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;
+        border:1.5px solid ${activa?'var(--green)':'var(--border)'};
+        background:${activa?'var(--green)':'var(--bg2)'};
+        color:${activa?'#fff':'var(--text2)'};text-transform:capitalize">${escHtml(t.toLowerCase())}</button>`;
+    }).join('');
+
+    // Ejercicios de la sesión seleccionada
+    const tipoSel = tiposSesion[editSesionEntreno];
+    const lista = (porSesion[tipoSel] || []).slice()
+      .sort((a,b) => (a.exercise_order||0) - (b.exercise_order||0));
+
+    const filas = lista.map((ej,idx) => `
+      <div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="width:22px;height:22px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${idx+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:10px">
+              <span><span style="opacity:.6">Series:</span> ${ej.sets ?? '—'}</span>
+              <span><span style="opacity:.6">Reps:</span> ${escHtml(ej.reps || '—')}</span>
+              <span><span style="opacity:.6">Descanso:</span> ${fmtDescanso(ej.rest_sec)}</span>
+            </div>
+          </div>
+          ${ej.video_url
+            ? `<a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;flex-shrink:0;font-weight:600">▶ Vídeo</a>`
+            : ''}
+        </div>
+      </div>`).join('');
+
+    sesionesHtml = `
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${lista.length} ${lista.length===1?'ejercicio':'ejercicios'} en esta sesión</div>
+      ${filas}`;
+  }
+
+  return `<div style="${cardStyle}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="${secTitle}">🏋️ Plan de entreno</div>
+      <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
+    </div>
+    ${splitHtml}
+    <div style="height:1px;background:var(--border);margin:14px 0"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Ejercicios por sesión</div>
+    ${sesionesHtml}
+  </div>`;
+}
+
+// Cambia la sesión de entreno mostrada
+function seleccionarSesionEntreno(i){
+  editSesionEntreno = i;
+  renderClientPanel();
+}
+
+
 function renderEditar() {
   const c = currentClient;
 
@@ -5964,23 +6173,10 @@ function renderEditar() {
       </div>
     </div>`;
 
-  // ── Plan de entreno — se conecta en el Bloque 5B ──
-  const entrenoPendiente = `
-    <div style="background:var(--bg2);border:1.5px dashed var(--border2);border-radius:16px;padding:18px;display:flex;align-items:center;gap:14px">
-      <div style="width:38px;height:38px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">🏋️ Plan de entreno</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">Se conectará en el siguiente bloque, con el plan de entrenamiento real del cliente.</div>
-      </div>
-      <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px">Próximamente</span>
-    </div>`;
-
   return `
     ${notasHtml}
     ${seccionPlanNutricional(c)}
-    ${entrenoPendiente}`;
+    ${seccionPlanEntreno(c)}`;
 }
 
 

@@ -3186,6 +3186,7 @@ function selectClient(id) {
   segWeekOffset = 0;
   editNutriOpcion = 0;
   editSesionEntreno = 0;
+  editandoObjetivos = false;
   // Cerrar vista general si estaba abierta
   _overviewOpen = false;
   const ovBtn = document.getElementById('overview-btn');
@@ -3321,6 +3322,7 @@ function renderClientPanel() {
 
 function switchTab(tab) {
   currentTab = tab;
+  editandoObjetivos = false;  // salir de modo edición al cambiar de tab
   renderClientPanel();
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
@@ -5850,6 +5852,8 @@ function saveChanges() {
 
 // Qué opción de dieta está seleccionada en el tab Editar plan (índice)
 let editNutriOpcion = 0;
+// Bloque 6A — modo edición de los objetivos nutricionales
+let editandoObjetivos = false;
 
 const COMIDAS_ORDEN = ['Desayuno','Comida','Merienda','Cena'];
 
@@ -5889,19 +5893,57 @@ function seccionPlanNutricional(c){
   const plan = nut.plan;
   const opciones = nut.options || [];
 
-  // ── Objetivos (macros / kcal del plan) ──
+  // ── Objetivos (macros / kcal del plan) — editables (Bloque 6A) ──
   const objetivo = (lbl, val, unidad, color) => `
     <div style="background:var(--bg);border-radius:11px;padding:10px 12px;text-align:center;flex:1">
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:3px">${lbl}</div>
       <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${color||'var(--text)'}">${val ?? '—'}<span style="font-size:11px;font-weight:400;color:var(--text3)">${unidad||''}</span></div>
     </div>`;
 
-  const objetivosHtml = `<div style="display:flex;gap:8px;margin-bottom:6px">
-    ${objetivo('Calorías', plan.kcal_goal, ' kcal', 'var(--green)')}
-    ${objetivo('Proteína', plan.protein_g, ' g', 'var(--text)')}
-    ${objetivo('Carbohid.', plan.carbs_g, ' g', 'var(--text)')}
-    ${objetivo('Grasa', plan.fat_g, ' g', 'var(--text)')}
-  </div>`;
+  // Campo editable (input numérico)
+  const objetivoEdit = (lbl, id, val, unidad) => `
+    <div style="background:var(--bg);border-radius:11px;padding:10px 12px;text-align:center;flex:1">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:5px">${lbl}</div>
+      <div style="display:flex;align-items:baseline;justify-content:center;gap:3px">
+        <input id="${id}" type="number" min="0" value="${val ?? ''}" style="
+          width:64px;text-align:center;font-family:'DM Serif Display',serif;font-size:18px;
+          border:1.5px solid var(--green);border-radius:8px;padding:2px 4px;background:var(--bg2);color:var(--text)">
+        <span style="font-size:11px;color:var(--text3)">${unidad||''}</span>
+      </div>
+    </div>`;
+
+  let objetivosHtml;
+  if (editandoObjetivos){
+    objetivosHtml = `
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        ${objetivoEdit('Calorías', 'obj-kcal', plan.kcal_goal, 'kcal')}
+        ${objetivoEdit('Proteína', 'obj-prot', plan.protein_g, 'g')}
+        ${objetivoEdit('Carbohid.', 'obj-carb', plan.carbs_g, 'g')}
+        ${objetivoEdit('Grasa', 'obj-fat', plan.fat_g, 'g')}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button onclick="guardarObjetivosNutri()" style="
+          flex:1;height:34px;border:none;border-radius:9px;cursor:pointer;
+          background:var(--green);color:#fff;font-size:12px;font-weight:700">Guardar cambios</button>
+        <button onclick="cancelarObjetivosNutri()" style="
+          height:34px;padding:0 16px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">Cancelar</button>
+      </div>`;
+  } else {
+    objetivosHtml = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Objetivos diarios</div>
+        <button onclick="editarObjetivosNutri()" style="
+          height:26px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">✏️ Editar</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        ${objetivo('Calorías', plan.kcal_goal, ' kcal', 'var(--green)')}
+        ${objetivo('Proteína', plan.protein_g, ' g', 'var(--text)')}
+        ${objetivo('Carbohid.', plan.carbs_g, ' g', 'var(--text)')}
+        ${objetivo('Grasa', plan.fat_g, ' g', 'var(--text)')}
+      </div>`;
+  }
 
   // Estilo / preferencias / restricciones
   const meta = [];
@@ -5997,6 +6039,67 @@ function seccionPlanNutricional(c){
 // Cambia la opción de dieta mostrada
 function seleccionarOpcionNutri(i){
   editNutriOpcion = i;
+  renderClientPanel();
+}
+
+// ── Bloque 6A — edición de los objetivos nutricionales ──
+function editarObjetivosNutri(){
+  editandoObjetivos = true;
+  renderClientPanel();
+}
+
+function cancelarObjetivosNutri(){
+  editandoObjetivos = false;
+  renderClientPanel();
+}
+
+async function guardarObjetivosNutri(){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.plan) return;
+
+  // Leer los valores de los inputs
+  const leerCampo = id => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const v = el.value.trim();
+    if (v === '') return null;
+    const n = Number(v);
+    return (isNaN(n) || n < 0) ? NaN : Math.round(n);
+  };
+  const kcal = leerCampo('obj-kcal');
+  const prot = leerCampo('obj-prot');
+  const carb = leerCampo('obj-carb');
+  const fat  = leerCampo('obj-fat');
+
+  // Validación: ningún valor puede ser inválido (texto, negativo)
+  if ([kcal, prot, carb, fat].some(v => Number.isNaN(v))){
+    alert('Revisa los valores: deben ser números positivos.');
+    return;
+  }
+
+  const plan = c._nutrition.plan;
+  const cambios = {
+    kcal_goal: kcal, protein_g: prot, carbs_g: carb, fat_g: fat,
+  };
+
+  // Guardar en Supabase
+  const { error } = await sb
+    .from('nutrition_plans')
+    .update(cambios)
+    .eq('id', plan.id);
+
+  if (error){
+    console.error('guardarObjetivosNutri error:', error);
+    alert('No se pudieron guardar los cambios. Inténtalo de nuevo.');
+    return;
+  }
+
+  // Actualizar el objeto en memoria para que la vista refleje el cambio
+  plan.kcal_goal = kcal;
+  plan.protein_g = prot;
+  plan.carbs_g = carb;
+  plan.fat_g = fat;
+  editandoObjetivos = false;
   renderClientPanel();
 }
 

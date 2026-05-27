@@ -5904,6 +5904,104 @@ function totalesOpcion(opt){
 }
 
 // Sección completa de Plan Nutricional para el tab Editar plan
+// ── Rediseño nutrición — preferencias/restricciones (etiquetas del cuestionario) ──
+
+// Parsea un campo de texto del cuestionario en una lista de etiquetas
+function parseEtiquetas(txt){
+  if (!txt) return [];
+  return String(txt).split(",").map(s => s.trim()).filter(Boolean);
+}
+
+// Construye la sección de estilo + 3 listas de etiquetas (alergias / enfermedades / no le gustan)
+function seccionPreferenciasNutri(c, plan){
+  const q = c._questionnaire || {};
+  const grupo = (titulo, campo, valor, color) => {
+    const tags = parseEtiquetas(valor);
+    const chips = tags.map((t,idx) => `
+      <span style="display:inline-flex;align-items:center;height:24px;border-radius:7px;
+        border:1.5px solid ${color};background:${color}1a;color:var(--text);font-size:11px;font-weight:600;white-space:nowrap">
+        <span style="padding:0 3px 0 9px">${escHtml(t)}</span>
+        <button onclick="quitarEtiquetaCuest('${campo}',${idx})" title="Quitar" style="
+          background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0 6px 0 3px;line-height:1">&#10005;</button>
+      </span>`).join("");
+    const vacio = tags.length ? "" : `<span style="font-size:11px;color:var(--text3)">Sin elementos</span>`;
+    return `<div style="margin-bottom:9px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:5px">${titulo}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+        ${chips}${vacio}
+        <span style="display:inline-flex;gap:4px;align-items:center">
+          <input id="nueva-etq-${campo}" placeholder="Anadir..." onkeydown="if(event.key==='Enter')anadirEtiquetaCuest('${campo}')" style="
+            width:96px;height:24px;border:1.5px dashed var(--border2);border-radius:7px;padding:0 7px;
+            background:var(--bg2);color:var(--text);font-size:11px">
+          <button onclick="anadirEtiquetaCuest('${campo}')" style="
+            height:24px;width:24px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+            background:var(--bg2);color:var(--green);font-size:13px;font-weight:700;padding:0">+</button>
+        </span>
+      </div>
+    </div>`;
+  };
+
+  const estiloHtml = plan && plan.style
+    ? `<div style="font-size:11px;color:var(--text2);margin-bottom:9px"><span style="opacity:.6">Estilo de dieta:</span> <strong>${escHtml(plan.style)}</strong></div>`
+    : "";
+
+  return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-top:8px">
+    ${estiloHtml}
+    ${grupo("Alergias e intolerancias", "allergies", q.allergies, "#dc2626")}
+    ${grupo("Enfermedades", "diseases", q.diseases, "#d97706")}
+    ${grupo("Alimentos que no le gustan", "disliked_foods", q.disliked_foods, "#6b7280")}
+    <div style="font-size:9.5px;color:var(--text3);margin-top:2px">Estos datos se comparten con el cuestionario del cliente (tab Perfil).</div>
+  </div>`;
+}
+
+// Anade una etiqueta a un campo del cuestionario
+async function anadirEtiquetaCuest(campo){
+  const c = currentClient;
+  if (!c || !c._questionnaire){
+    alert("Este cliente no tiene cuestionario; no se puede editar.");
+    return;
+  }
+  const inp = document.getElementById("nueva-etq-" + campo);
+  const valor = inp ? inp.value.trim() : "";
+  if (!valor) return;
+  const lista = parseEtiquetas(c._questionnaire[campo]);
+  if (lista.some(t => t.toLowerCase() === valor.toLowerCase())){
+    alert('"' + valor + '" ya esta en la lista.');
+    return;
+  }
+  lista.push(valor);
+  await guardarEtiquetasCuest(campo, lista);
+}
+
+// Quita una etiqueta de un campo del cuestionario
+async function quitarEtiquetaCuest(campo, idx){
+  const c = currentClient;
+  if (!c || !c._questionnaire) return;
+  const lista = parseEtiquetas(c._questionnaire[campo]);
+  if (idx < 0 || idx >= lista.length) return;
+  lista.splice(idx, 1);
+  await guardarEtiquetasCuest(campo, lista);
+}
+
+// Guarda la lista (como texto separado por comas) en client_questionnaire
+async function guardarEtiquetasCuest(campo, lista){
+  const c = currentClient;
+  if (!c || !c._questionnaire) return;
+  const texto = lista.join(", ") || null;
+  const { error } = await sb
+    .from("client_questionnaire")
+    .update({ [campo]: texto })
+    .eq("id", c._questionnaire.id);
+  if (error){
+    console.error("guardarEtiquetasCuest error:", error);
+    alert("No se pudo guardar. Intentalo de nuevo.");
+    return;
+  }
+  // Actualizar en memoria (el tab Perfil lee el mismo objeto => queda vinculado)
+  c._questionnaire[campo] = texto;
+  renderClientPanel();
+}
+
 function seccionPlanNutricional(c){
   const nut = c._nutrition;
   const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px';
@@ -5974,14 +6072,10 @@ function seccionPlanNutricional(c){
       </div>`;
   }
 
-  // Estilo / preferencias / restricciones
-  const meta = [];
-  if (plan.style)        meta.push(`<span style="opacity:.6">Estilo:</span> ${escHtml(plan.style)}`);
-  if (plan.preferences)  meta.push(`<span style="opacity:.6">Preferencias:</span> ${escHtml(plan.preferences)}`);
-  if (plan.restrictions) meta.push(`<span style="opacity:.6">Restricciones:</span> ${escHtml(plan.restrictions)}`);
-  const metaHtml = meta.length
-    ? `<div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:14px">${meta.join('')}</div>`
-    : '';
+  // ── Estilo + Alergias / Enfermedades / Alimentos que no le gustan ──
+  // Estas tres listas viven en el cuestionario del cliente (fuente única,
+  // compartida con el tab Perfil).
+  const metaHtml = seccionPreferenciasNutri(c, plan);
 
   // ── Opciones de dieta ──
   let opcionesHtml;

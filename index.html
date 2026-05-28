@@ -3340,6 +3340,9 @@ function selectClient(id) {
   document.getElementById(`ci-${id}`)?.classList.add('active');
   renderClientPanel();
   renderMiniSidebar();
+  // El tab por defecto al seleccionar cliente es Resumen → cargar ajustes
+  // (retrasos/reorganización) y re-renderizar cuando lleguen.
+  setTimeout(async () => { await cargarAjustesCliente(currentClient); renderClientPanel(); }, 0);
 }
 
 
@@ -3527,22 +3530,23 @@ async function cargarSeriesCliente(){
    Mismo patrón que cargarSeriesCliente: bajo demanda, cachea en c._xxx. */
 async function cargarAjustesCliente(c){
   if (!c) return;
-  if (c._splitAdjustments != null && c._weekReorders != null) return; // ya cargados
-  c._splitAdjustments = c._splitAdjustments || [];
-  c._weekReorders     = c._weekReorders     || {};
+  if (c._ajustesCargados) return; // ya cargados con éxito
   try{
     const [adjRes, reoRes] = await Promise.all([
       sb.from('split_adjustments').select('*').eq('client_id', c.id).order('effective_date'),
       sb.from('week_reorders').select('*').eq('client_id', c.id)
     ]);
-    if (adjRes && !adjRes.error) c._splitAdjustments = adjRes.data || [];
-    else if (adjRes && adjRes.error) console.error('cargarAjustes split_adjustments:', adjRes.error);
+    c._splitAdjustments = (adjRes && !adjRes.error) ? (adjRes.data || []) : [];
+    if (adjRes && adjRes.error) console.error('cargarAjustes split_adjustments:', adjRes.error);
+    const map = {};
     if (reoRes && !reoRes.error){
-      const map = {};
       (reoRes.data || []).forEach(r => { if (r && r.week_key && Array.isArray(r.plan)) map[r.week_key] = r.plan; });
-      c._weekReorders = map;
-    } else if (reoRes && reoRes.error) console.error('cargarAjustes week_reorders:', reoRes.error);
-  }catch(e){ console.error('cargarAjustesCliente:', e); }
+    } else if (reoRes && reoRes.error){
+      console.error('cargarAjustes week_reorders:', reoRes.error);
+    }
+    c._weekReorders = map;
+    c._ajustesCargados = true; // marcar éxito solo si no hubo excepción
+  }catch(e){ console.error('cargarAjustesCliente:', e); c._splitAdjustments=c._splitAdjustments||[]; c._weekReorders=c._weekReorders||{}; }
 }
 
 /* clave de semana "YYYY-Www" — REPLICA EXACTA de getWeekKey de MyTracc.

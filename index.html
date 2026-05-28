@@ -4406,60 +4406,70 @@ function closeActividadModal() {
 }
 
 function renderActModal() {
-  const c    = currentClient;
-  const isHugoAct = c.id === 1;
+  const c = currentClient;
   const DIAS_FULL_A = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
+  // Lunes de la semana visible (actWeekOffset)
+  const ref = new Date(); ref.setDate(ref.getDate() + actWeekOffset*7);
+  const jd = ref.getDay(); const mon = new Date(ref);
+  mon.setDate(ref.getDate() - (jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+  const dom = new Date(mon); dom.setDate(mon.getDate()+6);
+
+  const fmt = d => d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+  const rangoLabel = `${fmt(mon)} – ${fmt(dom)}`;
   const weekLabel = actWeekOffset===0?'Esta semana':actWeekOffset===-1?'Semana anterior':`Hace ${Math.abs(actWeekOffset)} semanas`;
 
-  const weekActs = isHugoAct
-    ? (HUGO_ACTIVITIES_HISTORY[String(actWeekOffset)] || [])
-    : (actWeekOffset===0 ? (c.actividades||[]) : []);
+  // Icono según el texto de la actividad (detectado por palabras clave)
+  function iconoActividad(txt){
+    const t = (txt||'').toLowerCase();
+    if(/f[úu]tbol|futsal|partido/.test(t)) return '⚽';
+    if(/p[áa]del|tenis/.test(t)) return '🎾';
+    if(/correr|running|trote|atletismo|maraton|maratón/.test(t)) return '🏃';
+    if(/caminar|andar|paseo/.test(t)) return '🚶';
+    if(/bici|ciclismo|spinning/.test(t)) return '🚴';
+    if(/nadar|nataci[óo]n|piscina|swim/.test(t)) return '🏊';
+    if(/yoga|pilates|estiramiento|movilidad/.test(t)) return '🧘';
+    if(/push|pull|torso|leg|pierna|gym|gimnasio|crossfit|pecho|espalda|hombro|brazo/.test(t)) return '🏋️';
+    if(/baloncesto|basket/.test(t)) return '🏀';
+    if(/boxeo|kick/.test(t)) return '🥊';
+    return '⚡';
+  }
 
-  const totalKcal = weekActs.reduce((s,a)=>s+(a.kcal||0),0);
-  const totalMin  = weekActs.reduce((s,a)=>s+(a.min||0),0);
+  // Recopilar actividad real de cada día desde c._metrics (columna activity)
+  const diasData = DIAS_FULL_A.map((dia,i)=>{
+    const d = new Date(mon); d.setDate(mon.getDate()+i);
+    const fecha = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const m = (c._metrics||[]).find(x=>x&&String(x.date).slice(0,10)===fecha);
+    const txt = (m && m.activity && String(m.activity).trim()) ? String(m.activity).trim() : null;
+    return { dia, txt };
+  });
+  const nDias = diasData.filter(x=>x.txt).length;
 
-  const diasHtml = DIAS_FULL_A.map(dia=>{
-    const dayActs = weekActs.filter(a=>a.dia===dia);
-    if(!dayActs.length) return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+  const diasHtml = diasData.map(({dia,txt})=>{
+    if(!txt) return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:12px;font-weight:500;color:var(--text2)">${dia}</span>
       <span style="font-size:11px;color:var(--text3)">Sin actividad</span>
     </div>`;
-    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">${dia}</div>
-      ${dayActs.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">${a.tipo}</span>
-          <div>
-            <div style="font-size:12px;font-weight:500">${a.nombre}</div>
-            <div style="font-size:10.5px;color:var(--text3)">${a.min} min</div>
-          </div>
-        </div>
-        <span style="font-size:11.5px;font-family:Geist Mono,monospace;color:var(--amber);font-weight:500">−${a.kcal} kcal</span>
-      </div>`).join('')}
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;font-weight:500;color:var(--text2);min-width:74px">${dia}</span>
+      <span style="font-size:18px">${iconoActividad(txt)}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${txt}</span>
     </div>`;
   }).join('');
 
   document.getElementById('act-modal-body').innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <button onclick="actWeekOffset--;renderActModal()" style="font-size:11.5px;padding:4px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'Geist',sans-serif">‹ Semana anterior</button>
-      <span style="font-size:11px;font-weight:600;color:var(--text2);flex:1;text-align:center">${weekLabel}</span>
-      ${actWeekOffset<0?`<button onclick="actWeekOffset++;renderActModal()" style="font-size:11.5px;padding:4px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'Geist',sans-serif">Semana siguiente ›</button>`:'<div style="width:140px"></div>'}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <button onclick="actWeekOffset--;renderActModal()" style="font-size:11.5px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'Geist',sans-serif">‹ Anterior</button>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${weekLabel}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${rangoLabel}</div>
+      </div>
+      ${actWeekOffset<0?`<button onclick="actWeekOffset++;renderActModal()" style="font-size:11.5px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'Geist',sans-serif">Siguiente ›</button>`:'<div style="width:78px"></div>'}
     </div>
-    ${weekActs.length?`<div style="display:flex;gap:10px;margin-bottom:14px">
-      <div style="flex:1;background:var(--al);border-radius:9px;padding:10px 14px;text-align:center">
-        <div style="font-size:18px;font-weight:700;font-family:Geist Mono,monospace;color:var(--amber)">${weekActs.length}</div>
-        <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em">Actividades</div>
-      </div>
-      <div style="flex:1;background:var(--bg3);border-radius:9px;padding:10px 14px;text-align:center">
-        <div style="font-size:18px;font-weight:700;font-family:Geist Mono,monospace">${totalMin}</div>
-        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Minutos</div>
-      </div>
-      <div style="flex:1;background:var(--gl);border-radius:9px;padding:10px 14px;text-align:center">
-        <div style="font-size:18px;font-weight:700;font-family:Geist Mono,monospace;color:var(--green)">${totalKcal}</div>
-        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.05em">Kcal quemadas</div>
-      </div>
-    </div>`:''}
+    <div style="background:var(--al);border-radius:9px;padding:10px 14px;text-align:center;margin-bottom:14px">
+      <div style="font-size:20px;font-weight:700;font-family:Geist Mono,monospace;color:var(--amber)">${nDias}</div>
+      <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em">${nDias===1?'día con actividad':'días con actividad'}</div>
+    </div>
     <div>${diasHtml}</div>`;
 }
 
@@ -9392,7 +9402,7 @@ const CHART_CONFIG = {
       }
       return [];
     }},
-  cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana'],
+  cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana','mes','3 meses','histórico'],
     getData:(c,r)=>{
       const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
       const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
@@ -9418,11 +9428,73 @@ function openChartModal(metric) {
   document.getElementById('chart-modal-sub').textContent=weekLbl+(cfg.sub?' — '+cfg.sub:'');
   document.getElementById('chart-modal').style.display='flex';
   renderChartRangeTabs();
-  {
+  if(metric==='cheats'){ renderCheatsView(); }
+  else {
     const cv=document.getElementById('main-chart'); if(cv) cv.style.display='';
     const ex=document.getElementById('sessions-custom'); if(ex) ex.remove();
     renderChart();
   }
+}
+
+/* Vista de cheats: recuento (no gráfico). Semana = cheats de la semana;
+   mes/3 meses/histórico = total del periodo. Lista debajo. */
+function renderCheatsView(){
+  const c = currentClient;
+  const ch = (c._cheatsReal)||[];
+  const r = currentChartRange;
+  const hoy = new Date(); hoy.setHours(23,59,59,999);
+  let desde;
+  let titulo;
+  if(r==='semana'){
+    const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+    const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+    const dom=new Date(mon); dom.setDate(mon.getDate()+6); dom.setHours(23,59,59,999);
+    desde=mon;
+    titulo='esta semana';
+    var hasta=dom;
+  } else if(r==='mes'){
+    desde=new Date(hoy); desde.setDate(desde.getDate()-30); titulo='último mes';
+  } else if(r==='3 meses'){
+    desde=new Date(hoy); desde.setDate(desde.getDate()-90); titulo='últimos 3 meses';
+  } else {
+    desde=new Date(0); titulo='histórico';
+  }
+  const hastaD = (typeof hasta!=='undefined') ? hasta : hoy;
+  const ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const desdeS = ymd(desde), hastaS = ymd(hastaD);
+  const enRango = ch.filter(x=>{ const f=String(x.date).slice(0,10); return f>=desdeS && f<=hastaS; })
+                   .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const n = enRango.length;
+
+  // Ocultar gráfico y stats estándar
+  const cv=document.getElementById('main-chart'); if(cv) cv.style.display='none';
+  const wrap=document.querySelector('.chart-wrap'); if(wrap) wrap.style.height='auto';
+  document.getElementById('chart-stats-row').innerHTML='';
+  const exo=document.getElementById('sessions-custom'); if(exo) exo.remove();
+
+  const lista = n ? enRango.map(x=>{
+    const f=String(x.date).slice(0,10);
+    let fechaFmt=f; try{ fechaFmt=new Date(f+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }catch(e){}
+    const desc = (x.description||x.descripcion||x.name||'Cheat');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">🍕</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${desc}</div>
+          <div style="font-size:11px;color:var(--text3)">${fechaFmt}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : `<div style="text-align:center;padding:24px 0;color:var(--green);font-size:13px;font-weight:600">✓ Sin cheats ${titulo} — plan cumplido</div>`;
+
+  const div=document.createElement('div'); div.id='sessions-custom'; div.style.padding='4px 0';
+  div.innerHTML = `
+    <div style="text-align:center;padding:18px 0 8px">
+      <div style="font-size:44px;font-weight:700;font-family:Geist Mono,monospace;color:${n===0?'var(--green)':n<=2?'var(--amber)':'var(--red)'}">${n}</div>
+      <div style="font-size:12px;color:var(--text2)">cheat${n===1?'':'s'} ${titulo}</div>
+    </div>
+    <div style="margin-top:10px">${lista}</div>`;
+  document.querySelector('.chart-wrap').after(div);
 }
 
 function renderSessionsChart() {
@@ -9473,7 +9545,7 @@ function renderChartRangeTabs() {
   ).join('');
 }
 
-function changeRange(r){currentChartRange=r;renderChartRangeTabs();renderChart();}
+function changeRange(r){currentChartRange=r;renderChartRangeTabs();if(currentChartMetric==='cheats'){renderCheatsView();}else{const cv=document.getElementById('main-chart');if(cv)cv.style.display='';const ex=document.getElementById('sessions-custom');if(ex)ex.remove();renderChart();}}
 
 function renderChart() {
   const cfg  = CHART_CONFIG[currentChartMetric];

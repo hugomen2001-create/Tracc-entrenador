@@ -2450,6 +2450,7 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     edad: ageFromBirthdate(row.birth_date),
     revisionCadaSemanas: row.revision_every_weeks || 2,
     ultimaRevision: row.last_revision || null,
+    stepsGoal: row.steps_goal || 8000,
     // Guardamos también los campos crudos por si hacen falta luego
     _raw: row,
     _lastSessionDate: lastSessionDate || null,
@@ -3777,6 +3778,22 @@ function fechaLocalOffset(offsetDays){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+/* Cambia el objetivo de pasos del cliente en ±delta (de 500 en 500), entre
+   2000 y 30000. Guarda en clients.steps_goal y re-renderiza. */
+async function cambiarObjetivoPasos(delta){
+  const c = currentClient;
+  if (!c) return;
+  const actual = c.stepsGoal || 8000;
+  const nuevo = Math.max(2000, Math.min(30000, actual + delta));
+  if (nuevo === actual) return;
+  c.stepsGoal = nuevo;            // optimista: refresca ya
+  renderClientPanel();
+  try{
+    const { error } = await sb.from('clients').update({ steps_goal: nuevo }).eq('id', c.id);
+    if (error){ console.error('cambiarObjetivoPasos:', error); }
+  }catch(e){ console.error('cambiarObjetivoPasos:', e); }
+}
+
 function renderTab() {
   if (currentTab === 'resumen')     return renderResumen();
   if (currentTab === 'seguimiento') return renderSeguimiento();
@@ -3844,9 +3861,10 @@ function renderResumen() {
                   : 'Último peso de la semana';
 
   // Pasos media de la semana
+  const stepsGoalC  = c.stepsGoal || 8000;
   const stepsAvgRaw = mediaCampoSemana(c, mondayRef, 'steps');
   const stepsAvg    = stepsAvgRaw != null ? Math.round(stepsAvgRaw) : 0;
-  const stCol       = stepsAvg>=8000?'sg':stepsAvg>=5000?'sa':'sr';
+  const stCol       = stepsAvg>=stepsGoalC?'sg':stepsAvg>=stepsGoalC*0.6?'sa':'sr';
 
   // Sueño media (para métricas de abajo / bloque D, pero lo dejamos calculado)
   const sleepAvgRaw = mediaCampoSemana(c, mondayRef, 'sleep_hours');
@@ -4163,7 +4181,12 @@ function renderResumen() {
       <div class="stat-card" onclick="openChartModal('pasos')">
         <div class="stat-label">Pasos media/día</div>
         <div class="stat-value ${stCol}">${(stepsAvg/1000).toFixed(1)}<span style="font-size:12px;color:var(--text3);font-weight:400">k</span></div>
-        <div class="stat-sub">Objetivo: 8.000/día</div>
+        <div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:7px;margin-top:2px">
+          <span style="font-size:11px;color:var(--text3)">Objetivo:</span>
+          <button onclick="cambiarObjetivoPasos(-500)" style="width:20px;height:20px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">−</button>
+          <span style="font-size:11px;font-weight:700;color:var(--text);min-width:42px;text-align:center">${stepsGoalC.toLocaleString('es-ES')}</span>
+          <button onclick="cambiarObjetivoPasos(500)" style="width:20px;height:20px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
+        </div>
         <div class="stat-hint">↗ Ver histórico</div>
       </div>
       <div class="stat-card" onclick="openChartModal('cheats')">
@@ -4193,7 +4216,7 @@ function renderResumen() {
           <div class="metric-tile" onclick="openChartModal('pasos')">
             <div class="metric-emoji"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M7.5 5.25a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3v.205c.933.085 1.857.197 2.774.334 1.454.218 2.476 1.483 2.476 2.917v3.033c0 1.211-.734 2.352-1.936 2.752A24.726 24.726 0 0 1 12 15.75c-2.73 0-5.357-.442-7.814-1.259-1.202-.4-1.936-1.541-1.936-2.752V8.706c0-1.434 1.022-2.7 2.476-2.917A48.814 48.814 0 0 1 7.5 5.455V5.25Zm7.5 0v.09a49.488 49.488 0 0 0-6 0v-.09a1.5 1.5 0 0 1 1.5-1.5h3a1.5 1.5 0 0 1 1.5 1.5Zm-3 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd"/></svg></div>
             <div>
-              <div class="metric-val" style="color:${(mSteps??0)>=8000?'var(--green)':'var(--amber)'}">
+              <div class="metric-val" style="color:${(mSteps??0)>=stepsGoalC?'var(--green)':'var(--amber)'}">
                 ${fmtK(mSteps)}
               </div>
               <div class="metric-lbl">${weekOffset===0?'Pasos hoy':'Media pasos'}</div>
@@ -5346,7 +5369,7 @@ function setMetricsDay(offset) {
   const sleepVal  = m.sleep==null ? '—' : m.sleep+'h';
   const weightVal = m.weight==null ? '—' : m.weight;
   const actVal    = m.activity ? m.activity : '—';
-  const stepsColor = (m.steps??0)>=8000?'var(--green)':'var(--amber)';
+  const stepsColor = (m.steps??0)>=(c.stepsGoal||8000)?'var(--green)':'var(--amber)';
   const sleepColor = (m.sleep??0)>=7?'var(--green)':'var(--amber)';
   const actsColor  = m.activity?'var(--amber)':'var(--text3)';
 
@@ -9299,14 +9322,18 @@ function getWeekData(c, field, wo) {
 const CHART_CONFIG = {
   pasos:{title:'Pasos diarios',sub:'Objetivo: 8.000 pasos/día',color:'#2563eb',unit:'pasos',chartType:'bar',goal:8000,decimals:0,ranges:['semana'],
     getData:(c,r)=>{
-      // Use real history if available for current weekOffset
-      const hist = getWeekData(c, 'steps', weekOffset);
-      if(r==='semana' && hist) return hist;
-      if(r==='semana') return c.historial.pasos;
-      if(r==='mes')    return Array.from({length:28},(_,i)=>({label:`D${i+1}`,v:Math.round(7000+(Math.random()-.3)*3000)}));
-      if(r==='3 meses')return Array.from({length:12},(_,i)=>({label:`S${i+1}`,v:Math.round(8000+(Math.random()-.3)*2500)}));
-      if(r==='6 meses')return Array.from({length:24},(_,i)=>({label:`S${i+1}`,v:Math.round(8000+(Math.random()-.3)*2500)}));
-      return Array.from({length:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(8000+(Math.random()-.3)*2500)}));
+      const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+      const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+      if(r==='semana'){
+        const DIAS=['L','M','X','J','V','S','D'];
+        return DIAS.map((label,i)=>{
+          const d=new Date(mon); d.setDate(mon.getDate()+i);
+          const fecha=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const m=(c._metrics||[]).find(x=>x&&String(x.date).slice(0,10)===fecha&&x.steps!=null);
+          return {label, v: m? Number(m.steps) : null};
+        });
+      }
+      return [];
     }},
   peso:{title:'Evolución del peso',sub:'kg',color:'#16a34a',unit:'kg',chartType:'line',decimals:1,ranges:['semana'],
     getData:(c,r)=>{
@@ -9455,6 +9482,10 @@ function changeRange(r){currentChartRange=r;renderChartRangeTabs();renderChart()
 function renderChart() {
   const cfg  = CHART_CONFIG[currentChartMetric];
   const data = cfg.getData(currentClient, currentChartRange);
+  // Objetivo dinámico: para pasos, el del cliente; resto, el del config.
+  const goalVal = currentChartMetric==='pasos'
+    ? ((currentClient && currentClient.stepsGoal) || cfg.goal)
+    : cfg.goal;
   if (chartInstance) chartInstance.destroy();
   const ctx  = document.getElementById('main-chart').getContext('2d');
   const vals     = data.map(d=>d.v);
@@ -9475,16 +9506,25 @@ function renderChart() {
         {
           data: displayVals,
           borderColor: cfg.color,
-          backgroundColor: isBar ? cfg.color+'bb' : cfg.color+'18',
+          backgroundColor: isBar
+            ? displayVals.map(v => {
+                if (v === null || v === undefined) return '#e8e8e4';        // sin dato → gris
+                if (goalVal) return v >= goalVal ? cfg.color+'dd' : cfg.color+'55'; // según objetivo
+                return cfg.color+'bb';
+              })
+            : cfg.color+'18',
           borderWidth: isBar ? 0 : 2,
           fill: !isBar,
           tension: 0.4,
+          spanGaps: true,
           pointRadius: isLine ? (data.length>20?0:4) : 0,
           pointBackgroundColor: cfg.color,
+          pointBorderColor: '#fff',
+          pointBorderWidth: isLine ? 2 : 0,
           borderRadius: isBar ? 4 : 0,
         },
-        ...(cfg.goal ? [{
-          type:'line', data:Array(data.length).fill(cfg.goal),
+        ...(goalVal ? [{
+          type:'line', data:Array(data.length).fill(goalVal),
           borderColor:'#d4d3cf', borderWidth:1, borderDash:[4,4],
           pointRadius:0, fill:false, tension:0
         }] : [])
@@ -9492,7 +9532,9 @@ function renderChart() {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
-      spanGaps: false,
+      // Línea: conecta los puntos con dato saltándose los días vacíos.
+      // Barras: spanGaps no aplica (cada barra es independiente).
+      spanGaps: true,
       plugins: {
         legend:{display:false},
         tooltip:{

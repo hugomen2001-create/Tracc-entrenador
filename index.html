@@ -9352,13 +9352,20 @@ const CHART_CONFIG = {
       // periodos largos: se implementan en la 2ª fase
       return [];
     }},
-  sueno:{title:'Horas de sueño',sub:'Objetivo: 7-9h/noche',color:'#7c3aed',unit:'h',chartType:'bar',decimals:1,goal:7.5,ranges:['semana'],
+  sueno:{title:'Horas de sueño',sub:'Objetivo: 7h/noche',color:'#7c3aed',unit:'h',chartType:'bar',decimals:1,goal:7,ranges:['semana'],
     getData:(c,r)=>{
-      const hist = getWeekData(c, 'sleep', weekOffset);
-      if(r==='semana' && hist) return hist;
-      if(r==='semana') return c.historial.sueno;
-      if(r==='mes')    return Array.from({length:28},(_,i)=>({label:`D${i+1}`,v:+(6.5+Math.random()*2).toFixed(1)}));
-      return Array.from({length:c.weeks*7},(_,i)=>({label:`D${i+1}`,v:+(6.5+Math.random()*2).toFixed(1)}));
+      const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+      const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+      if(r==='semana'){
+        const DIAS=['L','M','X','J','V','S','D'];
+        return DIAS.map((label,i)=>{
+          const d=new Date(mon); d.setDate(mon.getDate()+i);
+          const fecha=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const m=(c._metrics||[]).find(x=>x&&String(x.date).slice(0,10)===fecha&&x.sleep_hours!=null);
+          return {label, v: m? +Number(m.sleep_hours).toFixed(1) : null};
+        });
+      }
+      return [];
     }},
   actividad:{title:'Actividad física semanal',sub:'actividades registradas',color:'#d97706',unit:'actividades',chartType:'bar',decimals:0,ranges:['semana'],
     getData:(c,r)=>{

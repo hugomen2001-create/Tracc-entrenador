@@ -2552,11 +2552,22 @@ async function loadRealClients(){
     let metricsByClient = {};
     if (rows.length){
       const ids = rows.map(r => r.id);
-      const { data: metrics } = await sb
+      let { data: metrics, error: metErr } = await sb
         .from('daily_metrics')
         .select('client_id, date, weight_kg, steps, sleep_hours, activity_details')
         .in('client_id', ids)
         .order('date', { ascending:true });
+      // Si falla (p.ej. la columna activity_details no existe), reintentar sin ella.
+      if (metErr){
+        console.warn('daily_metrics con activity_details falló, reintento sin ella:', metErr);
+        const retry = await sb
+          .from('daily_metrics')
+          .select('client_id, date, weight_kg, steps, sleep_hours')
+          .in('client_id', ids)
+          .order('date', { ascending:true });
+        metrics = retry.data;
+        if (retry.error) console.error('daily_metrics error (reintento):', retry.error);
+      }
       (metrics || []).forEach(m => {
         // Descartar solo si el registro está completamente vacío.
         // Un día puede tener pasos/sueño aunque no tenga peso (y viceversa).

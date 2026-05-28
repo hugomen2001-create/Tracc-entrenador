@@ -3847,6 +3847,14 @@ function renderResumen() {
       El cliente retrasó el split ${r.dias} día${r.dias===1?'':'s'} (desde ${desdeFmt})</div>`;
   }
 
+  // [DEBUG TEMPORAL] diagnóstico de la reorganización
+  const _dbgKey = weekKeyFromMonday(mondayRef);
+  const _dbgLoaded = !!c._ajustesCargados;
+  const _dbgReorgKeys = c._weekReorders ? Object.keys(c._weekReorders) : [];
+  const _dbgReorgFound = !!buscarReorgSemana(c, mondayRef);
+  reorgNoteHtml += `<div style="margin-top:9px;padding:8px 11px;background:#1e293b;border-radius:8px;font-size:10px;color:#93c5fd;font-family:monospace;line-height:1.5">
+    DEBUG · cargado:${_dbgLoaded} · claveTracc:${_dbgKey} · clavesEnDatos:[${_dbgReorgKeys.join(',')}] · reorgEncontrada:${_dbgReorgFound} · splitLen:${(c._training&&c._training.split&&c._training.split.length)||'?'}</div>`;
+
   // Today's split workout
   const todayDate  = new Date(); todayDate.setHours(0,0,0,0);
   const todaySplit = weekOffset===0&&ts_r.split?.length?getSplitDayForDate(ts_r,todayDate):null;

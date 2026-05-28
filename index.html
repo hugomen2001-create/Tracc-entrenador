@@ -3896,12 +3896,23 @@ function renderResumen() {
 
   // Dynamic chart ranges
   function getAvailableRanges(metric) {
-    const w = c.weeks;
+    // Antigüedad real: meses desde el primer dato disponible (métricas o sesiones).
+    const fechas = []
+      .concat((c._metrics||[]).map(m=>String(m.date).slice(0,10)))
+      .concat((c._sessions||[]).map(s=>String(s.session_date).slice(0,10)))
+      .filter(Boolean).sort();
+    let mesesAntiguedad = 0;
+    if (fechas.length){
+      const prim = new Date(fechas[0]+'T00:00:00');
+      mesesAntiguedad = (Date.now() - prim.getTime()) / (1000*60*60*24*30.44);
+    }
     const r = ['semana'];
-    if(w>=4)  r.push('mes');
-    if(w>=12) r.push('3 meses');
-    if(w>=24) r.push('6 meses');
-    if(['sessions','cheats','peso','pasos'].includes(metric)) r.push('histórico');
+    if(mesesAntiguedad>=1)  r.push('mes');
+    if(mesesAntiguedad>=3)  r.push('3 meses');
+    if(mesesAntiguedad>=6)  r.push('6 meses');
+    if(mesesAntiguedad>=12) r.push('1 año');
+    // Histórico siempre disponible para métricas con datos
+    if(['sessions','cheats','peso','pasos','sueno'].includes(metric)) r.push('histórico');
     return r;
   }
   ['sessions','peso','pasos','cheats','sueno','actividad'].forEach(m=>{
@@ -9329,6 +9340,88 @@ function getWeekData(c, field, wo) {
   return DAYS.map(d => ({ label: d, v: wk[d] ? wk[d][field] : null }));
 }
 
+/* ── Helpers de agregación para periodos largos de los modales ───────────── */
+/* Agrega un campo de daily_metrics por SEMANA. agg: 'last'|'avg'|'sum'.
+   Devuelve [{label, v, _ini, _fin}] de las últimas nSemanas (antigua→reciente). */
+function _ymdLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _lunesDe(d){ const x=new Date(d); const jd=x.getDay(); x.setDate(x.getDate()-(jd===0?6:jd-1)); x.setHours(0,0,0,0); return x; }
+const _MES_CORTO=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function serieSemanas(c, campo, agg, nSemanas){
+  const ms=(c._metrics||[]);
+  const hoyLun=_lunesDe(new Date());
+  const out=[];
+  for(let k=nSemanas-1;k>=0;k--){
+    const ini=new Date(hoyLun); ini.setDate(hoyLun.getDate()-k*7);
+    const fin=new Date(ini); fin.setDate(ini.getDate()+6);
+    const iniS=_ymdLocal(ini), finS=_ymdLocal(fin);
+    const enSem=ms.filter(m=>{const f=String(m.date).slice(0,10); return f>=iniS&&f<=finS&&m[campo]!=null;})
+                  .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    let v=null;
+    if(enSem.length){
+      const nums=enSem.map(m=>Number(m[campo]));
+      if(agg==='last') v=nums[nums.length-1];
+      else if(agg==='avg') v=nums.reduce((a,b)=>a+b,0)/nums.length;
+      else if(agg==='sum') v=nums.reduce((a,b)=>a+b,0);
+    }
+    // label: mostrar mes solo en la primera semana de cada mes
+    const label = ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '';
+    out.push({label, v: v==null?null:+v.toFixed(2), _ini:iniS, _fin:finS});
+  }
+  return out;
+}
+
+/* Cuenta sesiones completadas por semana (de c._sessions). */
+function serieSesionesSemanas(c, nSemanas){
+  const ses=(c._sessions||[]);
+  const hoyLun=_lunesDe(new Date());
+  const out=[];
+  for(let k=nSemanas-1;k>=0;k--){
+    const ini=new Date(hoyLun); ini.setDate(hoyLun.getDate()-k*7);
+    const fin=new Date(ini); fin.setDate(ini.getDate()+6);
+    const iniS=_ymdLocal(ini), finS=_ymdLocal(fin);
+    const n=ses.filter(s=>{const f=String(s.session_date).slice(0,10); return s.completed&&f>=iniS&&f<=finS;}).length;
+    const label = ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '';
+    out.push({label, v:n, _ini:iniS, _fin:finS});
+  }
+  return out;
+}
+
+/* Agrega por MES (nMeses hacia atrás). agg: 'last'|'avg'|'sum'. */
+function serieMeses(c, campo, agg, nMeses){
+  const ms=(c._metrics||[]);
+  const now=new Date();
+  const out=[];
+  for(let k=nMeses-1;k>=0;k--){
+    const dt=new Date(now.getFullYear(), now.getMonth()-k, 1);
+    const y=dt.getFullYear(), mo=dt.getMonth();
+    const enMes=ms.filter(m=>{const d=new Date(String(m.date).slice(0,10)+'T00:00:00'); return d.getFullYear()===y&&d.getMonth()===mo&&m[campo]!=null;})
+                  .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    let v=null;
+    if(enMes.length){
+      const nums=enMes.map(m=>Number(m[campo]));
+      if(agg==='last') v=nums[nums.length-1];
+      else if(agg==='avg') v=nums.reduce((a,b)=>a+b,0)/nums.length;
+      else if(agg==='sum') v=nums.reduce((a,b)=>a+b,0);
+    }
+    out.push({label:_MES_CORTO[mo], v: v==null?null:+v.toFixed(2)});
+  }
+  return out;
+}
+
+function serieSesionesMeses(c, nMeses){
+  const ses=(c._sessions||[]);
+  const now=new Date();
+  const out=[];
+  for(let k=nMeses-1;k>=0;k--){
+    const dt=new Date(now.getFullYear(), now.getMonth()-k, 1);
+    const y=dt.getFullYear(), mo=dt.getMonth();
+    const n=ses.filter(s=>{const d=new Date(String(s.session_date).slice(0,10)+'T00:00:00'); return s.completed&&d.getFullYear()===y&&d.getMonth()===mo;}).length;
+    out.push({label:_MES_CORTO[mo], v:n});
+  }
+  return out;
+}
+
 const CHART_CONFIG = {
   pasos:{title:'Pasos diarios',sub:'Objetivo: 8.000 pasos/día',color:'#2563eb',unit:'pasos',chartType:'bar',goal:8000,decimals:0,ranges:['semana'],
     getData:(c,r)=>{
@@ -9343,6 +9436,11 @@ const CHART_CONFIG = {
           return {label, v: m? Number(m.steps) : null};
         });
       }
+      if(r==='mes')      return serieSemanas(c,'steps','avg',4).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
+      if(r==='3 meses')  return serieSemanas(c,'steps','avg',13).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
+      if(r==='6 meses')  return serieMeses(c,'steps','avg',6).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
+      if(r==='1 año')    return serieMeses(c,'steps','avg',12).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
+      if(r==='histórico')return serieMeses(c,'steps','avg',12).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
       return [];
     }},
   peso:{title:'Evolución del peso',sub:'kg',color:'#16a34a',unit:'kg',chartType:'line',decimals:1,ranges:['semana'],
@@ -9359,7 +9457,12 @@ const CHART_CONFIG = {
           return {label, v: m? +Number(m.weight_kg).toFixed(1) : null};
         });
       }
-      // periodos largos: se implementan en la 2ª fase
+      // periodos largos
+      if(r==='mes')      return serieSemanas(c,'weight_kg','last',4);
+      if(r==='3 meses')  return serieSemanas(c,'weight_kg','last',13);
+      if(r==='6 meses')  return serieMeses(c,'weight_kg','last',6);
+      if(r==='1 año')    return serieMeses(c,'weight_kg','last',12);
+      if(r==='histórico')return serieMeses(c,'weight_kg','last',12);
       return [];
     }},
   sueno:{title:'Horas de sueño',sub:'Objetivo: 7h/noche',color:'#7c3aed',unit:'h',chartType:'bar',decimals:1,goal:7,ranges:['semana'],
@@ -9375,6 +9478,11 @@ const CHART_CONFIG = {
           return {label, v: m? +Number(m.sleep_hours).toFixed(1) : null};
         });
       }
+      if(r==='mes')      return serieSemanas(c,'sleep_hours','avg',4).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
+      if(r==='3 meses')  return serieSemanas(c,'sleep_hours','avg',13).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
+      if(r==='6 meses')  return serieMeses(c,'sleep_hours','avg',6).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
+      if(r==='1 año')    return serieMeses(c,'sleep_hours','avg',12).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
+      if(r==='histórico')return serieMeses(c,'sleep_hours','avg',12).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
       return [];
     }},
   actividad:{title:'Actividad física semanal',sub:'actividades registradas',color:'#d97706',unit:'actividades',chartType:'bar',decimals:0,ranges:['semana'],
@@ -9400,6 +9508,11 @@ const CHART_CONFIG = {
           return {label, v: hizo?1:0};
         });
       }
+      if(r==='mes')      return serieSesionesSemanas(c,4);
+      if(r==='3 meses')  return serieSesionesSemanas(c,13);
+      if(r==='6 meses')  return serieSesionesMeses(c,6);
+      if(r==='1 año')    return serieSesionesMeses(c,12);
+      if(r==='histórico')return serieSesionesMeses(c,12);
       return [];
     }},
   cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana','mes','3 meses','histórico'],

@@ -3734,6 +3734,17 @@ function cheatsSemana(c, mondayDate){
   return ch.filter(x => x && fechas.includes(String(x.date).slice(0,10))).length;
 }
 
+/* Último peso registrado del cliente (el más reciente de todo el historial),
+   con su fecha. Devuelve {valor, fecha} o {valor:null}. */
+function ultimoPesoConocido(c){
+  const ms = ((c && c._metrics) || [])
+    .filter(m => m && m.weight_kg != null)
+    .sort((a,b)=> String(a.date).localeCompare(String(b.date)));
+  if (!ms.length) return { valor:null, fecha:null };
+  const last = ms[ms.length-1];
+  return { valor: Number(last.weight_kg), fecha: String(last.date).slice(0,10) };
+}
+
 /* ── BLOQUE D: métricas de un día concreto (hoy/ayer) ───────────────────── */
 /* Devuelve {steps, sleep, weight, activities} del día `fechaStr` (YYYY-MM-DD)
    leyendo de c._metrics. Si no hay registro, valores null/[]. */
@@ -3811,11 +3822,20 @@ function renderResumen() {
   const prevMonday = new Date(mondayRef); prevMonday.setDate(mondayRef.getDate()-7);
   const weightThis = pesoSemana(c, mondayRef);
   const weightPrev = pesoSemana(c, prevMonday);
-  const weight     = weightThis != null ? +weightThis.toFixed(1) : null;
-  const wChange    = (weightThis != null && weightPrev != null) ? +(weightThis - weightPrev).toFixed(1) : 0;
-  const wSign      = wChange<0?'↓':wChange>0?'↑':'→';
+  // Para la card "Peso actual" usamos el último peso conocido (aunque no sea de
+  // esta semana), con su fecha. Evita el "null" cuando no hay registro semanal.
+  const _ultPeso = ultimoPesoConocido(c);
+  // Card "Peso actual": el ÚLTIMO peso registrado DE ESA SEMANA (no media, no
+  // perfil). Si no hay registro esa semana → '—'.
+  const weight     = weightThis!=null ? +weightThis.toFixed(1) : null;
+  const wChange    = (weightThis != null && weightPrev != null) ? +(weightThis - weightPrev).toFixed(1) : null;
+  const wSign      = wChange==null ? '' : wChange<0?'↓':wChange>0?'↑':'→';
   const goalStr    = (c.goal||'');
-  const wCol       = wChange===0?'':(goalStr.includes('grasa')||goalStr==='Definición'||goalStr==='Resistencia')?(wChange<0?'sg':'sr'):(wChange>0?'sg':'sa');
+  const wCol       = (wChange==null||wChange===0)?'':(goalStr.includes('grasa')||goalStr==='Definición'||goalStr==='Resistencia')?(wChange<0?'sg':'sr'):(wChange>0?'sg':'sa');
+  // Subtexto de la card de peso
+  const weightSub = weight==null ? 'Sin registro esta semana'
+                  : (wChange!=null && wChange!==0) ? `${wSign} ${Math.abs(wChange)} kg vs sem. anterior`
+                  : 'Último peso de la semana';
 
   // Pasos media de la semana
   const stepsAvgRaw = mediaCampoSemana(c, mondayRef, 'steps');
@@ -4130,8 +4150,8 @@ function renderResumen() {
       </div>
       <div class="stat-card" onclick="openChartModal('peso')">
         <div class="stat-label">Peso actual</div>
-        <div class="stat-value">${weight}<span style="font-size:12px;color:var(--text3);font-weight:400"> kg</span></div>
-        <div class="stat-sub ${wCol}">${wSign} ${Math.abs(wChange)} kg esta semana</div>
+        <div class="stat-value">${weight==null?'—':weight}<span style="font-size:12px;color:var(--text3);font-weight:400"> kg</span></div>
+        <div class="stat-sub ${wCol}">${weightSub}</div>
         <div class="stat-hint">↗ Ver evolución</div>
       </div>
       <div class="stat-card" onclick="openChartModal('pasos')">

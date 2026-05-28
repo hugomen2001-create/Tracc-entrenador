@@ -1254,6 +1254,20 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   </div>
 </div>
 
+<!-- MACROS MODAL -->
+<div id="macros-modal" style="display:none" class="modal-overlay" onclick="if(event.target===this)closeMacrosModal()">
+  <div class="modal-box" style="width:440px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="macros-modal-title">Comida</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="macros-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeMacrosModal()">✕</button>
+    </div>
+    <div class="modal-body" id="macros-modal-body"></div>
+  </div>
+</div>
+
 <!-- IMPORT MODAL -->
 <div id="import-modal" style="display:none" class="modal-overlay" onclick="if(event.target===this)closeImportModal()">
   <div class="modal-box">
@@ -4537,44 +4551,129 @@ function renderActModal() {
 }
 
 
+/* Devuelve la opción de dieta a mostrar: la que el cliente tenga seleccionada
+   o la primera con comidas. Normaliza meals a [{nombre, items:[{name,grams,kcal,ch,g,p}]}]. */
+function dietaActiva(c){
+  const nut = c && c._nutrition;
+  if (!nut || !nut.options || !nut.options.length) return null;
+  // Elegir opción: la primera que tenga comidas con items
+  const opt = nut.options.find(o => o.meals && Object.keys(o.meals).length) || nut.options[0];
+  if (!opt || !opt.meals) return null;
+  const ORDEN = ['desayuno','almuerzo','comida','merienda','cena','snack','pre-entreno','post-entreno'];
+  const comidas = Object.keys(opt.meals).map(nombre => {
+    const m = opt.meals[nombre] || {};
+    const items = (m.items || []).map(it => ({
+      name: it.name || it.nombre || '—',
+      grams: it.grams != null ? it.grams : (it.gramos != null ? it.gramos : null),
+      kcal: Number(it.kcal)||0, ch: Number(it.ch)||0, g: Number(it.g)||0, p: Number(it.p)||0
+    }));
+    return { nombre, items };
+  }).sort((a,b)=>{
+    const ia=ORDEN.indexOf(a.nombre.toLowerCase()), ib=ORDEN.indexOf(b.nombre.toLowerCase());
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  return { nombre: opt.name || 'Plan nutricional', comidas, kcalObjetivo: opt.kcal_estimate || (nut.plan&&nut.plan.kcal_target) || null };
+}
+
 function renderDietCard(op, c) {
-  if (!op) {
+  const dieta = dietaActiva(c);
+  if (!dieta || !dieta.comidas.length) {
     return `<div class="panel-card" style="text-align:center;padding:20px;color:var(--text3);font-size:12px">
       Sin plan nutricional. <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="switchTab('editar')">Crear plan →</span>
     </div>`;
   }
-  const ds = getDietState(c.id);
-  const totalKcal = op.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.kcal||0),0),0);
-  const kcalGoal  = ds.params?.kcal || 2000;
+  // Guardar para el modal de macros
+  window._dietaActual = dieta;
+  const totalKcal = dieta.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.kcal||0),0),0);
+  const totCH = dieta.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.ch||0),0),0);
+  const totG  = dieta.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.g||0),0),0);
+  const totP  = dieta.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.p||0),0),0);
+  const kcalGoal  = dieta.kcalObjetivo || totalKcal || 2000;
   const kcalPct   = Math.min(100, Math.round(totalKcal / kcalGoal * 100));
-  const kcalCls   = totalKcal > kcalGoal*1.1 ? 'pr' : totalKcal < kcalGoal*0.85 ? 'pa' : '';
-  const kcalCol   = totalKcal > kcalGoal*1.1 ? 'var(--red)' : totalKcal < kcalGoal*0.85 ? 'var(--amber)' : 'var(--green)';
-  const mealsHtml = op.comidas.map(com => {
-    const comKcal = com.items.reduce((s,it)=>s+(it.kcal||0),0);
-    const itemsTxt = com.items.map(it=>it.nombre+(it.cantidad?` · <span style="color:var(--text3)">${it.cantidad}</span>`:'')).join(', ');
-    return `<div class="meal-row">
-      <div class="meal-hdr">
-        <div class="meal-name">${com.nombre}</div>
-        ${comKcal>0?`<div class="meal-kcal">${comKcal} kcal</div>`:''}
+  const mealIcons = {desayuno:'☕',almuerzo:'🥪',comida:'🍗',merienda:'🍎',cena:'🌙',snack:'🥜'};
+  const mealsHtml = dieta.comidas.map((com,idx) => {
+    const comKcal = Math.round(com.items.reduce((s,it)=>s+(it.kcal||0),0));
+    const itemsTxt = com.items.map(it=>it.name).join(' · ');
+    const ico = mealIcons[com.nombre.toLowerCase()] || '🍽️';
+    return `<div class="meal-row" style="cursor:pointer" onclick="openMacrosModal(${idx})">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:16px">${ico}</span>
+        <div style="flex:1;min-width:0">
+          <div class="meal-name">${com.nombre}</div>
+          <div class="meal-items" style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${itemsTxt}</div>
+        </div>
+        ${comKcal>0?`<div style="font-size:12px;font-weight:600;font-family:Geist Mono,monospace;color:var(--text2);white-space:nowrap">${comKcal} kcal</div>`:''}
       </div>
-      <div class="meal-items" style="font-size:12px">${itemsTxt}</div>
     </div>`;
   }).join('');
-  const macros = op.macros || {};
   return `<div class="panel-card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:11px;font-weight:600;color:var(--text2)">${op.nombre||'Plan del día'}</span>
-      <span style="color:${kcalCol};font-size:12px;font-family:Geist Mono,monospace;font-weight:600">${totalKcal||kcalGoal} / ${kcalGoal} kcal</span>
+      <span style="font-size:11px;font-weight:600;color:var(--text2)">${dieta.nombre}</span>
+      <span style="color:var(--green);font-size:12px;font-family:Geist Mono,monospace;font-weight:600">${Math.round(totalKcal)}${dieta.kcalObjetivo?' / '+kcalGoal:''} kcal</span>
     </div>
-    <div class="prog-bar" style="margin-bottom:11px"><div class="prog-fill ${kcalCls}" style="width:${kcalPct}%"></div></div>
+    ${dieta.kcalObjetivo?`<div class="prog-bar" style="margin-bottom:11px"><div class="prog-fill" style="width:${kcalPct}%"></div></div>`:''}
     ${mealsHtml}
-    ${macros.ch||macros.p?`<div style="display:flex;gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)">
-      <span class="badge badge-a">CH ${macros.ch||0}g</span>
-      <span class="badge badge-r">G ${macros.g||0}g</span>
-      <span class="badge badge-g">P ${macros.p||0}g</span>
-    </div>`:''}
+    <div style="display:flex;gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)">
+      <span class="badge badge-a">CH ${Math.round(totCH)}g</span>
+      <span class="badge badge-r">G ${Math.round(totG)}g</span>
+      <span class="badge badge-g">P ${Math.round(totP)}g</span>
+    </div>
   </div>`;
 }
+
+/* Modal de macros de una comida (al clicar una comida de la dieta). */
+function openMacrosModal(idx){
+  const dieta = window._dietaActual;
+  if (!dieta || !dieta.comidas[idx]) return;
+  const com = dieta.comidas[idx];
+  const totKcal = com.items.reduce((s,it)=>s+(it.kcal||0),0);
+  const totCH = com.items.reduce((s,it)=>s+(it.ch||0),0);
+  const totG  = com.items.reduce((s,it)=>s+(it.g||0),0);
+  const totP  = com.items.reduce((s,it)=>s+(it.p||0),0);
+  const mealIcons = {desayuno:'☕',almuerzo:'🥪',comida:'🍗',merienda:'🍎',cena:'🌙',snack:'🥜'};
+  const ico = mealIcons[com.nombre.toLowerCase()] || '🍽️';
+  // gramos totales de macros para barra proporcional
+  const sumaMacros = totCH+totG+totP || 1;
+  const pctCH=Math.round(totCH/sumaMacros*100), pctG=Math.round(totG/sumaMacros*100), pctP=100-pctCH-pctG;
+  // % kcal del total del día (si hay)
+  const totalDia = dieta.comidas.reduce((s,c)=>s+c.items.reduce((ss,it)=>ss+(it.kcal||0),0),0) || 1;
+
+  const itemsHtml = com.items.map(it=>`
+    <div style="padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${it.name}${it.grams?` <span style="font-size:11px;color:var(--text3);font-weight:400">${it.grams}g</span>`:''}</span>
+        <span style="font-size:12px;font-weight:600;font-family:Geist Mono,monospace;color:var(--text2)">${Math.round(it.kcal)} kcal</span>
+      </div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:2px">CH ${Math.round(it.ch)}g · G ${Math.round(it.g)}g · P ${Math.round(it.p)}g</div>
+    </div>`).join('');
+
+  document.getElementById('macros-modal-title').innerHTML = `${ico} ${com.nombre}`;
+  document.getElementById('macros-modal-sub').textContent = `${com.items.length} aliment${com.items.length===1?'o':'os'} · ${Math.round(totKcal)} kcal · ${Math.round(totKcal/totalDia*100)}% del día`;
+  document.getElementById('macros-modal-body').innerHTML = `
+    <div>${itemsHtml}</div>
+    <div style="display:flex;height:8px;border-radius:5px;overflow:hidden;margin:16px 0 12px;background:var(--bg3)">
+      <div style="width:${pctCH}%;background:#2563eb"></div>
+      <div style="width:${pctG}%;background:#f59e0b"></div>
+      <div style="width:${pctP}%;background:#16a34a"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1;background:#eff6ff;border-radius:9px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:700;font-family:Geist Mono,monospace;color:#2563eb">${Math.round(totCH)}g</div>
+        <div style="font-size:10px;color:#2563eb;font-weight:600">Carbos · ${pctCH}%</div>
+      </div>
+      <div style="flex:1;background:#fffbeb;border-radius:9px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:700;font-family:Geist Mono,monospace;color:#f59e0b">${Math.round(totG)}g</div>
+        <div style="font-size:10px;color:#f59e0b;font-weight:600">Grasas · ${pctG}%</div>
+      </div>
+      <div style="flex:1;background:#f0fdf4;border-radius:9px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:700;font-family:Geist Mono,monospace;color:#16a34a">${Math.round(totP)}g</div>
+        <div style="font-size:10px;color:#16a34a;font-weight:600">Proteína · ${pctP}%</div>
+      </div>
+    </div>`;
+  document.getElementById('macros-modal').style.display='flex';
+}
+function closeMacrosModal(){ document.getElementById('macros-modal').style.display='none'; }
+
 
 // ── TAB: SEGUIMIENTO ──────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════

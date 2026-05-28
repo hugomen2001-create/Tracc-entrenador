@@ -4399,77 +4399,120 @@ let actWeekOffset = 0;
 // ── TRAINING EVOLUTION MODAL ──────────────────────────────────────────────
 function openEvoModal(sessionType) {
   const c = currentClient;
+  // Sesiones COMPLETADAS de este tipo, más reciente primero
+  const ses = ((c && c._sessions)||[])
+    .filter(s => s && s.completed && (s.session_type||'')===sessionType && s.session_date)
+    .sort((a,b)=>String(b.session_date).localeCompare(String(a.session_date)));
+  // Ejercicios únicos de la última sesión (para chips)
+  let chips = [];
+  if (ses.length){
+    const lastSets = ((c._workoutSets)||[]).filter(ws => ws && ws.session_id===ses[0].id);
+    const seen = new Set();
+    lastSets.forEach(ws => { if (ws.exercise_name && !seen.has(ws.exercise_name)){ seen.add(ws.exercise_name); chips.push(ws.exercise_name); } });
+  }
   document.getElementById('evo-modal-title').textContent = `Evolución — ${sessionType}`;
-  document.getElementById('evo-modal-sub').textContent   = `${c.name} · Mesociclo de ${c.weeks} semanas`;
+  document.getElementById('evo-modal-sub').textContent   = `${ses.length} ${ses.length===1?'sesión':'sesiones'} · selecciona un ejercicio`;
   document.getElementById('evo-modal').style.display     = 'flex';
-  renderEvoModal(sessionType);
+  window._evoState = { sessionType, ejercicios: chips, sesiones: ses, selected: chips[0]||null };
+  renderEvoModal();
 }
 
 function closeEvoModal() {
   document.getElementById('evo-modal').style.display = 'none';
+  if (window._evoChart){ try{ window._evoChart.destroy(); }catch(e){} window._evoChart=null; }
 }
 
-function renderEvoModal(sessionType) {
+function selectEvoEjercicio(nombre){
+  if (!window._evoState) return;
+  window._evoState.selected = nombre;
+  renderEvoModal();
+}
+
+function renderEvoModal(){
+  const st = window._evoState;
+  const body = document.getElementById('evo-modal-body');
+  if (!st || !st.sesiones.length){
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Sin sesiones completadas de este tipo.</div>';
+    return;
+  }
+  if (!st.ejercicios.length){
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">La última sesión no tiene ejercicios registrados.</div>';
+    return;
+  }
   const c = currentClient;
-  const isHugo = c.id === 1;
-  if (!isHugo || !HUGO_TRAINING_HISTORY) {
-    document.getElementById('evo-modal-body').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Sin datos históricos disponibles.</div>';
-    return;
-  }
+  const sets = (c._workoutSets)||[];
 
-  // Map session type to day index in weekHistory sessions array
-  // Hugo split: L=0 M=1(TORSO) X=2 J=3(LEG) V=4(PUSH) S=5(PULL) D=6
-  const SESSION_DAY_IDX = {TORSO:1, LEG:3, PUSH:4, PULL:5, FULL:1, CARDIO:4};
-  const dayIdx = SESSION_DAY_IDX[sessionType] ?? -1;
-
-  const weeks = Object.keys(HUGO_TRAINING_HISTORY).sort(); // S1..S8
-  const firstWithData = weeks.find(w => HUGO_TRAINING_HISTORY[w][sessionType]);
-  if (!firstWithData) {
-    document.getElementById('evo-modal-body').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3)">Sin datos para esta sesión.</div>';
-    return;
-  }
-
-  const ejercicios = Object.keys(HUGO_TRAINING_HISTORY[firstWithData][sessionType]);
-
-  // Check if client did the session that week using weekHistory
-  function sessionDone(weekKey) {
-    if (!c.weekHistory) return true; // assume done if no history
-    // weekKey is like 'S1'..'S8', convert to weekOffset '-7'..'-1','0'
-    const weekNum  = parseInt(weekKey.replace('S',''));
-    const wo       = -(8 - weekNum); // S1=-7, S8=0
-    const hist     = c.weekHistory[String(wo)];
-    if (!hist) return true;
-    return dayIdx >= 0 ? hist.sessions[dayIdx] === true : true;
-  }
-
-  // Build table — all 8 weeks, skipped weeks show '—' in all cells
-  const thCols = weeks.map((w,i) => {
-    const done = sessionDone(w);
-    return `<th style="${done?'':'color:var(--red);opacity:.6'}">S${i+1}${done?'':'*'}</th>`;
+  // Chips de ejercicios
+  const chipsHtml = st.ejercicios.map(ej => {
+    const act = ej===st.selected;
+    return `<button onclick="selectEvoEjercicio(${JSON.stringify(ej).replace(/"/g,'&quot;')})" style="font-size:11px;padding:5px 11px;border-radius:14px;border:1px solid ${act?'var(--text)':'var(--border)'};background:${act?'var(--text)':'var(--bg2)'};color:${act?'#fff':'var(--text2)'};cursor:pointer;font-family:'Geist',sans-serif;white-space:nowrap">${ej}</button>`;
   }).join('');
 
-  const rows = ejercicios.map(ej => {
-    const cells = weeks.map(w => {
-      const done = sessionDone(w);
-      if (!done) return `<td style="color:var(--text3);text-align:center">—</td>`;
-      const val = HUGO_TRAINING_HISTORY[w][sessionType]?.[ej];
-      return `<td>${val || '—'}</td>`;
-    }).join('');
-    return `<tr><td>${ej}</td>${cells}</tr>`;
+  // Serie de kg máximo por sesión del ejercicio seleccionado, antigua→reciente
+  const serie = st.sesiones.slice().sort((a,b)=>String(a.session_date).localeCompare(String(b.session_date)))
+    .map(s => {
+      const setsSes = sets.filter(ws => ws && ws.session_id===s.id && ws.exercise_name===st.selected);
+      const pesos = setsSes.map(ws => ws.weight_kg!=null?Number(ws.weight_kg):null).filter(p=>p!=null);
+      const pesoMax = pesos.length?Math.max(...pesos):null;
+      return { fecha:String(s.session_date).slice(0,10), pesoMax, sets:setsSes };
+    });
+  const pesosValidos = serie.map(s=>s.pesoMax).filter(p=>p!=null);
+  const prMax = pesosValidos.length?Math.max(...pesosValidos):null;
+
+  // Últimas 5 sesiones, más reciente primero
+  const ultimas5 = st.sesiones.slice(0,5).map(s => {
+    const setsSes = sets.filter(ws => ws && ws.session_id===s.id && ws.exercise_name===st.selected)
+                        .sort((a,b)=>(a.set_number||0)-(b.set_number||0));
+    const pesos = setsSes.map(ws => ws.weight_kg!=null?Number(ws.weight_kg):null).filter(p=>p!=null);
+    const pesoMax = pesos.length?Math.max(...pesos):null;
+    let fechaFmt = String(s.session_date).slice(0,10);
+    try{ fechaFmt = new Date(s.session_date+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }catch(e){}
+    return { fecha:s.session_date, fechaFmt, pesoMax, sets:setsSes, esPR: pesoMax!=null&&prMax!=null&&pesoMax===prMax };
+  });
+
+  const listaHtml = ultimas5.map(s => {
+    const repsHtml = s.sets.map(ws => `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;background:var(--bg3);border-radius:5px;font-size:11px;font-family:Geist Mono,monospace;color:var(--text2);padding:0 6px">${ws.reps_done!=null?ws.reps_done:'—'}</span>`).join('');
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div style="display:flex;align-items:center;gap:7px">
+          ${s.esPR?'<span style="font-size:10px;font-weight:700;color:#fff;background:var(--green);padding:2px 7px;border-radius:10px">★ PR</span>':''}
+          <span style="font-size:12px;font-weight:600;color:var(--text);text-transform:capitalize">${s.fechaFmt}</span>
+        </div>
+        <span style="font-size:13px;font-weight:700;font-family:Geist Mono,monospace;color:var(--text)">${s.pesoMax!=null?s.pesoMax+' kg':'—'}</span>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">${repsHtml||'<span style="font-size:11px;color:var(--text3)">Sin series</span>'}</div>
+    </div>`;
   }).join('');
 
-  // Legend if any skipped
-  const hasSkipped = weeks.some(w => !sessionDone(w));
-  const legend = hasSkipped ? '<div style="font-size:11px;color:var(--red);margin-top:10px;padding:0 2px">* Semana no completada</div>' : '';
+  body.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${chipsHtml}</div>
+    <div style="height:180px;margin-bottom:14px"><canvas id="evo-chart"></canvas></div>
+    <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Últimas sesiones</div>
+    <div>${listaHtml}</div>`;
 
-  document.getElementById('evo-modal-body').innerHTML = `
-    <div class="evo-table-wrap">
-      <table class="evo-table">
-        <thead><tr><th>Ejercicio</th>${thCols}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${legend}`;
+  // Gráfico de barras: peso máx por sesión (PR en verde, resto gris)
+  if (window._evoChart){ try{ window._evoChart.destroy(); }catch(e){} }
+  const ctx = document.getElementById('evo-chart');
+  if (!ctx || !serie.length) return;
+  const labels = serie.map(s => { try{ return new Date(s.fecha+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){ return s.fecha.slice(5); } });
+  const vals = serie.map(s => s.pesoMax);
+  const colors = vals.map(v => v!=null && v===prMax ? '#16a34a' : '#d4d3cf');
+  window._evoChart = new Chart(ctx.getContext('2d'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data:vals, backgroundColor:colors, borderRadius:4, borderWidth:0 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{
+        callbacks:{
+          label: ctx => (ctx.parsed.y!=null?ctx.parsed.y+' kg':'sin dato') + (ctx.parsed.y===prMax?' ★ PR':'')
+        }
+      }},
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:10}, color:'#a3a39e'} },
+        y:{ grid:{color:'#f0efed'}, beginAtZero:true, ticks:{font:{size:10}, color:'#a3a39e'} }
+      }
+    }
+  });
 }
 
 function openActividadModal() {

@@ -3532,9 +3532,10 @@ async function cargarAjustesCliente(c){
   if (!c) return;
   if (c._ajustesCargados) return; // ya cargados con éxito
   try{
-    const [adjRes, reoRes] = await Promise.all([
+    const [adjRes, reoRes, cheatRes] = await Promise.all([
       sb.from('split_adjustments').select('*').eq('client_id', c.id).order('effective_date'),
-      sb.from('week_reorders').select('*').eq('client_id', c.id)
+      sb.from('week_reorders').select('*').eq('client_id', c.id),
+      sb.from('cheats').select('*').eq('client_id', c.id).order('date', { ascending:false }).limit(200)
     ]);
     c._splitAdjustments = (adjRes && !adjRes.error) ? (adjRes.data || []) : [];
     if (adjRes && adjRes.error) console.error('cargarAjustes split_adjustments:', adjRes.error);
@@ -3545,8 +3546,10 @@ async function cargarAjustesCliente(c){
       console.error('cargarAjustes week_reorders:', reoRes.error);
     }
     c._weekReorders = map;
+    c._cheatsReal = (cheatRes && !cheatRes.error) ? (cheatRes.data || []) : [];
+    if (cheatRes && cheatRes.error) console.error('cargarAjustes cheats:', cheatRes.error);
     c._ajustesCargados = true; // marcar éxito solo si no hubo excepción
-  }catch(e){ console.error('cargarAjustesCliente:', e); c._splitAdjustments=c._splitAdjustments||[]; c._weekReorders=c._weekReorders||{}; }
+  }catch(e){ console.error('cargarAjustesCliente:', e); c._splitAdjustments=c._splitAdjustments||[]; c._weekReorders=c._weekReorders||{}; c._cheatsReal=c._cheatsReal||[]; }
 }
 
 /* clave de semana "YYYY-Www" — REPLICA EXACTA de getWeekKey de MyTracc.
@@ -3682,6 +3685,55 @@ function avisosSemana(c, mondayDate){
   return out;
 }
 
+/* ── BLOQUE C: stats reales de la semana desde Supabase ──────────────────── */
+
+/* Cuenta sesiones COMPLETADAS de la semana (de c._sessions). */
+function sesionesCompletadasSemana(c, mondayDate){
+  const fechas = semanaFechasDesde(mondayDate);
+  const ses = (c && c._sessions) || [];
+  return fechas.filter(f => ses.some(s => s && s.completed && String(s.session_date).slice(0,10) === f)).length;
+}
+
+/* Objetivo de sesiones: días de entreno (no descanso) del plan de la semana. */
+function objetivoSesionesSemana(c, mondayDate){
+  const plan = planSemanaCicloTracc(c, mondayDate);
+  if (!Array.isArray(plan)) return 0;
+  const off = t => !t || t==='OFF' || t==='DESCANSO' || t==='DSC';
+  return plan.filter(t => !off(t)).length;
+}
+
+/* Métricas de la semana de daily_metrics (c._metrics): devuelve arrays por campo. */
+function metricasSemana(c, mondayDate){
+  const fechas = semanaFechasDesde(mondayDate);
+  const ms = (c && c._metrics) || [];
+  const enSemana = ms.filter(m => m && fechas.includes(String(m.date).slice(0,10)));
+  return enSemana;
+}
+
+/* Media de un campo numérico en la semana (o null si no hay datos). */
+function mediaCampoSemana(c, mondayDate, campo){
+  const ms = metricasSemana(c, mondayDate);
+  const vals = ms.map(m => m[campo]).filter(v => v != null && !isNaN(v)).map(Number);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+/* Último peso registrado hasta el final de la semana (el más reciente <= domingo). */
+function pesoSemana(c, mondayDate){
+  const fechas = semanaFechasDesde(mondayDate);
+  const finSemana = fechas[6];
+  const ms = ((c && c._metrics) || [])
+    .filter(m => m && m.weight_kg != null && String(m.date).slice(0,10) <= finSemana)
+    .sort((a,b)=> String(a.date).localeCompare(String(b.date)));
+  return ms.length ? Number(ms[ms.length-1].weight_kg) : null;
+}
+
+/* Nº de cheats de la semana (de c._cheatsReal). */
+function cheatsSemana(c, mondayDate){
+  const fechas = semanaFechasDesde(mondayDate);
+  const ch = (c && c._cheatsReal) || [];
+  return ch.filter(x => x && fechas.includes(String(x.date).slice(0,10))).length;
+}
+
 function renderTab() {
   if (currentTab === 'resumen')     return renderResumen();
   if (currentTab === 'seguimiento') return renderSeguimiento();
@@ -3721,69 +3773,46 @@ function renderResumen() {
                   : weekOffset === -1 ? 'Semana anterior'
                   : `${mondayFmt} – ${sundayFmt}`;
 
-  // Stats — use real history for past weeks
-  const isHugo = c.id === 1;
-  const weekMetrics = isHugo && weekOffset !== 0 ? HUGO_METRICS_HISTORY[String(weekOffset)] : null;
-  const weekActs    = isHugo ? (HUGO_ACTIVITIES_HISTORY[String(weekOffset)] || []) : (weekOffset===0?(c.actividades||[]):[]);
+  // ── BLOQUE C: STATS REALES (Supabase) ───────────────────────────────────
+  // Sesiones completadas vs objetivo (días de entreno del plan de la semana)
+  const sessionGoal = objetivoSesionesSemana(c, mondayRef) || 0;
+  const sessions    = sesionesCompletadasSemana(c, mondayRef);
+  const sessPct     = sessionGoal>0 ? Math.round(sessions/sessionGoal*100) : 0;
+  const sessClass   = (sessionGoal>0 && sessions>=sessionGoal)?'':sessions===0?'pr':'pa';
+  const sessCol     = (sessionGoal>0 && sessions>=sessionGoal)?'sg':sessions===0?'sr':'sa';
 
-  // Compute week averages from day metrics
-  function weekAvg(field) {
-    if (!weekMetrics) return null;
-    const vals = Object.values(weekMetrics).filter(d=>d&&d[field]!=null).map(d=>d[field]);
-    return vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null;
-  }
+  // Peso de la semana (último registro) y cambio respecto a la semana anterior
+  const prevMonday = new Date(mondayRef); prevMonday.setDate(mondayRef.getDate()-7);
+  const weightThis = pesoSemana(c, mondayRef);
+  const weightPrev = pesoSemana(c, prevMonday);
+  const weight     = weightThis != null ? +weightThis.toFixed(1) : null;
+  const wChange    = (weightThis != null && weightPrev != null) ? +(weightThis - weightPrev).toFixed(1) : 0;
+  const wSign      = wChange<0?'↓':wChange>0?'↑':'→';
+  const goalStr    = (c.goal||'');
+  const wCol       = wChange===0?'':(goalStr.includes('grasa')||goalStr==='Definición'||goalStr==='Resistencia')?(wChange<0?'sg':'sr'):(wChange>0?'sg':'sa');
 
-  // Sessions done = days actually trained up to today (not future days)
-  const jsNow = new Date(); jsNow.setHours(23,59,59,0);
-  function countSessionsDone(weekOff) {
-    if (weekOff === 0) {
-      // Current week: count trained days that have already passed or are today
-      return (c.week||[]).filter((d,i) => {
-        const dayDate = new Date(mondayRef); dayDate.setDate(mondayRef.getDate()+i); dayDate.setHours(23,59,59,0);
-        return d.trained && dayDate <= jsNow;
-      }).length;
-    }
-    // Past weeks: count from weekHistory
-    const hist = c.weekHistory?.[String(weekOff)];
-    if (hist) return hist.sessions.filter(Boolean).length;
-    if (isHugo) return Object.values(HUGO_TRAINING_HISTORY[`S${8+weekOff}`]||{}).length;
-    return Math.round(c.stats.sessionGoal*0.85);
-  }
-  // Total training days in the split (non-OFF days)
-  const ts_sess = getTrainState(c.id);
-  const sessionGoal = ts_sess.split ? ts_sess.split.filter(d=>d.type!=='OFF').length : c.stats.sessionGoal;
-  const sessions    = countSessionsDone(weekOffset);
-  const sessPct     = Math.round(sessions/sessionGoal*100);
-  const sessClass   = sessions>=sessionGoal?'':sessions===0?'pr':'pa';
-  const sessCol     = sessions>=sessionGoal?'sg':sessions===0?'sr':'sa';
-
-  const weightAvg   = weekOffset===0 ? c.stats.weight : (weekAvg('weight') ?? c.stats.weight);
-  const weight      = weightAvg;
-  const prevWeekMetrics = isHugo && weekOffset !== 0 ? HUGO_METRICS_HISTORY[String(weekOffset-1)] : null;
-  const prevWeightAvg   = prevWeekMetrics ? +(Object.values(prevWeekMetrics).filter(d=>d&&d.weight!=null).map(d=>d.weight).reduce((a,b,_,arr)=>a+b/arr.length,0)).toFixed(1) : c.stats.weight+0.3;
-  const wChange     = weekOffset===0 ? c.stats.weightChange : +(weight - prevWeightAvg).toFixed(1);
-  const wSign       = wChange<0?'↓':wChange>0?'↑':'→';
-  const wCol        = wChange===0?'':(c.goal.includes('grasa')||c.goal==='Definición'||c.goal==='Resistencia')?(wChange<0?'sg':'sr'):(wChange>0?'sg':'sa');
-
-  // Steps avg: use HUGO_METRICS_HISTORY for all weeks (same source as chart)
-  function computeStepsAvg() {
-    const wk = isHugo ? HUGO_METRICS_HISTORY[String(weekOffset)] : null;
-    if (wk) {
-      const vals = Object.values(wk).filter(d=>d&&d.steps!=null).map(d=>d.steps);
-      if (vals.length) return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-    }
-    // Fallback: historial.pasos
-    const pasos = c.historial?.pasos || [];
-    const real  = pasos.filter(d=>d.v!=null).map(d=>d.v);
-    return real.length ? Math.round(real.reduce((a,b)=>a+b,0)/real.length) : c.stats.stepsAvg;
-  }
-  const stepsAvg = computeStepsAvg();
+  // Pasos media de la semana
+  const stepsAvgRaw = mediaCampoSemana(c, mondayRef, 'steps');
+  const stepsAvg    = stepsAvgRaw != null ? Math.round(stepsAvgRaw) : 0;
   const stCol       = stepsAvg>=8000?'sg':stepsAvg>=5000?'sa':'sr';
 
-  // Cheats: for past weeks use a simple estimate based on history (real data would come from DB)
-  const cheatsN = weekOffset===0 ? c.cheats.length
-                : (isHugo ? [0,1,2,0,1,0,2,1][Math.abs(weekOffset)%8] : 0);
+  // Sueño media (para métricas de abajo / bloque D, pero lo dejamos calculado)
+  const sleepAvgRaw = mediaCampoSemana(c, mondayRef, 'sleep_hours');
+
+  // Cheats reales de la semana
+  const cheatsN     = cheatsSemana(c, mondayRef);
   const chCol       = cheatsN===0?'sg':cheatsN<=2?'sa':'sr';
+
+  // [COMPAT TEMPORAL — se sustituye en Bloque D] referencias que aún usa la
+  // sección de métricas/último entreno de abajo. Evita romper el render.
+  const isHugo = false;
+  const weekActs = [];
+  function weekAvg(field){
+    if (field==='sleep') return sleepAvgRaw!=null ? +sleepAvgRaw.toFixed(1) : null;
+    if (field==='weight') return weight;
+    if (field==='steps') return stepsAvg;
+    return null;
+  }
 
   // Dynamic chart ranges
   function getAvailableRanges(metric) {

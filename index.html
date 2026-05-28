@@ -4073,12 +4073,12 @@ function renderResumen() {
   if (avisos.reorg){
     const cambios = avisos.reorg.cambios || [];
     const detalle = cambios.length
-      ? cambios.map(ch => `<span style="white-space:nowrap"><b>${ch.dia}:</b> ${ch.antes}→${ch.ahora}</span>`).join('<span style="opacity:.5"> · </span>')
+      ? cambios.map(ch => `<span style="white-space:nowrap"><b>${ch.dia}:</b>&nbsp;${ch.antes}→${ch.ahora}</span>`).join('<span style="opacity:.5;margin:0 8px">·</span>')
       : '';
     reorgNoteHtml += `<div class="reorg-note" style="margin-top:9px;padding:9px 11px;background:#fffbeb;border:1.5px solid rgba(245,158,11,.25);border-radius:9px;font-size:11px;color:#b45309;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span>El cliente reorganizó esta semana</span>
-      ${cambios.length?`<span style="opacity:.5">—</span><span style="font-weight:500;color:#92400e;display:inline-flex;flex-wrap:wrap;gap:0">${detalle}</span>`:''}
+      ${cambios.length?`<span style="opacity:.4;margin:0 4px">—</span><span style="font-weight:500;color:#92400e;display:inline-flex;flex-wrap:wrap;align-items:center">${detalle}</span>`:''}
     </div>`;
   }
   if (avisos.retraso){

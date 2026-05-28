@@ -4749,11 +4749,13 @@ function graficaEvolucionCargas(sesiones){
     const repsTxt = (s.repsMax && s.repsMax.length)
       ? ' · ' + s.repsMax.join(', ') + (s.repsMax.length===1?' rep':' reps')
       : '';
-    const tooltip = formatearFechaCorta(s.fecha) + ' · ' + s.pesoMax + ' kg' + repsTxt
-      + ' · ' + s.totalSeries + (s.totalSeries===1?' serie':' series');
-    return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--green)" stroke="#fff" stroke-width="2">
-              <title>${escHtml(tooltip)}</title>
-            </circle>`;
+    const valTxt = s.pesoMax + ' kg' + repsTxt + ' · ' + s.totalSeries + (s.totalSeries===1?' serie':' series');
+    const diaTxt = formatearFechaCorta(s.fecha);
+    // círculo transparente grande = área fácil de apuntar; mismo sistema de tooltip que las métricas
+    return `<circle cx="${cx}" cy="${cy}" r="11" fill="transparent" style="cursor:pointer"
+        class="metric-pt" data-dia="${escHtml(diaTxt)}" data-val="${escHtml(valTxt)}"
+        onmouseover="mostrarTooltipPunto(event)" onmouseout="ocultarTooltipPunto()"></circle>
+      <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--green)" stroke="#fff" stroke-width="2" style="pointer-events:none"/>`;
   }).join('');
 
   // Etiquetas de fecha en el eje X (primera, última, y alguna intermedia si caben)

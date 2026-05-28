@@ -3545,15 +3545,37 @@ async function cargarAjustesCliente(c){
   }catch(e){ console.error('cargarAjustesCliente:', e); }
 }
 
-/* clave de semana "YYYY-Www" (ISO-ish) a partir del lunes (Date local). */
+/* clave de semana "YYYY-Www" — REPLICA EXACTA de getWeekKey de MyTracc.
+   Importante: debe ser idéntica (incluso en casos límite de fin de año) porque
+   la clave que hay en la BD la generó MyTracc. Recibe el lunes local de la
+   semana; se le aplica el MISMO algoritmo que MyTracc aplica a cualquier día. */
 function weekKeyFromMonday(mondayDate){
-  const y = mondayDate.getFullYear();
-  // número de semana aproximado por día del año / 7 (suficiente para clave única
-  // y coherente con el que usa MyTracc, que deriva del lunes local).
-  const start = new Date(y,0,1);
-  const days = Math.floor((mondayDate - start) / 86400000);
-  const wk = Math.floor((days + ((start.getDay()+6)%7)) / 7) + 1;
-  return y + '-W' + String(wk).padStart(2,'0');
+  const date = mondayDate instanceof Date ? mondayDate : new Date(mondayDate+'T12:00:00');
+  const tmp = new Date(date.valueOf());
+  const dow = (date.getDay()+6)%7; // 0=Lun,6=Dom
+  tmp.setDate(tmp.getDate()-dow+3);
+  const thu = tmp.valueOf();
+  tmp.setMonth(0,1);
+  if(tmp.getDay()!==4) tmp.setMonth(0,1+((4-tmp.getDay())+7)%7);
+  const wn = 1+Math.round((thu-tmp)/604800000);
+  return date.getFullYear()+'-W'+wn;
+}
+
+/* Busca el plan reorganizado de una semana de forma robusta: prueba la clave del
+   lunes y, como fallback (semana que cruza el año), la clave de cada día de la
+   semana. Devuelve el array de 7 o null. Esto cubre el desajuste de getWeekKey
+   en la 1ª semana de enero sin tener que tocar MyTracc. */
+function buscarReorgSemana(c, mondayDate){
+  if (!c || !c._weekReorders) return null;
+  const k0 = weekKeyFromMonday(mondayDate);
+  if (Array.isArray(c._weekReorders[k0])) return c._weekReorders[k0];
+  // fallback: probar la clave generada desde cada día de la semana
+  for (let i=0;i<7;i++){
+    const d = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate()+i);
+    const k = weekKeyFromMonday(d);
+    if (Array.isArray(c._weekReorders[k])) return c._weekReorders[k];
+  }
+  return null;
 }
 
 /* Array de 7 fechas 'YYYY-MM-DD' (lunes..domingo) de la semana que contiene refDate. */
@@ -3573,9 +3595,9 @@ function semanaFechasDesde(mondayDate){
 function planSemanaCicloTracc(c, mondayDate){
   const split = (c && c._training && Array.isArray(c._training.split) && c._training.split.length)
     ? c._training.split : null;
-  const wk = weekKeyFromMonday(mondayDate);
   // 1) Reorganización semanal (máxima prioridad)
-  if (c && c._weekReorders && Array.isArray(c._weekReorders[wk])) return [...c._weekReorders[wk]];
+  const reorgPlan = buscarReorgSemana(c, mondayDate);
+  if (Array.isArray(reorgPlan)) return [...reorgPlan];
   if (!split) return null;
   // 2a) Split semanal (7): ancla a lunes
   if (split.length === 7) return [...split];
@@ -3622,9 +3644,9 @@ function avisosSemana(c, mondayDate){
     }
   }
   // Reorganización: ¿hay week_reorder para esta semana?
-  const wk = weekKeyFromMonday(mondayDate);
-  if (c && c._weekReorders && Array.isArray(c._weekReorders[wk])){
-    out.reorg = { plan: c._weekReorders[wk] };
+  const reorgPlan = buscarReorgSemana(c, mondayDate);
+  if (Array.isArray(reorgPlan)){
+    out.reorg = { plan: reorgPlan };
   }
   return out;
 }

@@ -2554,7 +2554,7 @@ async function loadRealClients(){
       const ids = rows.map(r => r.id);
       const { data: metrics } = await sb
         .from('daily_metrics')
-        .select('client_id, date, weight_kg, steps, sleep_hours')
+        .select('client_id, date, weight_kg, steps, sleep_hours, activity_details')
         .in('client_id', ids)
         .order('date', { ascending:true });
       (metrics || []).forEach(m => {
@@ -3734,6 +3734,32 @@ function cheatsSemana(c, mondayDate){
   return ch.filter(x => x && fechas.includes(String(x.date).slice(0,10))).length;
 }
 
+/* ── BLOQUE D: métricas de un día concreto (hoy/ayer) ───────────────────── */
+/* Devuelve {steps, sleep, weight, activities} del día `fechaStr` (YYYY-MM-DD)
+   leyendo de c._metrics. Si no hay registro, valores null/[]. */
+function metricaDeFecha(c, fechaStr){
+  const ms = (c && c._metrics) || [];
+  const m = ms.find(x => x && String(x.date).slice(0,10) === fechaStr);
+  if (!m) return { steps:null, sleep:null, weight:null, activities:[] };
+  let acts = [];
+  if (Array.isArray(m.activity_details)) acts = m.activity_details;
+  else if (typeof m.activity_details === 'string'){
+    try{ const p = JSON.parse(m.activity_details); if (Array.isArray(p)) acts = p; }catch(e){}
+  }
+  return {
+    steps:  m.steps != null ? Number(m.steps) : null,
+    sleep:  m.sleep_hours != null ? Number(m.sleep_hours) : null,
+    weight: m.weight_kg != null ? Number(m.weight_kg) : null,
+    activities: acts
+  };
+}
+
+/* Fecha 'YYYY-MM-DD' local de hoy + offset días. */
+function fechaLocalOffset(offsetDays){
+  const d = new Date(); d.setDate(d.getDate() + (offsetDays||0));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function renderTab() {
   if (currentTab === 'resumen')     return renderResumen();
   if (currentTab === 'seguimiento') return renderSeguimiento();
@@ -3813,6 +3839,16 @@ function renderResumen() {
     if (field==='steps') return stepsAvg;
     return null;
   }
+
+  // ── BLOQUE D: métricas del día seleccionado (hoy por defecto) ────────────
+  // En semana actual: métricas de HOY desde c._metrics. En semanas pasadas:
+  // medias de la semana. El toggle Hoy/Ayer (setMetricsDay) actualiza en vivo.
+  const _mToday = metricaDeFecha(c, fechaLocalOffset(0));
+  const mSteps  = weekOffset===0 ? _mToday.steps  : (stepsAvgRaw!=null?Math.round(stepsAvgRaw):null);
+  const mSleep  = weekOffset===0 ? _mToday.sleep  : (sleepAvgRaw!=null?+sleepAvgRaw.toFixed(1):null);
+  const mWeight = weekOffset===0 ? _mToday.weight : weight;
+  const mActs   = weekOffset===0 ? (_mToday.activities||[]) : [];
+  const fmtK = v => v==null ? '—' : (v/1000).toFixed(1)+'k';
 
   // Dynamic chart ranges
   function getAvailableRanges(metric) {
@@ -4131,8 +4167,8 @@ function renderResumen() {
           <div class="metric-tile" onclick="openChartModal('pasos')">
             <div class="metric-emoji"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M7.5 5.25a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3v.205c.933.085 1.857.197 2.774.334 1.454.218 2.476 1.483 2.476 2.917v3.033c0 1.211-.734 2.352-1.936 2.752A24.726 24.726 0 0 1 12 15.75c-2.73 0-5.357-.442-7.814-1.259-1.202-.4-1.936-1.541-1.936-2.752V8.706c0-1.434 1.022-2.7 2.476-2.917A48.814 48.814 0 0 1 7.5 5.455V5.25Zm7.5 0v.09a49.488 49.488 0 0 0-6 0v-.09a1.5 1.5 0 0 1 1.5-1.5h3a1.5 1.5 0 0 1 1.5 1.5Zm-3 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd"/></svg></div>
             <div>
-              <div class="metric-val" style="color:${(weekOffset===0?c.todayMetrics.steps:stepsAvg)>=8000?'var(--green)':'var(--amber)'}">
-                ${weekOffset===0?(c.todayMetrics.steps/1000).toFixed(1)+'k':(stepsAvg/1000).toFixed(1)+'k'}
+              <div class="metric-val" style="color:${(mSteps??0)>=8000?'var(--green)':'var(--amber)'}">
+                ${fmtK(mSteps)}
               </div>
               <div class="metric-lbl">${weekOffset===0?'Pasos hoy':'Media pasos'}</div>
             </div>
@@ -4140,8 +4176,8 @@ function renderResumen() {
           <div class="metric-tile" onclick="openChartModal('sueno')">
             <div class="metric-emoji"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd"/></svg></div>
             <div>
-              <div class="metric-val" style="color:${(weekOffset===0?c.todayMetrics.sleep:(weekAvg('sleep')??0))>=7?'var(--green)':'var(--amber)'}">
-                ${weekOffset===0?c.todayMetrics.sleep+'h':((weekAvg('sleep')??'—')+'h')}
+              <div class="metric-val" style="color:${(mSleep??0)>=7?'var(--green)':'var(--amber)'}">
+                ${mSleep==null?'—':mSleep+'h'}
               </div>
               <div class="metric-lbl">${weekOffset===0?'Sueño hoy':'Media sueño'}</div>
             </div>
@@ -4149,15 +4185,15 @@ function renderResumen() {
           <div class="metric-tile" onclick="openChartModal('peso')">
             <div class="metric-emoji"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path d="M10.5 1.875a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0ZM5.625 6.375a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0Zm9.585 1.782a.75.75 0 0 0-.585-.282h-6.25a.75.75 0 0 0-.585.282l-3.75 4.5a.75.75 0 0 0 .585 1.218h13.75a.75.75 0 0 0 .585-1.218l-3.75-4.5Z"/></svg></div>
             <div>
-              <div class="metric-val">${weekOffset===0?(c.todayMetrics.weight??'—'):weight}</div>
+              <div class="metric-val">${mWeight==null?'—':mWeight}</div>
               <div class="metric-lbl">${weekOffset===0?'Peso hoy':'Media peso'}</div>
             </div>
           </div>
           <div class="metric-tile" onclick="openActividadModal()">
             <div class="metric-emoji"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.818a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .845-.143Z" clip-rule="evenodd"/></svg></div>
             <div>
-              <div class="metric-val" style="color:${weekActs.length>0?'var(--amber)':'var(--text3)'}">
-                ${weekActs.length}
+              <div class="metric-val" style="color:${mActs.length>0?'var(--amber)':'var(--text3)'}">
+                ${mActs.length}
               </div>
               <div class="metric-lbl">${weekOffset===0?'Actividades':'Total act.'}</div>
             </div>
@@ -5266,65 +5302,47 @@ function setMetricsDay(offset) {
   const btnAyer = document.getElementById('btn-metrics-ayer');
   if(!grid||!title) return;
 
-  const DAYS_KEY_M = ['L','M','X','J','V','S','D'];
-  const DIAS_FULL_M = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-  const now = new Date();
-  const jsDay = now.getDay();
-  const todayIdx = jsDay===0?6:jsDay-1;
-
-  let steps, sleep, weight, actsCount, dayLabel;
-
+  // Datos reales del día (hoy = offset 0, ayer = offset -1) desde c._metrics
+  const fecha = fechaLocalOffset(offset);
+  const m = metricaDeFecha(c, fecha);
+  const dayLabel = offset===0 ? 'hoy' : 'ayer';
   if(offset===0){
-    steps = c.todayMetrics.steps;
-    sleep = c.todayMetrics.sleep;
-    weight = c.todayMetrics.weight;
-    // count today's activities
-    const todayDia = DIAS_FULL_M[todayIdx];
-    const todayActs = (HUGO_ACTIVITIES_HISTORY?.['0']||[]).filter(a=>a.dia===todayDia);
-    actsCount = todayActs.length;
-    dayLabel = 'hoy';
     title.textContent = 'Métricas de hoy';
     btnHoy.style.background='var(--accent)';btnHoy.style.color='#fff';
     btnAyer.style.background='var(--bg2)';btnAyer.style.color='var(--text2)';
   } else {
-    const yesterdayIdx = todayIdx===0?6:todayIdx-1;
-    const weekKey = todayIdx===0?'-1':'0';
-    const dayKey = DAYS_KEY_M[yesterdayIdx];
-    const hist = (typeof HUGO_METRICS_HISTORY!=='undefined') ? HUGO_METRICS_HISTORY?.[weekKey]?.[dayKey] : null;
-    steps = hist?.steps ?? '—';
-    sleep = hist?.sleep ?? '—';
-    weight = hist?.weight ?? '—';
-    // count yesterday's activities
-    const yesterdayDia = DIAS_FULL_M[yesterdayIdx];
-    const yesterdayActs = (HUGO_ACTIVITIES_HISTORY?.[weekKey]||[]).filter(a=>a.dia===yesterdayDia);
-    actsCount = yesterdayActs.length;
-    dayLabel = 'ayer';
     title.textContent = 'Métricas de ayer';
     btnAyer.style.background='var(--accent)';btnAyer.style.color='#fff';
     btnHoy.style.background='var(--bg2)';btnHoy.style.color='var(--text2)';
   }
 
-  const stepsVal = typeof steps==='number'?(steps/1000).toFixed(1)+'k':steps;
-  const sleepVal = typeof sleep==='number'?sleep+'h':sleep;
-  const weightVal = weight ?? '—';
-  const stepsColor = typeof steps==='number'&&steps>=8000?'var(--green)':'var(--amber)';
-  const sleepColor = typeof sleep==='number'&&sleep>=7?'var(--green)':'var(--amber)';
-  const actsColor = actsCount>0?'var(--amber)':'var(--text3)';
+  const stepsVal  = m.steps==null ? '—' : (m.steps/1000).toFixed(1)+'k';
+  const sleepVal  = m.sleep==null ? '—' : m.sleep+'h';
+  const weightVal = m.weight==null ? '—' : m.weight;
+  const actsCount = (m.activities||[]).length;
+  const stepsColor = (m.steps??0)>=8000?'var(--green)':'var(--amber)';
+  const sleepColor = (m.sleep??0)>=7?'var(--green)':'var(--amber)';
+  const actsColor  = actsCount>0?'var(--amber)':'var(--text3)';
+
+  const icoPasos='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M7.5 5.25a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3v.205c.933.085 1.857.197 2.774.334 1.454.218 2.476 1.483 2.476 2.917v3.033c0 1.211-.734 2.352-1.936 2.752A24.726 24.726 0 0 1 12 15.75c-2.73 0-5.357-.442-7.814-1.259-1.202-.4-1.936-1.541-1.936-2.752V8.706c0-1.434 1.022-2.7 2.476-2.917A48.814 48.814 0 0 1 7.5 5.455V5.25Zm7.5 0v.09a49.488 49.488 0 0 0-6 0v-.09a1.5 1.5 0 0 1 1.5-1.5h3a1.5 1.5 0 0 1 1.5 1.5Zm-3 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clip-rule="evenodd"/></svg>';
+  const icoSueno='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clip-rule="evenodd"/></svg>';
+  const icoPeso='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 1.875a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0ZM5.625 6.375a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0Zm9.585 1.782a.75.75 0 0 0-.585-.282h-6.25a.75.75 0 0 0-.585.282l-3.75 4.5a.75.75 0 0 0 .585 1.218h13.75a.75.75 0 0 0 .585-1.218l-3.75-4.5Z"/></svg>';
+  const icoAct='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.818a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .845-.143Z" clip-rule="evenodd"/></svg>';
 
   grid.innerHTML = `
-    <div class="metric-tile"><div class="metric-emoji">🚶</div><div>
+    <div class="metric-tile" onclick="openChartModal('pasos')"><div class="metric-emoji">${icoPasos}</div><div>
       <div class="metric-val" style="color:${stepsColor}">${stepsVal}</div>
       <div class="metric-lbl">Pasos ${dayLabel}</div>
     </div></div>
-    <div class="metric-tile"><div class="metric-emoji">🌙</div><div>
+    <div class="metric-tile" onclick="openChartModal('sueno')"><div class="metric-emoji">${icoSueno}</div><div>
       <div class="metric-val" style="color:${sleepColor}">${sleepVal}</div>
       <div class="metric-lbl">Sueño ${dayLabel}</div>
     </div></div>
-    <div class="metric-tile"><div class="metric-emoji">⚖️</div><div>
+    <div class="metric-tile" onclick="openChartModal('peso')"><div class="metric-emoji">${icoPeso}</div><div>
       <div class="metric-val">${weightVal}</div>
       <div class="metric-lbl">Peso ${dayLabel}</div>
     </div></div>
-    <div class="metric-tile" onclick="openActividadModal()"><div class="metric-emoji">⚡</div><div>
+    <div class="metric-tile" onclick="openActividadModal()"><div class="metric-emoji">${icoAct}</div><div>
       <div class="metric-val" style="color:${actsColor}">${actsCount}</div>
       <div class="metric-lbl">Actividades ${dayLabel}</div>
     </div></div>`;

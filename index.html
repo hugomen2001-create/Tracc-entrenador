@@ -3746,64 +3746,54 @@ function renderResumen() {
     if(CHART_CONFIG[m]) CHART_CONFIG[m].ranges=getAvailableRanges(m);
   });
 
-  // Week strip
+  // ── BLOQUE B: tira de entrenos REAL (ciclo vs realidad) ──────────────────
   const DAYS_SHORT = ['L','M','X','J','V','S','D'];
-  const weekSchedule = ts_r.split&&ts_r.split.length
+  // Plan según el ciclo (lo que el cliente debería ver) y lo que hizo realmente
+  const planCiclo = planSemanaCicloTracc(c, mondayRef);      // array 7 de strings o null
+  const realWeek  = realidadSemana(c, mondayRef);            // array 7 de {type,completed}|null
+  const avisos    = avisosSemana(c, mondayRef);              // {retraso, reorg}
+
+  function esDescanso(t){ return !t || t==='OFF' || t==='DESCANSO' || t==='DSC'; }
+
+  const weekHtml = (planCiclo
     ? DAYS_SHORT.map((label,i)=>{
-        const date=new Date(mondayRef); date.setDate(mondayRef.getDate()+i);
-        return {label,date,splitDay:getSplitDayForDate(ts_r,date)};
-      })
-    : null;
-
-  const weekHtml = weekSchedule
-    ? weekSchedule.map((w,i)=>{
-        const sd=w.splitDay, type=sd?.type||'OFF', isOff=type==='OFF';
-        const color=SPLIT_COLORS[type]||'#a3a39e';
-        const isRealToday=weekOffset===0&&i===todayIdx_r;
-        const dayDate=new Date(mondayRef); dayDate.setDate(mondayRef.getDate()+i); dayDate.setHours(23,59,59,0);
-        const isPast=dayDate<=jsToday||isRealToday;
-        const clientDayKey=['L','M','X','J','V','S','D'][i];
-        const clientDay=c.week?.find(d=>d.day===clientDayKey);
-        // For past weeks use weekHistory, for current week use c.week
-        const hist = weekOffset !== 0 ? c.weekHistory?.[String(weekOffset)] : null;
-        const trainedThisDay = weekOffset !== 0
-          ? (hist?.sessions?.[i] === true)
-          : (clientDay?.trained === true);
+        const tipoPlan = planCiclo[i] || 'OFF';
+        const off = esDescanso(tipoPlan);
+        const color = SPLIT_COLORS[off?'OFF':tipoPlan] || '#a3a39e';
+        const isRealToday = weekOffset===0 && i===todayIdx_r;
+        const dayDate = new Date(mondayRef); dayDate.setDate(mondayRef.getDate()+i); dayDate.setHours(23,59,59,0);
         const strictlyPast = dayDate < jsToday;
-        const done = isOff ? strictlyPast : (isPast && trainedThisDay);
+        const isPastOrToday = dayDate <= jsToday || isRealToday;
 
-        // Reorganization only applies to current week (weekOffset === 0)
-        const reorg = weekOffset === 0 ? c.weekReorganization : null;
-        const moved = reorg && reorg[i];
-        const receivedFrom = reorg && Object.entries(reorg).find(([k,v])=>v.movedTo===i);
-        const isReorged = moved && moved.movedTo !== null;
-        const isReceiving = !!receivedFrom;
+        const real = realWeek[i];                 // {type, completed} | null
+        const entreno = real && real.completed;   // entrenó y lo marcó completado
 
-        // Effective type after reorganization
-        let displayType = type;
-        let displayColor = color;
-        let reorgNote = null;
-        const DAYS_LABELS = ['L','M','X','J','V','S','D'];
-        if (isReorged) {
-          displayType = 'OFF'; displayColor = '#a3a39e';
-          reorgNote = `→ ${DAYS_LABELS[moved.movedTo]}`;
-        } else if (isReceiving) {
-          const [fromIdx, fromData] = receivedFrom;
-          displayType = fromData.originalType;
-          displayColor = SPLIT_COLORS[displayType] || color;
-          reorgNote = `← ${DAYS_LABELS[fromIdx]}`;
-        }
-        const displayOff = displayType === 'OFF';
+        // Estado visual:
+        //  - día de descanso ya pasado → ✓ verde tenue (cumplió descanso)
+        //  - día de entreno hecho → ✓ verde
+        //  - hoy → punto ·
+        //  - futuro de entreno → ○ color
+        //  - pasado de entreno NO hecho → ○ rojo (no registrado)
+        const pastOff = off && strictlyPast;
+        const showGreen = entreno || pastOff;
+        const faltó = !off && strictlyPast && !entreno;   // tocaba entrenar y no lo hizo
 
-        // Visual state: green if done, amber if reorganized, color if future session
-        const pastOff = displayOff && strictlyPast;
-        const showGreen = done || pastOff;
+        let check, checkCol, sessCol;
+        if (showGreen){ check='✓'; checkCol='var(--green)'; sessCol='var(--green)'; }
+        else if (isRealToday){ check='·'; checkCol='var(--accent)'; sessCol=off?'var(--text3)':color; }
+        else if (faltó){ check='○'; checkCol='var(--red,#ef4444)'; sessCol='var(--red,#ef4444)'; }
+        else if (off){ check='—'; checkCol='var(--text3)'; sessCol='var(--text3)'; }
+        else { check='○'; checkCol=color; sessCol=color; }
 
-        return `<div class="day-cell" style="background:${showGreen?'var(--gl)':isReorged?'var(--bg3)':''};border:${isRealToday?'2px solid var(--accent)':isReorged||isReceiving?'1px solid var(--amber)':'1px solid var(--border)'};border-radius:9px;padding:9px 4px;text-align:center;position:relative">
-          ${reorgNote?`<div style="position:absolute;top:3px;right:4px;font-size:8px;font-weight:700;color:var(--amber)">${reorgNote}</div>`:''}
-          <div class="day-name" style="${isRealToday?'font-weight:700':''}">${w.label}</div>
-          <div class="day-check" style="color:${showGreen?'var(--green)':displayOff?'var(--text3)':displayColor}">${showGreen?'✓':displayOff?'—':'○'}</div>
-          <div class="day-session" style="color:${showGreen?'var(--green)':displayOff?'var(--text3)':displayColor};font-size:9.5px">${displayOff?'OFF':displayType}</div>
+        const borderCol = isRealToday ? '2px solid var(--accent)'
+                        : faltó ? '1px solid var(--red,#ef4444)'
+                        : '1px solid var(--border)';
+        const bg = showGreen ? 'var(--gl)' : faltó ? 'rgba(239,68,68,.05)' : '';
+
+        return `<div class="day-cell" style="background:${bg};border:${borderCol};border-radius:9px;padding:9px 4px;text-align:center;position:relative">
+          <div class="day-name" style="${isRealToday?'font-weight:700':''}">${label}</div>
+          <div class="day-check" style="color:${checkCol}">${check}</div>
+          <div class="day-session" style="color:${sessCol};font-size:9.5px">${off?'OFF':tipoPlan}</div>
         </div>`;
       }).join('')
     : c.week.map((d,i)=>{
@@ -3813,7 +3803,23 @@ function renderResumen() {
           <div class="day-check">${d.trained?'✓':'○'}</div>
           <div class="day-session">${d.session==='—'?'OFF':d.session}</div>
         </div>`;
-      }).join('');
+      }).join('')
+    );
+
+  // Nota de reorganización + alerta de retraso (debajo de la tira)
+  let reorgNoteHtml = '';
+  if (avisos.reorg){
+    reorgNoteHtml += `<div class="reorg-note" style="display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px 11px;background:#fffbeb;border:1.5px solid rgba(245,158,11,.25);border-radius:9px;font-size:11px;color:#b45309;font-weight:600">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      El cliente reorganizó esta semana</div>`;
+  }
+  if (avisos.retraso){
+    const r = avisos.retraso;
+    const desdeFmt = (()=>{ try{ const d=new Date(r.desde+'T00:00:00'); return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){ return r.desde; } })();
+    reorgNoteHtml += `<div class="reorg-note" style="display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px 11px;background:#fffbeb;border:1.5px solid rgba(245,158,11,.25);border-radius:9px;font-size:11px;color:#b45309;font-weight:600">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      El cliente retrasó el split ${r.dias} día${r.dias===1?'':'s'} (desde ${desdeFmt})</div>`;
+  }
 
   // Today's split workout
   const todayDate  = new Date(); todayDate.setHours(0,0,0,0);
@@ -4020,6 +4026,7 @@ function renderResumen() {
     <!-- WEEK STRIP -->
     <div class="section-title" style="margin-top:2px">Entrenos — ${weekLabel.toLowerCase()}</div>
     <div class="week-strip">${weekHtml}</div>
+    ${reorgNoteHtml}
 
     <!-- ROW: metrics + today workout -->
     <div class="two-col" style="margin-bottom:16px;align-items:stretch">
@@ -4072,29 +4079,21 @@ function renderResumen() {
         <div class="section-title" style="margin-bottom:8px">${weekOffset===0?'Entreno de hoy':'Entrenos de la semana'}${weekOffset===0&&todayType&&todayType!=='OFF'?` — <span style="color:${todayColor}">${todayType}</span>`:''}</div>
         <div class="panel-card" style="${weekOffset===0?'':'padding:0;overflow:hidden'}">
           ${weekOffset===0 ? todayWorkoutHtml : (()=>{
-            if (!weekSchedule) return '<div style="padding:14px;font-size:12px;color:var(--text3)">Sin datos</div>';
-            const hist = c.weekHistory?.[String(weekOffset)];
+            if (!planCiclo) return '<div style="padding:14px;font-size:12px;color:var(--text3)">Sin datos</div>';
             const DIAS_W = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-            return weekSchedule.map((w,i)=>{
-              const sd=w.splitDay,type=sd?.type||'OFF',isOff=type==='OFF';
+            return planCiclo.map((tipoPlan,i)=>{
+              const isOff = esDescanso(tipoPlan);
+              const type = isOff ? 'OFF' : tipoPlan;
               const color=SPLIT_COLORS[type]||'#a3a39e';
-              // For past weeks (weekOffset < 0): all days are in the past → all done
-              // For current week: use hist data
-              const done = weekOffset < 0 ? true : (!isOff&&hist?.sessions?.[i]===true);
-              const exs=sd?.exercises||[];
-              const rId='hw_'+c.id+'_'+i+'_'+(0-weekOffset);
-              const exRows=exs.length
-                ?exs.map(e=>`<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><div>${e.nombre}</div><div style="color:var(--text2);font-family:Geist Mono,monospace">${e.series}×${e.reps}</div></div>`).join('')
-                :'<div style="font-size:12px;color:var(--text3);padding:4px 0">Sin ejercicios</div>';
+              const real = realWeek[i];
+              const done = isOff ? true : !!(real && real.completed);
               return `<div style="border-bottom:1px solid var(--border)">
-                <div onclick="${isOff?'':("toggleAccordion('"+rId+"')")}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:${isOff?'default':'pointer'};background:var(--bg2);user-select:none">
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--bg2);user-select:none">
                   <span style="font-size:11px;font-weight:600;color:var(--text2);width:80px">${DIAS_W[i]}</span>
                   ${isOff?'<span style="font-size:10px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:1px 8px;border-radius:5px">OFF</span>'
                          :`<span style="font-size:11px;font-weight:700;color:${color};background:${color}18;padding:2px 8px;border-radius:5px">${type}</span>`}
                   ${isOff?'':(`<span style="margin-left:auto;font-size:11px;font-weight:600;color:${done?'var(--green)':'var(--text3)'}">` + (done?'✓ Completado':'No completado') + '</span>')}
-                  ${isOff?'':(`<span id="${rId}-arrow" style="font-size:12px;color:var(--text3);transition:transform .18s;display:inline-block">▾</span>`)}
                 </div>
-                ${isOff?'':(`<div id="${rId}" style="display:none;padding:10px 14px;background:var(--bg3);border-top:1px solid var(--border)">${exRows}</div>`)}
               </div>`;
             }).join('');
           })()}

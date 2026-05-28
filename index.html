@@ -9347,7 +9347,7 @@ function _ymdLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStar
 function _lunesDe(d){ const x=new Date(d); const jd=x.getDay(); x.setDate(x.getDate()-(jd===0?6:jd-1)); x.setHours(0,0,0,0); return x; }
 const _MES_CORTO=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-function serieSemanas(c, campo, agg, nSemanas){
+function serieSemanas(c, campo, agg, nSemanas, labelMode){
   const ms=(c._metrics||[]);
   const hoyLun=_lunesDe(new Date());
   const out=[];
@@ -9364,15 +9364,16 @@ function serieSemanas(c, campo, agg, nSemanas){
       else if(agg==='avg') v=nums.reduce((a,b)=>a+b,0)/nums.length;
       else if(agg==='sum') v=nums.reduce((a,b)=>a+b,0);
     }
-    // label: mostrar mes solo en la primera semana de cada mes
-    const label = ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '';
+    // label: 'sem' → S1..Sn · 'mes' → mes en la 1ª semana del mes
+    const idx = nSemanas-k; // 1..nSemanas
+    const label = labelMode==='sem' ? ('S'+idx) : (ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '');
     out.push({label, v: v==null?null:+v.toFixed(2), _ini:iniS, _fin:finS});
   }
   return out;
 }
 
 /* Cuenta sesiones completadas por semana (de c._sessions). */
-function serieSesionesSemanas(c, nSemanas){
+function serieSesionesSemanas(c, nSemanas, labelMode){
   const ses=(c._sessions||[]);
   const hoyLun=_lunesDe(new Date());
   const out=[];
@@ -9381,7 +9382,8 @@ function serieSesionesSemanas(c, nSemanas){
     const fin=new Date(ini); fin.setDate(ini.getDate()+6);
     const iniS=_ymdLocal(ini), finS=_ymdLocal(fin);
     const n=ses.filter(s=>{const f=String(s.session_date).slice(0,10); return s.completed&&f>=iniS&&f<=finS;}).length;
-    const label = ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '';
+    const idx = nSemanas-k;
+    const label = labelMode==='sem' ? ('S'+idx) : (ini.getDate()<=7 ? _MES_CORTO[ini.getMonth()] : '');
     out.push({label, v:n, _ini:iniS, _fin:finS});
   }
   return out;
@@ -9436,7 +9438,7 @@ const CHART_CONFIG = {
           return {label, v: m? Number(m.steps) : null};
         });
       }
-      if(r==='mes')      return serieSemanas(c,'steps','avg',4).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
+      if(r==='mes')      return serieSemanas(c,'steps','avg',4,'sem').map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
       if(r==='3 meses')  return serieSemanas(c,'steps','avg',13).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
       if(r==='6 meses')  return serieMeses(c,'steps','avg',6).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
       if(r==='1 año')    return serieMeses(c,'steps','avg',12).map(x=>({...x,v:x.v==null?null:Math.round(x.v)}));
@@ -9458,7 +9460,7 @@ const CHART_CONFIG = {
         });
       }
       // periodos largos
-      if(r==='mes')      return serieSemanas(c,'weight_kg','last',4);
+      if(r==='mes')      return serieSemanas(c,'weight_kg','last',4,'sem');
       if(r==='3 meses')  return serieSemanas(c,'weight_kg','last',13);
       if(r==='6 meses')  return serieMeses(c,'weight_kg','last',6);
       if(r==='1 año')    return serieMeses(c,'weight_kg','last',12);
@@ -9478,7 +9480,7 @@ const CHART_CONFIG = {
           return {label, v: m? +Number(m.sleep_hours).toFixed(1) : null};
         });
       }
-      if(r==='mes')      return serieSemanas(c,'sleep_hours','avg',4).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
+      if(r==='mes')      return serieSemanas(c,'sleep_hours','avg',4,'sem').map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
       if(r==='3 meses')  return serieSemanas(c,'sleep_hours','avg',13).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
       if(r==='6 meses')  return serieMeses(c,'sleep_hours','avg',6).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
       if(r==='1 año')    return serieMeses(c,'sleep_hours','avg',12).map(x=>({...x,v:x.v==null?null:+x.v.toFixed(1)}));
@@ -9508,7 +9510,7 @@ const CHART_CONFIG = {
           return {label, v: hizo?1:0};
         });
       }
-      if(r==='mes')      return serieSesionesSemanas(c,4);
+      if(r==='mes')      return serieSesionesSemanas(c,4,'sem');
       if(r==='3 meses')  return serieSesionesSemanas(c,13);
       if(r==='6 meses')  return serieSesionesMeses(c,6);
       if(r==='1 año')    return serieSesionesMeses(c,12);

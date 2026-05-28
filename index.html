@@ -4565,7 +4565,10 @@ function dietaActiva(c){
     const items = (m.items || []).map(it => ({
       name: it.name || it.nombre || '—',
       grams: it.grams != null ? it.grams : (it.gramos != null ? it.gramos : null),
-      kcal: Number(it.kcal)||0, ch: Number(it.ch)||0, g: Number(it.g)||0, p: Number(it.p)||0
+      kcal: Number(it.kcal)||0,
+      ch:   Number(it.carbs   ?? it.ch ?? 0),
+      g:    Number(it.fat     ?? it.g  ?? 0),
+      p:    Number(it.protein ?? it.p  ?? 0)
     }));
     return { nombre, items };
   }).sort((a,b)=>{

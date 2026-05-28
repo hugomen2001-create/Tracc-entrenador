@@ -3617,6 +3617,23 @@ function planSemanaCicloTracc(c, mondayDate){
   return [...split];
 }
 
+/* Plan de la semana SIN aplicar reorganización (lo que tocaría por defecto):
+   split 7 → ancla a lunes; ciclo → ciclo con retrasos/pausas. Sirve para
+   comparar contra la reorganización y listar qué cambió. */
+function planBaseSinReorg(c, mondayDate){
+  const split = (c && c._training && Array.isArray(c._training.split) && c._training.split.length)
+    ? c._training.split : null;
+  if (!split) return null;
+  if (split.length === 7) return [...split];
+  const meso = c && c._mesocycle;
+  if (meso && meso.start_date){
+    const fechas = semanaFechasDesde(mondayDate);
+    const adj = (c && c._splitAdjustments) || [];
+    return Cycle.weekPlanForDates(String(meso.start_date).slice(0,10), split, fechas, adj).map(s => s==null ? 'DESCANSO' : s);
+  }
+  return [...split];
+}
+
 /* ¿Qué hizo el cliente realmente esa semana? Mapea c._sessions (por fecha) a
    array de 7: cada posición = {type, completed} o null si no entrenó ese día. */
 function realidadSemana(c, mondayDate){
@@ -3650,7 +3667,17 @@ function avisosSemana(c, mondayDate){
   // Reorganización: ¿hay week_reorder para esta semana?
   const reorgPlan = buscarReorgSemana(c, mondayDate);
   if (Array.isArray(reorgPlan)){
-    out.reorg = { plan: reorgPlan };
+    // Calcular qué cambió día a día respecto al plan base (sin reorganización)
+    const base = planBaseSinReorg(c, mondayDate) || [];
+    const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    const norm = t => (!t || t==='OFF' || t==='DESCANSO' || t==='DSC') ? 'OFF' : t;
+    const cambios = [];
+    for (let i=0;i<7;i++){
+      const antes = norm(base[i]);
+      const ahora = norm(reorgPlan[i]);
+      if (antes !== ahora) cambios.push({ dia: DIAS[i], antes, ahora });
+    }
+    out.reorg = { plan: reorgPlan, cambios: cambios };
   }
   return out;
 }
@@ -3835,9 +3862,16 @@ function renderResumen() {
   // Nota de reorganización + alerta de retraso (debajo de la tira)
   let reorgNoteHtml = '';
   if (avisos.reorg){
-    reorgNoteHtml += `<div class="reorg-note" style="display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px 11px;background:#fffbeb;border:1.5px solid rgba(245,158,11,.25);border-radius:9px;font-size:11px;color:#b45309;font-weight:600">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      El cliente reorganizó esta semana</div>`;
+    const cambios = avisos.reorg.cambios || [];
+    const detalle = cambios.length
+      ? cambios.map(ch => `<span style="white-space:nowrap"><b>${ch.dia}:</b> ${ch.antes}→${ch.ahora}</span>`).join('<span style="opacity:.5"> · </span>')
+      : 'Sin cambios respecto al plan';
+    reorgNoteHtml += `<div class="reorg-note" style="margin-top:9px;padding:9px 11px;background:#fffbeb;border:1.5px solid rgba(245,158,11,.25);border-radius:9px;font-size:11px;color:#b45309;font-weight:600">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:${cambios.length?'5px':'0'}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        El cliente reorganizó esta semana</div>
+      ${cambios.length?`<div style="display:flex;flex-wrap:wrap;gap:3px 0;padding-left:20px;font-weight:500;color:#92400e">${detalle}</div>`:''}
+    </div>`;
   }
   if (avisos.retraso){
     const r = avisos.retraso;
@@ -3846,14 +3880,6 @@ function renderResumen() {
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       El cliente retrasó el split ${r.dias} día${r.dias===1?'':'s'} (desde ${desdeFmt})</div>`;
   }
-
-  // [DEBUG TEMPORAL] diagnóstico de la reorganización
-  const _dbgKey = weekKeyFromMonday(mondayRef);
-  const _dbgLoaded = !!c._ajustesCargados;
-  const _dbgReorgKeys = c._weekReorders ? Object.keys(c._weekReorders) : [];
-  const _dbgReorgFound = !!buscarReorgSemana(c, mondayRef);
-  reorgNoteHtml += `<div style="margin-top:9px;padding:8px 11px;background:#1e293b;border-radius:8px;font-size:10px;color:#93c5fd;font-family:monospace;line-height:1.5">
-    DEBUG · cargado:${_dbgLoaded} · claveTracc:${_dbgKey} · clavesEnDatos:[${_dbgReorgKeys.join(',')}] · reorgEncontrada:${_dbgReorgFound} · splitLen:${(c._training&&c._training.split&&c._training.split.length)||'?'}</div>`;
 
   // Today's split workout
   const todayDate  = new Date(); todayDate.setHours(0,0,0,0);

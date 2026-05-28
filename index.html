@@ -9376,35 +9376,21 @@ const CHART_CONFIG = {
       if(r==='semana') return ['L','M','X','J','V','S','D'].map((label,i)=>({label,v:acts.filter(a=>a.dia===DIAS_FULL_MAP[i]).length}));
       return Array.from({length:r==='mes'?4:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(Math.random()*4)}));
     }},
-  sessions:{title:'Sesiones completadas',sub:'',color:'#16a34a',unit:'sesiones',chartType:'bar',decimals:0,ranges:['semana','mes','histórico'],
+  sessions:{title:'Sesiones completadas',sub:'',color:'#16a34a',unit:'sesiones',chartType:'bar',decimals:0,ranges:['semana'],
     getData:(c,r)=>{
-      if(r==='semana') {
-        if (weekOffset !== 0 && c.id===1 && c.weekHistory?.[String(weekOffset)]) {
-          return ['L','M','X','J','V','S','D'].map((label,i)=>({label,v:c.weekHistory[String(weekOffset)].sessions[i]?1:0}));
-        }
-        // Current week: only count days up to today
-        const jsN = new Date(); jsN.setHours(23,59,59,0);
-        const mon = new Date(); const jd=mon.getDay(); mon.setDate(mon.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
-        return ['L','M','X','J','V','S','D'].map((label,i)=>{
-          const dd=new Date(mon); dd.setDate(mon.getDate()+i); dd.setHours(23,59,59,0);
-          const trained = c.week&&c.week[i]?.trained && dd<=jsN;
-          return {label,v:trained?1:0};
+      const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+      const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+      if(r==='semana'){
+        const DIAS=['L','M','X','J','V','S','D'];
+        const ses=(c._sessions)||[];
+        return DIAS.map((label,i)=>{
+          const d=new Date(mon); d.setDate(mon.getDate()+i);
+          const fecha=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const hizo=ses.some(s=>s&&s.completed&&String(s.session_date).slice(0,10)===fecha);
+          return {label, v: hizo?1:0};
         });
       }
-      if(r==='mes') {
-        // 4 weeks: S1=3w ago, S2=2w ago, S3=1w ago, S4=current
-        return Array.from({length:4},(_,i)=>{
-          const wo=-(3-i);
-          const hist=c.weekHistory?.[String(wo)];
-          const done=hist?hist.sessions.filter(Boolean).length:Math.round(3+Math.random()*2);
-          return {label:`S${i+1}`,v:done};
-        });
-      }
-      // histórico: all 8 weeks
-      if(c.id===1&&c.weekHistory) {
-        return Object.entries(c.weekHistory).sort((a,b)=>+a[0]-+b[0]).map(([wo,h],i)=>({label:`S${i+1}`,v:h.sessions.filter(Boolean).length}));
-      }
-      return Array.from({length:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(3+Math.random()*2)}));
+      return [];
     }},
   cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana','mes','histórico'],
     getData:(c,r)=>{

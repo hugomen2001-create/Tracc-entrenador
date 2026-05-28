@@ -4622,32 +4622,58 @@ function agruparSeriesPorEjercicio(c){
   const sets = (c && c._workoutSets) || [];
   const sessions = (c && c._sessions) || [];
   if (!sets.length) return [];
-  const fechaPorSession = {};
-  sessions.forEach(s => { fechaPorSession[s.id] = String(s.session_date).slice(0,10); });
-  // Acumulador: nombre → { totalSeries, porSesion: { fecha → {pesoMax, totalSeries} } }
+  const infoPorSession = {};
+  sessions.forEach(s => {
+    infoPorSession[s.id] = { fecha: String(s.session_date).slice(0,10), tipo: s.session_type || '' };
+  });
+  // Acumulador por (nombre + tipo de sesión):
+  //   clave → { nombre, tipo, totalSeries, porSesion: { fecha → {pesoMax, series:[{peso,reps}]} } }
   const acc = {};
   sets.forEach(ws => {
+    const info = infoPorSession[ws.session_id];
+    if (!info) return;
     const nombre = ws.exercise_name || '—';
-    const fecha = fechaPorSession[ws.session_id];
-    if (!fecha) return;
-    if (!acc[nombre]) acc[nombre] = { totalSeries: 0, porSesion: {} };
-    acc[nombre].totalSeries++;
-    if (!acc[nombre].porSesion[fecha]){
-      acc[nombre].porSesion[fecha] = { pesoMax: 0, totalSeries: 0 };
+    const tipo = info.tipo;
+    const fecha = info.fecha;
+    const clave = nombre + '\u0000' + tipo;
+    if (!acc[clave]) acc[clave] = { nombre, tipo, totalSeries: 0, porSesion: {} };
+    acc[clave].totalSeries++;
+    if (!acc[clave].porSesion[fecha]){
+      acc[clave].porSesion[fecha] = { pesoMax: 0, series: [] };
     }
     const p = Number(ws.weight_kg);
-    if (!isNaN(p) && p > acc[nombre].porSesion[fecha].pesoMax){
-      acc[nombre].porSesion[fecha].pesoMax = p;
+    const reps = ws.reps_done != null ? Number(ws.reps_done) : null;
+    acc[clave].porSesion[fecha].series.push({ peso: isNaN(p)?null:p, reps });
+    if (!isNaN(p) && p > acc[clave].porSesion[fecha].pesoMax){
+      acc[clave].porSesion[fecha].pesoMax = p;
     }
-    acc[nombre].porSesion[fecha].totalSeries++;
   });
-  // Convertir a array, ordenar por totalSeries desc
-  return Object.keys(acc).map(nombre => {
-    const sesiones = Object.keys(acc[nombre].porSesion).sort().map(fecha => ({
-      fecha, pesoMax: acc[nombre].porSesion[fecha].pesoMax,
-      totalSeries: acc[nombre].porSesion[fecha].totalSeries,
-    }));
-    return { nombre, totalSeries: acc[nombre].totalSeries, sesiones };
+
+  // Contar en cuántos tipos de sesión distintos aparece cada NOMBRE base
+  // (para decidir si añadir el sufijo · TIPO — Opción B)
+  const tiposPorNombre = {};
+  Object.keys(acc).forEach(clave => {
+    const { nombre, tipo } = acc[clave];
+    (tiposPorNombre[nombre] = tiposPorNombre[nombre] || new Set()).add(tipo);
+  });
+
+  // Convertir a array
+  return Object.keys(acc).map(clave => {
+    const grupo = acc[clave];
+    const multiTipo = (tiposPorNombre[grupo.nombre] || new Set()).size > 1;
+    const etiqueta = multiTipo && grupo.tipo ? grupo.nombre + ' · ' + grupo.tipo : grupo.nombre;
+    const sesiones = Object.keys(grupo.porSesion).sort().map(fecha => {
+      const ps = grupo.porSesion[fecha];
+      // reps de las series que están al peso máximo (para el tooltip)
+      const repsEnMax = ps.series.filter(s => s.peso === ps.pesoMax && s.reps != null).map(s => s.reps);
+      return {
+        fecha, pesoMax: ps.pesoMax,
+        totalSeries: ps.series.length,
+        repsMax: repsEnMax,                 // reps al peso máximo
+        todasReps: ps.series.map(s => s.reps).filter(r => r != null),
+      };
+    });
+    return { nombre: etiqueta, totalSeries: grupo.totalSeries, sesiones };
   }).sort((a,b) => b.totalSeries - a.totalSeries);
 }
 
@@ -4720,7 +4746,11 @@ function graficaEvolucionCargas(sesiones){
 
   const circles = sesiones.map((s,i) => {
     const cx = x(i).toFixed(1), cy = y(s.pesoMax).toFixed(1);
-    const tooltip = formatearFechaCorta(s.fecha) + ' · ' + s.pesoMax + ' kg · ' + s.totalSeries + (s.totalSeries===1?' serie':' series');
+    const repsTxt = (s.repsMax && s.repsMax.length)
+      ? ' · ' + s.repsMax.join(', ') + (s.repsMax.length===1?' rep':' reps')
+      : '';
+    const tooltip = formatearFechaCorta(s.fecha) + ' · ' + s.pesoMax + ' kg' + repsTxt
+      + ' · ' + s.totalSeries + (s.totalSeries===1?' serie':' series');
     return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--green)" stroke="#fff" stroke-width="2">
               <title>${escHtml(tooltip)}</title>
             </circle>`;

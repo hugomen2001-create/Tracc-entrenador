@@ -1325,6 +1325,98 @@ const SB_URL = 'https://zniepgmzwhbxpsztpvli.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpuaWVwZ216d2hieHBzenRwdmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NzcxMzksImV4cCI6MjA5NTA1MzEzOX0.fYwxr4D6NYYxwSS-R37NoTEmCf_KkInWoOegSJP-rhk';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
+/* ===== Función de ciclos (idéntica a MyTracc, Fase 1 testeada). Para Resumen/Fase 5-6 =====
+ * Calcula qué toca un día según: start_date del mesociclo, split, ajustes.
+ * CRÍTICO: cuenta días con Date.UTC sobre componentes LOCALES → inmune a TZ.
+ * NO usa toISOString (causa de los bugs de fecha). Ver traspaso §7.
+ * ========================================================================== */
+const Cycle = (function(){
+  function toYMD(value){
+    if(value==null)return null;
+    if(value instanceof Date){
+      if(isNaN(value.getTime()))return null;
+      return {y:value.getFullYear(),m:value.getMonth()+1,d:value.getDate()};
+    }
+    if(typeof value==='string'){
+      const m=value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(!m)return null;
+      const y=+m[1],mo=+m[2],d=+m[3];
+      if(mo<1||mo>12||d<1||d>31)return null;
+      return {y:y,m:mo,d:d};
+    }
+    return null;
+  }
+  function dayNumber(ymd){return Math.floor(Date.UTC(ymd.y,ymd.m-1,ymd.d)/86400000);}
+  function diffDays(a,b){return dayNumber(a)-dayNumber(b);}
+  function mod(n,m){return ((n%m)+m)%m;}
+  function num(v){const n=Number(v);return isFinite(n)?n:0;}
+  function resolveOffset(adjustments,targetYMD){
+    if(!Array.isArray(adjustments)||adjustments.length===0)return 0;
+    const targetN=dayNumber(targetYMD);
+    let best=null; // {n, offset, ts, idx}
+    for(let i=0;i<adjustments.length;i++){
+      const adj=adjustments[i];if(!adj)continue;
+      const eff=toYMD(adj.effective_date);if(!eff)continue;
+      const n=dayNumber(eff);
+      if(n<=targetN){
+        // Desempate a IGUAL fecha: gana el ajuste más reciente
+        // (created_at si existe; si no, el último del array = última inserción).
+        const ts=adj.created_at?Date.parse(adj.created_at):NaN;
+        if(best===null || n>best.n ||
+           (n===best.n && (
+             (!isNaN(ts)&&!isNaN(best.ts)&&ts>=best.ts) ||
+             (isNaN(ts)&&isNaN(best.ts)&&i>=best.idx) ||
+             (!isNaN(ts)&&isNaN(best.ts)) // el que tiene fecha gana al que no
+           ))){
+          best={n:n,offset:num(adj.offset_days),ts:ts,idx:i};
+        }
+      }
+    }
+    return best?Math.max(0,best.offset):0;
+  }
+  function cyclePositionForDate(startDate,split,queryDate,adjustments){
+    if(!Array.isArray(split)||split.length===0)return null;
+    const len=split.length;
+    const start=toYMD(startDate),query=toYMD(queryDate);
+    if(!start||!query)return null;
+    const elapsed=diffDays(query,start);
+    if(elapsed<0)return null;
+    const offset=resolveOffset(adjustments,query);
+    return mod(elapsed-offset,len);
+  }
+  function sessionForDate(startDate,split,queryDate,adjustments){
+    const pos=cyclePositionForDate(startDate,split,queryDate,adjustments);
+    if(pos===null)return null;
+    return split[pos];
+  }
+  /* ¿La fecha cae en algún rango de pausa [pause_from, effective_date)?
+     Cada ajuste con pause_from define un parón: esos días son descanso forzado. */
+  function isInPause(queryDate, adjustments){
+    if(!Array.isArray(adjustments))return false;
+    const q=dayNumber(toYMD(queryDate));
+    for(let i=0;i<adjustments.length;i++){
+      const a=adjustments[i];if(!a||!a.pause_from||!a.effective_date)continue;
+      const pf=toYMD(a.pause_from), ed=toYMD(a.effective_date);
+      if(!pf||!ed)continue;
+      const from=dayNumber(pf), to=dayNumber(ed); // [from, to)
+      if(q>=from && q<to)return true;
+    }
+    return false;
+  }
+  function weekPlanForDates(startDate,split,weekDates,adjustments){
+    if(!Array.isArray(weekDates))return [];
+    return weekDates.map(function(d){
+      // Día en pausa (parón) → descanso forzado.
+      if(isInPause(d,adjustments))return 'DESCANSO';
+      return sessionForDate(startDate,split,d,adjustments);
+    });
+  }
+  return {cyclePositionForDate:cyclePositionForDate,sessionForDate:sessionForDate,
+          weekPlanForDates:weekPlanForDates,resolveOffset:resolveOffset,isInPause:isInPause,
+          _toYMD:toYMD,_diffDays:function(a,b){return diffDays(toYMD(a),toYMD(b));}};
+})();
+
+
 // Datos del coach con sesión activa (los rellena el login real)
 let coachData = null;
 
@@ -3397,6 +3489,8 @@ function switchTab(tab) {
   if (tab === 'perfil') setTimeout(hydratePhotoUrls, 0);
   // Si es el tab Seguimiento, cargar las series del cliente (S3) si no están cargadas
   if (tab === 'seguimiento') setTimeout(cargarSeriesCliente, 0);
+  // Si es el tab Resumen, cargar ajustes (retrasos/reorganización) del cliente
+  if (tab === 'resumen') setTimeout(async () => { await cargarAjustesCliente(currentClient); renderClientPanel(); }, 0);
 }
 
 // ── S3: estado del bloque de evolución de cargas ──
@@ -3422,6 +3516,117 @@ async function cargarSeriesCliente(){
   }
   c._workoutSets = data || [];
   renderClientPanel();
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   BLOQUE A (Fase 5 + cimiento Resumen): leer ajustes del cliente y calcular
+   ciclo-vs-realidad. NO toca el render del Resumen todavía.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Carga split_adjustments y week_reorders del cliente y los cachea en el objeto.
+   Mismo patrón que cargarSeriesCliente: bajo demanda, cachea en c._xxx. */
+async function cargarAjustesCliente(c){
+  if (!c) return;
+  if (c._splitAdjustments != null && c._weekReorders != null) return; // ya cargados
+  c._splitAdjustments = c._splitAdjustments || [];
+  c._weekReorders     = c._weekReorders     || {};
+  try{
+    const [adjRes, reoRes] = await Promise.all([
+      sb.from('split_adjustments').select('*').eq('client_id', c.id).order('effective_date'),
+      sb.from('week_reorders').select('*').eq('client_id', c.id)
+    ]);
+    if (adjRes && !adjRes.error) c._splitAdjustments = adjRes.data || [];
+    else if (adjRes && adjRes.error) console.error('cargarAjustes split_adjustments:', adjRes.error);
+    if (reoRes && !reoRes.error){
+      const map = {};
+      (reoRes.data || []).forEach(r => { if (r && r.week_key && Array.isArray(r.plan)) map[r.week_key] = r.plan; });
+      c._weekReorders = map;
+    } else if (reoRes && reoRes.error) console.error('cargarAjustes week_reorders:', reoRes.error);
+  }catch(e){ console.error('cargarAjustesCliente:', e); }
+}
+
+/* clave de semana "YYYY-Www" (ISO-ish) a partir del lunes (Date local). */
+function weekKeyFromMonday(mondayDate){
+  const y = mondayDate.getFullYear();
+  // número de semana aproximado por día del año / 7 (suficiente para clave única
+  // y coherente con el que usa MyTracc, que deriva del lunes local).
+  const start = new Date(y,0,1);
+  const days = Math.floor((mondayDate - start) / 86400000);
+  const wk = Math.floor((days + ((start.getDay()+6)%7)) / 7) + 1;
+  return y + '-W' + String(wk).padStart(2,'0');
+}
+
+/* Array de 7 fechas 'YYYY-MM-DD' (lunes..domingo) de la semana que contiene refDate. */
+function semanaFechasDesde(mondayDate){
+  const out=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(mondayDate.getFullYear(),mondayDate.getMonth(),mondayDate.getDate()+i);
+    out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
+  }
+  return out;
+}
+
+/* Plan de la semana SEGÚN EL CICLO (lo que el cliente debería ver en MyTracc),
+   aplicando la misma lógica que MyTracc: split 7→lunes; ≠7→ciclo+retrasos+pausas;
+   reorganización semanal tiene prioridad. Devuelve array de 7 strings.
+   c: cliente. mondayDate: lunes (Date local) de la semana. */
+function planSemanaCicloTracc(c, mondayDate){
+  const split = (c && c._training && Array.isArray(c._training.split) && c._training.split.length)
+    ? c._training.split : null;
+  const wk = weekKeyFromMonday(mondayDate);
+  // 1) Reorganización semanal (máxima prioridad)
+  if (c && c._weekReorders && Array.isArray(c._weekReorders[wk])) return [...c._weekReorders[wk]];
+  if (!split) return null;
+  // 2a) Split semanal (7): ancla a lunes
+  if (split.length === 7) return [...split];
+  // 2b) Ciclo (≠7): necesita mesociclo con start_date
+  const meso = c && c._mesocycle;
+  if (meso && meso.start_date){
+    const fechas = semanaFechasDesde(mondayDate);
+    const adj = (c && c._splitAdjustments) || [];
+    const plan = Cycle.weekPlanForDates(String(meso.start_date).slice(0,10), split, fechas, adj);
+    return plan.map(s => s==null ? 'DESCANSO' : s);
+  }
+  // 3) Fallback
+  return [...split];
+}
+
+/* ¿Qué hizo el cliente realmente esa semana? Mapea c._sessions (por fecha) a
+   array de 7: cada posición = {type, completed} o null si no entrenó ese día. */
+function realidadSemana(c, mondayDate){
+  const fechas = semanaFechasDesde(mondayDate);
+  const sesiones = (c && c._sessions) || [];
+  return fechas.map(f => {
+    const s = sesiones.find(x => x && String(x.session_date).slice(0,10) === f);
+    if (!s) return null;
+    return { type: s.session_type || '', completed: !!s.completed, _raw: s };
+  });
+}
+
+/* Detecta avisos de la semana: retraso del split y reorganización.
+   Devuelve { retraso: {dias, desde} | null, reorg: {texto} | null }. */
+function avisosSemana(c, mondayDate){
+  const out = { retraso:null, reorg:null };
+  const fechas = semanaFechasDesde(mondayDate);
+  const adj = (c && c._splitAdjustments) || [];
+  // Retraso: ¿algún ajuste con pausa afecta a esta semana?
+  for (let i=0;i<adj.length;i++){
+    const a=adj[i];
+    if (!a || !a.pause_from || !a.effective_date) continue;
+    const ed = String(a.effective_date).slice(0,10);
+    const pf = String(a.pause_from).slice(0,10);
+    // afecta si el rango [pf, ed] intersecta la semana
+    if (ed >= fechas[0] && pf <= fechas[6]){
+      const dias = Cycle._diffDays(ed, pf);
+      out.retraso = { dias: dias, desde: pf, hasta: ed };
+    }
+  }
+  // Reorganización: ¿hay week_reorder para esta semana?
+  const wk = weekKeyFromMonday(mondayDate);
+  if (c && c._weekReorders && Array.isArray(c._weekReorders[wk])){
+    out.reorg = { plan: c._weekReorders[wk] };
+  }
+  return out;
 }
 
 function renderTab() {

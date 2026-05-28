@@ -9392,17 +9392,21 @@ const CHART_CONFIG = {
       }
       return [];
     }},
-  cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana','mes','histórico'],
+  cheats:{title:'Cheats registrados',sub:'',color:'#dc2626',unit:'cheats',chartType:'bar',decimals:0,ranges:['semana'],
     getData:(c,r)=>{
-      const DIAS_CH=['L','M','X','J','V','S','D'];
-      const DIAS_FULL_CH=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-      if(r==='semana') {
-        // Map cheats to days
-        const cheats=weekOffset===0?c.cheats:[]; // past week data would come from DB
-        return DIAS_CH.map((label,i)=>({label,v:cheats.filter(ch=>ch.dia===DIAS_FULL_CH[i]).length}));
+      const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+      const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+      if(r==='semana'){
+        const DIAS=['L','M','X','J','V','S','D'];
+        const ch=(c._cheatsReal)||[];
+        return DIAS.map((label,i)=>{
+          const d=new Date(mon); d.setDate(mon.getDate()+i);
+          const fecha=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const n=ch.filter(x=>x&&String(x.date).slice(0,10)===fecha).length;
+          return {label, v:n};
+        });
       }
-      if(r==='mes') return Array.from({length:4},(_,i)=>({label:`S${i+1}`,v:[1,2,0,1][i]||0}));
-      return Array.from({length:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(Math.random()*3)}));
+      return [];
     }},
 };
 
@@ -9414,8 +9418,7 @@ function openChartModal(metric) {
   document.getElementById('chart-modal-sub').textContent=weekLbl+(cfg.sub?' — '+cfg.sub:'');
   document.getElementById('chart-modal').style.display='flex';
   renderChartRangeTabs();
-  if(metric==='sessions') renderSessionsChart();
-  else {
+  {
     const cv=document.getElementById('main-chart'); if(cv) cv.style.display='';
     const ex=document.getElementById('sessions-custom'); if(ex) ex.remove();
     renderChart();

@@ -142,6 +142,60 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 /* PANEL CARD */
 .panel-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px}
 
+/* ── VISTA GENERAL ── */
+.vg-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+.vg-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--text);letter-spacing:-.3px;line-height:1.1;font-weight:400}
+.vg-date{font-size:11.5px;color:var(--text3);margin-top:3px}
+.vg-body{padding:18px 24px 24px;flex:1;overflow-y:auto}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.kpi{background:var(--bg2);border:1.5px solid var(--border);border-radius:15px;padding:14px 16px}
+.kpi-lbl{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#bbb;margin-bottom:6px}
+.kpi-val{font-family:'DM Serif Display',serif;font-size:32px;font-weight:400;letter-spacing:-1.5px;color:var(--text);line-height:1}
+.kpi-val.g{color:var(--green)}.kpi-val.am{color:var(--amber)}.kpi-val.r{color:var(--red)}
+.kpi-sub{font-size:10.5px;color:var(--text3);margin-top:4px}
+.kpi-sub.g{color:var(--green);font-weight:600}.kpi-sub.am{color:var(--amber);font-weight:600}
+
+.alerts-section{margin-bottom:18px}
+.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sec-t{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#bbb}
+.alert-row{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg2);border:1.5px solid var(--border);border-radius:13px;margin-bottom:6px;cursor:pointer;transition:border-color .12s}
+.alert-row:hover{border-color:var(--border2)}
+.alert-row.amber{background:#fffbeb;border-color:rgba(217,119,6,.18)}
+.alert-row.red{background:#fef2f2;border-color:rgba(220,38,38,.18)}
+.alert-dot-a{width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0}
+.alert-dot-r{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0}
+.alert-av{width:28px;height:28px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--bg3);color:var(--text2)}
+.alert-txt{font-size:12px;font-weight:600;color:var(--text)}
+.alert-sub{font-size:10.5px;color:var(--text3);margin-top:2px}
+.alert-arrow{color:var(--text3);font-size:14px;flex-shrink:0}
+
+.clients-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ccard{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden}
+.ccard:hover{border-color:var(--border2)}
+.ccard.attn{border-color:rgba(217,119,6,.3)}
+.ccard.crit{border-color:rgba(220,38,38,.25)}
+.ccard-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px}
+.ccard-av{width:34px;height:34px;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--border)}
+.ccard-name{font-family:'DM Serif Display',serif;font-size:15px;color:var(--text);letter-spacing:-.2px;line-height:1.1;font-weight:400}
+.ccard-meta{font-size:10.5px;color:var(--text3);margin-top:3px}
+.ccard-status{margin-left:auto;flex-shrink:0;align-self:center}
+.status-dot{width:9px;height:9px;border-radius:50%}
+.status-dot.dg{background:var(--green)}.status-dot.da{background:var(--amber)}.status-dot.dr{background:var(--red)}
+.ccard-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.cs{background:var(--bg3);border-radius:9px;padding:8px}
+.cs-v{font-family:'DM Serif Display',serif;font-size:17px;color:var(--text);letter-spacing:-.5px;line-height:1;font-weight:400;text-align:center}
+.cs-v.g{color:var(--green)}.cs-v.am{color:var(--amber)}.cs-v.r{color:var(--red)}.cs-v.dim{color:#ccc}
+.cs-l{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#c0c0bc;margin-top:3px;text-align:center}
+.sess-bar{height:3px;background:#f0f0ee;border-radius:2px;overflow:hidden;margin-top:5px}
+.sess-fill{height:100%;border-radius:2px;background:var(--green);transition:width .4s}
+.sess-fill.am{background:var(--amber)}.sess-fill.r{background:var(--red)}
+.ccard-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.last-act{font-size:10.5px;color:var(--text3);display:flex;align-items:center;gap:4px}
+.ccard-alert{font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;white-space:nowrap}
+.ccard-alert.g{background:var(--gl);color:var(--green);border:1px solid rgba(22,163,74,.2)}
+.ccard-alert.a{background:var(--al);color:var(--amber);border:1px solid rgba(217,119,6,.2)}
+.ccard-alert.r{background:var(--rl);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+
 /* WORKOUT */
 .workout-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
 .workout-row:last-child{border-bottom:none}
@@ -6818,65 +6872,204 @@ function deleteTemplate(idx) {
 // ── OVERVIEW TABLE ─────────────────────────────────────────────────────────
 let _overviewOpen = false;
 
+/* ── VISTA GENERAL: helpers con datos reales ──────────────────────────────── */
+function _vgLunesActual(){ const d=new Date(); const jd=d.getDay(); d.setDate(d.getDate()-(jd===0?6:jd-1)); d.setHours(0,0,0,0); return d; }
+function _vgFechasSem(mon){ const arr=[]; for(let i=0;i<7;i++){ const d=new Date(mon); d.setDate(mon.getDate()+i); arr.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); } return arr; }
+
+/* Calcula los stats de la semana actual de un cliente desde sus datos reales. */
+function _vgStatsCliente(c){
+  const mon = _vgLunesActual();
+  const fechas = _vgFechasSem(mon);
+  // Sesiones completadas esta semana
+  const ses = (c._sessions||[]);
+  const sesCompletadas = fechas.filter(f => ses.some(s=>s&&s.completed&&String(s.session_date).slice(0,10)===f)).length;
+  // Objetivo: días de entreno del split (no OFF)
+  const split = (c._training && Array.isArray(c._training.split)) ? c._training.split : [];
+  const off = t => !t || t==='OFF' || t==='DESCANSO' || t==='DSC';
+  const sesObjetivo = split.length ? split.filter(t=>!off(t)).length : 0;
+  // Peso: último de la semana, o último conocido, o c.peso
+  const ms = (c._metrics||[]);
+  const pesosSem = ms.filter(m=>m&&m.weight_kg!=null&&fechas.includes(String(m.date).slice(0,10)))
+                     .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  let peso = null;
+  if (pesosSem.length) peso = Number(pesosSem[pesosSem.length-1].weight_kg);
+  else {
+    const todoPeso = ms.filter(m=>m&&m.weight_kg!=null).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    if (todoPeso.length) peso = Number(todoPeso[todoPeso.length-1].weight_kg);
+    else if (c.peso) peso = Number(c.peso);
+  }
+  // Pasos media de la semana
+  const pasosVals = ms.filter(m=>m&&m.steps!=null&&fechas.includes(String(m.date).slice(0,10))).map(m=>Number(m.steps));
+  const pasosMedia = pasosVals.length ? Math.round(pasosVals.reduce((a,b)=>a+b,0)/pasosVals.length) : null;
+  // Cheats de la semana
+  const cheats = (c._cheatsReal||[]).filter(x=>x&&fechas.includes(String(x.date).slice(0,10))).length;
+  // Última sesión completada (fecha más reciente)
+  const compTodas = ses.filter(s=>s&&s.completed&&s.session_date).sort((a,b)=>String(b.session_date).localeCompare(String(a.session_date)));
+  let diasDesdeUltima = null;
+  if (compTodas.length){
+    const last = new Date(String(compTodas[0].session_date).slice(0,10)+'T00:00:00');
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    diasDesdeUltima = Math.round((hoy-last)/86400000);
+  }
+  // Estado: OK si cumple objetivo de sesiones; atención si por debajo a mitad de semana; crítico si lleva >=4 días sin entrenar
+  const hoyDia = new Date().getDay(); const diaSem = hoyDia===0?7:hoyDia; // 1..7
+  const sesEsperadasHoy = sesObjetivo ? Math.round(sesObjetivo * (diaSem/7)) : 0;
+  let estado = 'ok'; let estadoTxt = 'Al día';
+  if (diasDesdeUltima!=null && diasDesdeUltima>=4 && sesObjetivo>0){
+    estado = 'crit'; estadoTxt = `${diasDesdeUltima} días sin entrenar`;
+  } else if (sesObjetivo>0 && sesCompletadas < sesEsperadasHoy-1){
+    estado = 'attn'; estadoTxt = 'Va por debajo';
+  } else if (sesObjetivo>0 && sesCompletadas>=sesObjetivo){
+    estado = 'ok'; estadoTxt = 'Semana completa';
+  }
+  // Mesociclo info
+  let mesoInfo = c.goal || '';
+  if (c._mesocycle){
+    const sem = c._mesocycle.current_week || c._mesocycle.week_number || null;
+    const total = c._mesocycle.total_weeks || c._mesocycle.weeks || null;
+    if (sem && total) mesoInfo += ` · sem ${sem}/${total}`;
+  }
+  return { sesCompletadas, sesObjetivo, peso, pasosMedia, cheats, diasDesdeUltima, estado, estadoTxt, mesoInfo };
+}
+
+function _vgFechaLarga(){
+  const d = new Date();
+  try{
+    const txt = d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+    return txt.charAt(0).toUpperCase()+txt.slice(1);
+  }catch(e){ return ''; }
+}
+function _vgSaludo(){
+  const h = new Date().getHours();
+  if (h < 6) return 'Buenas noches';
+  if (h < 13) return 'Buenos días';
+  if (h < 21) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 function toggleOverview() {
   const btn = document.getElementById('overview-btn');
   if (_overviewOpen) {
     // Cerrar: volver al panel del cliente activo
     _overviewOpen = false;
     if (btn) { btn.style.background = 'var(--bg2)'; btn.style.color = 'var(--text2)'; }
-    // Quitar active de todos los clientes y reactivar el actual
     document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
     if (currentClient) {
       document.getElementById('ci-' + currentClient.id)?.classList.add('active');
       renderClientPanel();
     }
   } else {
-    // Abrir vista general
     _overviewOpen = true;
-    if (btn) { btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; }
-    // Quitar active de la lista de clientes mientras se muestra la tabla
+    if (btn) { btn.style.background = '#1a1a18'; btn.style.color = '#fff'; }
     document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
-    renderOverview();
+    // Asegurar que todos los clientes tienen datos cargados
+    Promise.all(CLIENTS.map(c => cargarAjustesCliente(c))).then(() => renderOverview());
+    renderOverview(); // primer pintado optimista
   }
 }
 
 function renderOverview() {
-  const rows = CLIENTS.map(c=>{
-    const wh=c.weekHistory||{};
-    const wm=(typeof HUGO_METRICS_HISTORY!=='undefined'&&c.id===1)?HUGO_METRICS_HISTORY:{};
-    const acts=(typeof HUGO_ACTIVITIES_HISTORY!=='undefined'&&c.id===1)?HUGO_ACTIVITIES_HISTORY:{};
-    const doneDays=(wh['0']?.sessions||[]).filter((v,i)=>v&&(c.week||[])[i]?.session!=='OFF').length;
-    const trainDays=(c.week||[]).filter(d=>d.session!=='OFF').length;
-    const pesoHoy=wm['0']?.J?.weight||wm['0']?.M?.weight||c.peso||'--';
-    const pesoAnt=wm['-1']?.J?.weight||wm['-1']?.M?.weight||'--';
-    const pesoDiff=typeof pesoHoy==='number'&&typeof pesoAnt==='number'?Math.round((pesoHoy-pesoAnt)*10)/10:null;
-    const cheats=acts['0']?.length||0;
-    const stepsArr=Object.values(wm['0']||{}).filter(d=>d&&typeof d==='object').map(d=>d.steps).filter(Boolean);
-    const stepsAvg=stepsArr.length?Math.round(stepsArr.reduce((a,b)=>a+b,0)/stepsArr.length):0;
-    const alertCount=getSmartAlerts(c).filter(a=>a.type==='warning').length;
-    const dotColor=alertCount>0?'var(--red)':doneDays>=trainDays?'var(--green)':'var(--amber)';
-    return '<tr style="cursor:pointer" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'" onclick="selectClientById(\''+c.id+'\')">'+
-      '<td style="padding:10px 14px"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+dotColor+';flex-shrink:0"></div><span style="font-size:13px;font-weight:500;color:var(--text)">'+c.name+'</span></div></td>'+
-      '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px;font-weight:600;color:'+(doneDays>=trainDays?'var(--green)':'var(--amber)')+'">'+doneDays+'/'+trainDays+'</span></td>'+
-      '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px">'+pesoHoy+'kg</span>'+(pesoDiff!==null?'<span style="font-size:10px;color:'+(pesoDiff<0?'var(--green)':pesoDiff>0?'var(--amber)':'var(--text3)')+';margin-left:4px">'+(pesoDiff>0?'+':'')+pesoDiff+'</span>':'')+'</td>'+
-      '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px;color:'+(cheats>=3?'var(--red)':cheats>0?'var(--amber)':'var(--green)')+'">'+cheats+'</span></td>'+
-      '<td style="padding:10px 14px;text-align:center"><span style="font-size:13px;color:'+(stepsAvg>=8000?'var(--green)':'var(--amber)')+'">'+( stepsAvg?(stepsAvg/1000).toFixed(1)+'k':'--')+'</span></td>'+
-      '<td style="padding:10px 14px;text-align:center">'+(alertCount>0?'<span style="background:var(--rl);color:var(--red);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">'+alertCount+' alerta'+(alertCount>1?'s':'')+'</span>':'<span style="color:var(--green);font-size:12px">ok</span>')+'</td>'+
-      '</tr>';
+  const clientes = CLIENTS.slice();
+  const stats = clientes.map(c => ({ c, s: _vgStatsCliente(c) }));
+
+  // KPIs agregados
+  const alDia = stats.filter(x=>x.s.estado==='ok').length;
+  const atencion = stats.filter(x=>x.s.estado==='attn'||x.s.estado==='crit').length;
+  const criticos = stats.filter(x=>x.s.estado==='crit');
+  const sesTotalesSem = stats.reduce((a,x)=>a+x.s.sesCompletadas,0);
+  const sesPlanSem = stats.reduce((a,x)=>a+x.s.sesObjetivo,0);
+  const adherencia = sesPlanSem>0?Math.round(sesTotalesSem/sesPlanSem*100):0;
+  const necesitanNombres = stats.filter(x=>x.s.estado==='attn'||x.s.estado==='crit').map(x=>x.c.name.split(' ')[0]).slice(0,3).join(' · ') || '—';
+
+  // Alertas (críticos)
+  const alertasHtml = criticos.length ? criticos.map(({c,s}) => `
+    <div class="alert-row amber" onclick="selectClientById('${c.id}')">
+      <div class="alert-dot-a"></div>
+      <div class="alert-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'};border:none">${c.initials||'?'}</div>
+      <div style="flex:1">
+        <div class="alert-txt">${c.name} lleva ${s.diasDesdeUltima} días sin registrar ningún entreno</div>
+        <div class="alert-sub">${s.sesObjetivo} sesiones/semana planificadas</div>
+      </div>
+      <div class="alert-arrow">→</div>
+    </div>`).join('') : '';
+
+  // Grid de cards de cliente
+  function fmtUlt(s){
+    if (s.diasDesdeUltima==null) return 'Sin entrenos';
+    if (s.diasDesdeUltima===0) return 'Entreno hoy';
+    if (s.diasDesdeUltima===1) return 'Entreno hace 1 día';
+    return `Entreno hace ${s.diasDesdeUltima} días`;
+  }
+  function clsBadge(e){ return e==='ok'?'g':e==='crit'?'r':'a'; }
+  function clsDot(e){ return e==='ok'?'dg':e==='crit'?'dr':'da'; }
+  function clsCard(e){ return e==='ok'?'':e==='crit'?'crit':'attn'; }
+
+  const grid = stats.map(({c,s}) => {
+    const sesPct = s.sesObjetivo>0 ? Math.min(100,Math.round(s.sesCompletadas/s.sesObjetivo*100)) : 0;
+    const sesColor = s.sesObjetivo>0 && s.sesCompletadas>=s.sesObjetivo ? 'g' : (s.sesCompletadas===0 ? 'r' : 'am');
+    const pasosColor = s.pasosMedia==null ? 'dim' : (s.pasosMedia>=(c.stepsGoal||8000) ? 'g' : 'am');
+    const cheatsColor = s.cheats===0 ? 'g' : s.cheats<=2 ? '' : 'r';
+    return `<div class="ccard ${clsCard(s.estado)}" onclick="selectClientById('${c.id}')">
+      <div class="ccard-top">
+        <div class="ccard-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'}">${c.initials||'?'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="ccard-name">${c.name}</div>
+          <div class="ccard-meta">${s.mesoInfo||'—'}</div>
+        </div>
+        <div class="ccard-status"><div class="status-dot ${clsDot(s.estado)}"></div></div>
+      </div>
+      <div class="ccard-stats">
+        <div class="cs"><div class="cs-v ${sesColor}">${s.sesCompletadas}${s.sesObjetivo?'<span style="font-size:11px;color:#bbb">/'+s.sesObjetivo+'</span>':''}</div><div class="cs-l">Sesiones</div><div class="sess-bar"><div class="sess-fill ${sesColor==='g'?'':sesColor}" style="width:${sesPct}%"></div></div></div>
+        <div class="cs"><div class="cs-v ${s.peso==null?'dim':''}">${s.peso==null?'—':s.peso.toFixed(1)}</div><div class="cs-l">Peso kg</div></div>
+        <div class="cs"><div class="cs-v ${pasosColor}">${s.pasosMedia==null?'—':(s.pasosMedia/1000).toFixed(1)+'k'}</div><div class="cs-l">Pasos/d</div></div>
+        <div class="cs"><div class="cs-v ${cheatsColor}">${s.cheats}</div><div class="cs-l">Cheats</div></div>
+      </div>
+      <div class="ccard-footer">
+        <div class="last-act">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${fmtUlt(s)}
+        </div>
+        <div class="ccard-alert ${clsBadge(s.estado)}">${s.estadoTxt}</div>
+      </div>
+    </div>`;
   }).join('');
-  document.getElementById('main-panel').innerHTML='<div style="padding:24px">'+
-    '<div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px">Vista general</div>'+
-    '<div style="font-size:12px;color:var(--text3);margin-bottom:20px">'+CLIENTS.length+' clientes - semana actual - clic para abrir</div>'+
-    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden">'+
-    '<table style="width:100%;border-collapse:collapse">'+
-    '<thead><tr style="background:var(--bg3)">'+
-    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Cliente</th>'+
-    '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Sesiones</th>'+
-    '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Peso</th>'+
-    '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Cheats</th>'+
-    '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Pasos media</th>'+
-    '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase">Estado</th>'+
-    '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+
+  const coachName = (typeof coachData!=='undefined' && coachData && coachData.name) ? coachData.name.split(' ')[0] : '';
+
+  document.getElementById('main-panel').innerHTML = `
+    <div class="vg-header">
+      <div>
+        <div class="vg-title">${_vgSaludo()}${coachName?', '+coachName:''}.</div>
+        <div class="vg-date">${_vgFechaLarga()} · ${clientes.length} client${clientes.length===1?'e':'es'} activo${clientes.length===1?'':'s'}</div>
+      </div>
+    </div>
+    <div class="vg-body">
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="kpi-lbl">Clientes al día</div>
+          <div class="kpi-val g">${alDia}</div>
+          <div class="kpi-sub g">de ${clientes.length} activos</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">Necesitan atención</div>
+          <div class="kpi-val ${atencion>0?'am':''}">${atencion}</div>
+          <div class="kpi-sub ${atencion>0?'am':''}">${atencion>0?necesitanNombres:'Todo en orden'}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">Sesiones esta semana</div>
+          <div class="kpi-val">${sesTotalesSem}</div>
+          <div class="kpi-sub">de ${sesPlanSem} planificadas${sesPlanSem?' · '+adherencia+'%':''}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">Alertas pendientes</div>
+          <div class="kpi-val" style="color:#1a1a18">${criticos.length}</div>
+          <div class="kpi-sub">${criticos.length?criticos[0].c.name.split(' ')[0]+' sin entrenar '+criticos[0].s.diasDesdeUltima+' días':'Ninguna'}</div>
+        </div>
+      </div>
+      ${alertasHtml ? `<div class="alerts-section"><div class="sec-hd"><div class="sec-t">Alertas</div></div>${alertasHtml}</div>` : ''}
+      <div class="sec-hd" style="margin-bottom:10px"><div class="sec-t">Todos los clientes</div></div>
+      <div class="clients-grid">${grid}</div>
+    </div>`;
 }
 function selectClientById(id){ selectClient(id); }
 

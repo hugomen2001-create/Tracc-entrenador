@@ -9302,14 +9302,22 @@ const CHART_CONFIG = {
       if(r==='6 meses')return Array.from({length:24},(_,i)=>({label:`S${i+1}`,v:Math.round(8000+(Math.random()-.3)*2500)}));
       return Array.from({length:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(8000+(Math.random()-.3)*2500)}));
     }},
-  peso:{title:'Evolución del peso',sub:'kg',color:'#16a34a',unit:'kg',chartType:'line',decimals:2,ranges:['semana'],
+  peso:{title:'Evolución del peso',sub:'kg',color:'#16a34a',unit:'kg',chartType:'line',decimals:1,ranges:['semana'],
     getData:(c,r)=>{
-      const hist = getWeekData(c, 'weight', weekOffset);
-      if(r==='semana' && hist) return hist;
-      if(r==='semana') return c.historial.peso.slice(-7);
-      if(r==='mes')    return Array.from({length:30},(_,i)=>({label:`D${i+1}`,v:+(c.historial.peso[0].v+(c.historial.peso[c.historial.peso.length-1].v-c.historial.peso[0].v)*i/30+(Math.random()-.5)*.2).toFixed(2)}));
-      if(r==='6 meses')return Array.from({length:24},(_,i)=>({label:`S${i+1}`,v:+(c.historial.peso[0].v+(c.historial.peso[c.historial.peso.length-1].v-c.historial.peso[0].v)*i/24+(Math.random()-.5)*.3).toFixed(2)}));
-      return c.historial.peso.map(x=>({...x,v:+x.v.toFixed(2)}));
+      // Lunes de la semana visible (weekOffset)
+      const ref=new Date(); ref.setDate(ref.getDate()+weekOffset*7);
+      const jd=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(jd===0?6:jd-1)); mon.setHours(0,0,0,0);
+      if(r==='semana'){
+        const DIAS=['L','M','X','J','V','S','D'];
+        return DIAS.map((label,i)=>{
+          const d=new Date(mon); d.setDate(mon.getDate()+i);
+          const fecha=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          const m=(c._metrics||[]).find(x=>x&&String(x.date).slice(0,10)===fecha&&x.weight_kg!=null);
+          return {label, v: m? +Number(m.weight_kg).toFixed(1) : null};
+        });
+      }
+      // periodos largos: se implementan en la 2ª fase
+      return [];
     }},
   sueno:{title:'Horas de sueño',sub:'Objetivo: 7-9h/noche',color:'#7c3aed',unit:'h',chartType:'bar',decimals:1,goal:7.5,ranges:['semana'],
     getData:(c,r)=>{
@@ -9493,6 +9501,11 @@ function renderChart() {
       scales:{
         x:{grid:{display:false}, ticks:{font:{size:10},color:'#a3a39e', maxRotation:0}},
         y:{
+          ...(isLine && realVals.length ? (()=>{
+            const mn=Math.min(...realVals), mx=Math.max(...realVals);
+            const pad=Math.max((mx-mn)*0.15, 0.3);
+            return { min:+(mn-pad).toFixed(1), max:+(mx+pad).toFixed(1) };
+          })() : {}),
           grid:{color:'#f0efed'},
           ticks:{
             font:{size:10}, color:'#a3a39e',

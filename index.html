@@ -2962,6 +2962,89 @@ async function recargarScheduledDates(c){
   c._scheduledNutritionDate = (nFut && nFut.data) ? nFut.data.activation_date : null;
 }
 
+// ════════════════════════════════════════════════════════════
+// Crear plan VACÍO desde cero (cuando el cliente no tiene plan)
+// ════════════════════════════════════════════════════════════
+
+// Crea un plan de entreno vacío para un cliente. Split todo en OFF,
+// 0 ejercicios. El coach lo va rellenando manualmente desde el editor.
+async function crearPlanEntrenoVacio(){
+  const c = currentClient;
+  if (!c || !coachData){
+    showToast('No hay cliente o coach activo');
+    return;
+  }
+  if (c._training && c._training.plan){
+    showToast('Este cliente ya tiene un plan de entreno');
+    return;
+  }
+  const ok = await confirmDestructive({
+    title: 'Crear plan de entreno',
+    message: 'Se creará un plan de entreno vacío para <strong style="color:#111">' + escHtml(c.name||'este cliente') + '</strong>. Configura el split y añade ejercicios desde el editor.',
+    confirmText: 'Crear plan', cancelText: 'Cancelar', icon: 'dumbbell', danger: false,
+  });
+  if (!ok) return;
+
+  const datos = {
+    client_id: c.id,
+    coach_id: coachData.id,
+    split: ['OFF','OFF','OFF','OFF','OFF','OFF','OFF'],
+    split_days: 7,
+    is_active: true,
+    activation_date: new Date().toISOString().slice(0,10),
+  };
+  const { data, error } = await sb.from('training_plans').insert(datos).select().single();
+  if (error || !data){
+    console.error('crearPlanEntrenoVacio error:', error);
+    showToast('No se pudo crear el plan');
+    return;
+  }
+  // Recargar el plan del cliente para que el editor lo vea
+  await recargarTrainingDeCliente(c, data.id);
+  showToast('Plan de entreno creado ✓');
+  renderClientPanel();
+}
+
+// Crea un plan nutricional vacío para un cliente. Macros a 0, sin opciones.
+async function crearPlanNutricionVacio(){
+  const c = currentClient;
+  if (!c || !coachData){
+    showToast('No hay cliente o coach activo');
+    return;
+  }
+  if (c._nutrition && c._nutrition.plan){
+    showToast('Este cliente ya tiene un plan nutricional');
+    return;
+  }
+  const ok = await confirmDestructive({
+    title: 'Crear plan nutricional',
+    message: 'Se creará un plan nutricional vacío para <strong style="color:#111">' + escHtml(c.name||'este cliente') + '</strong>. Configura macros y opciones de dieta desde el editor.',
+    confirmText: 'Crear plan', cancelText: 'Cancelar', icon: 'utensils', danger: false,
+  });
+  if (!ok) return;
+
+  const datos = {
+    client_id: c.id,
+    coach_id: coachData.id,
+    kcal_goal: 0,
+    protein_g: 0,
+    carbs_g: 0,
+    fat_g: 0,
+    preferences: null,
+    is_active: true,
+    activation_date: new Date().toISOString().slice(0,10),
+  };
+  const { data, error } = await sb.from('nutrition_plans').insert(datos).select().single();
+  if (error || !data){
+    console.error('crearPlanNutricionVacio error:', error);
+    showToast('No se pudo crear el plan');
+    return;
+  }
+  await recargarNutricionDeCliente(c, data.id);
+  showToast('Plan nutricional creado ✓');
+  renderClientPanel();
+}
+
 // ── Clonado de plan de entreno ──
 // Crea una fila nueva en training_plans copiando todos los campos del plan vigente
 // + clona todos los client_plans activos. Devuelve {plan, exercises} o null si falla.
@@ -8566,10 +8649,14 @@ function seccionPlanNutricional(c){
   // Sin plan de nutrición
   if (!nut || !nut.plan){
     return `<div style="${cardStyle};margin-bottom:18px">
-      <div style="${secTitle};margin-bottom:6px">🥗 Plan nutricional</div>
-      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
-        Este cliente todavía no tiene un plan de nutrición.
-      </div>
+      <div style="${secTitle};margin-bottom:10px">🥗 Plan nutricional</div>
+      ${emptyState({
+        icon: 'utensils',
+        title: 'Sin plan nutricional',
+        description: 'Este cliente todavía no tiene un plan de nutrición. Crea uno desde cero para empezar a configurar macros y opciones de dieta.',
+        action: { label: '+ Crear plan nutricional', onClick: 'crearPlanNutricionVacio()' },
+        compact: true,
+      })}
     </div>`;
   }
 
@@ -9221,10 +9308,14 @@ function seccionPlanEntreno(c){
   // Sin plan de entrenamiento
   if (!nut || (!nut.exercises.length && !nut.split.length)){
     return `<div style="${cardStyle}">
-      <div style="${secTitle};margin-bottom:6px">🏋️ Plan de entreno</div>
-      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
-        Este cliente todavía no tiene un plan de entrenamiento.
-      </div>
+      <div style="${secTitle};margin-bottom:10px">🏋️ Plan de entreno</div>
+      ${emptyState({
+        icon: 'dumbbell',
+        title: 'Sin plan de entreno',
+        description: 'Este cliente todavía no tiene un plan de entrenamiento. Crea uno desde cero para configurar el split y los ejercicios.',
+        action: { label: '+ Crear plan de entreno', onClick: 'crearPlanEntrenoVacio()' },
+        compact: true,
+      })}
     </div>`;
   }
 

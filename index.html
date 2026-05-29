@@ -2812,18 +2812,449 @@ async function loadRealClients(){
       FOOD_LIBRARY = foodRows || [];
     }
 
+    // 9d. Activación programada — info de planes futuros por cliente
+    //     Se usa solo para mostrar el badge "Cambia el 15 jun" al lado
+    //     del título de Plan de entreno / Plan nutricional.
+    let scheduledTrainByClient = {}, scheduledNutriByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const hoyStr = new Date().toISOString().slice(0,10);
+      const [tFut, nFut] = await Promise.all([
+        sb.from('training_plans')
+          .select('client_id, activation_date')
+          .in('client_id', ids)
+          .eq('is_active', false)
+          .gt('activation_date', hoyStr)
+          .order('activation_date', { ascending: true }),
+        sb.from('nutrition_plans')
+          .select('client_id, activation_date')
+          .in('client_id', ids)
+          .eq('is_active', false)
+          .gt('activation_date', hoyStr)
+          .order('activation_date', { ascending: true }),
+      ]);
+      // El primero por cliente (más cercano en el tiempo)
+      ((tFut && tFut.data) || []).forEach(r => {
+        if (!scheduledTrainByClient[r.client_id]) scheduledTrainByClient[r.client_id] = r.activation_date;
+      });
+      ((nFut && nFut.data) || []).forEach(r => {
+        if (!scheduledNutriByClient[r.client_id]) scheduledNutriByClient[r.client_id] = r.activation_date;
+      });
+    }
+
     // 10. Construir objetos cliente y reemplazar el contenido de CLIENTS
-    const built = rows.map((row, i) =>
-      buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
+    const built = rows.map((row, i) => {
+      const c = buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
                         photosByClient[row.id], nutritionByClient[row.id],
-                        trainingByClient[row.id], sessionsByClient[row.id]));
+                        trainingByClient[row.id], sessionsByClient[row.id]);
+      // Inyectar info de planes programados
+      c._scheduledTrainingDate = scheduledTrainByClient[row.id] || null;
+      c._scheduledNutritionDate = scheduledNutriByClient[row.id] || null;
+      return c;
+    });
     CLIENTS.length = 0;
     built.forEach(c => CLIENTS.push(c));
 
   } catch(e){
     console.error('loadRealClients exception:', e);
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// ACTIVACIÓN PROGRAMADA — Sub-bloque 3.2
+// Versionado completo: clonar plan, editar borrador, activar/descartar.
+// ════════════════════════════════════════════════════════════
+
+// Recarga el plan de entreno de UN cliente (entrar/salir del borrador,
+// tras crear/descartar uno). Reemplaza c._training en memoria.
+// Si planId está definido, carga esa fila concreta; si no, la `is_active=true`.
+async function recargarTrainingDeCliente(c, planId){
+  if (!c) return false;
+  let q = sb.from('training_plans').select('*').eq('client_id', c.id);
+  if (planId) q = q.eq('id', planId);
+  else        q = q.eq('is_active', true);
+  const { data: plan, error: e1 } = await q.maybeSingle();
+  if (e1){ console.error('recargarTraining plan error:', e1); return false; }
+  if (!plan){ c._training = null; return true; }
+
+  // Cargar ejercicios de ese plan (filtrados por training_plan_id si existe esa col,
+  // si no, todos los client_plans activos del cliente).
+  let cpQ = sb.from('client_plans').select('*').eq('client_id', c.id).eq('is_active', true);
+  // Si client_plans tiene la columna training_plan_id, filtramos por ella.
+  // (Si la columna no existe, este filtro adicional dará error y el catch lo manejará.)
+  try {
+    const test = await sb.from('client_plans').select('training_plan_id').eq('client_id', c.id).limit(1);
+    if (test && !test.error){
+      cpQ = cpQ.eq('training_plan_id', plan.id);
+    }
+  } catch(_){}
+  const { data: cplans } = await cpQ.order('exercise_order', { ascending:true });
+  const cplanList = cplans || [];
+
+  // Resolver nombres/defaults desde tabla exercises
+  let exById = {};
+  const exIds = [...new Set(cplanList.map(cp => cp.exercise_id).filter(Boolean))];
+  if (exIds.length){
+    const { data: exRows } = await sb.from('exercises')
+      .select('id, name, muscle_group, video_url, default_sets, default_reps, default_rest_sec, default_approx')
+      .in('id', exIds);
+    (exRows || []).forEach(e => { exById[e.id] = e; });
+  }
+  const exercises = cplanList.map(cp => {
+    const ex = exById[cp.exercise_id] || {};
+    return {
+      id: cp.id,
+      session_type: cp.session_type,
+      exercise_order: cp.exercise_order,
+      sets: cp.sets != null ? cp.sets : (ex.default_sets ?? null),
+      reps: (cp.reps != null && cp.reps !== '') ? cp.reps : (ex.default_reps ?? null),
+      rest_sec: cp.rest_sec != null ? cp.rest_sec : (ex.default_rest_sec ?? null),
+      approx: cp.approx != null ? cp.approx : (ex.default_approx ?? null),
+      name: ex.name || 'Ejercicio',
+      muscle_group: ex.muscle_group || null,
+      video_url: ex.video_url || null,
+    };
+  });
+  c._training = { plan, split: plan.split || [], exercises };
+  return true;
+}
+
+// Recarga el plan de nutrición de UN cliente.
+async function recargarNutricionDeCliente(c, planId){
+  if (!c) return false;
+  let q = sb.from('nutrition_plans').select('*').eq('client_id', c.id);
+  if (planId) q = q.eq('id', planId);
+  else        q = q.eq('is_active', true);
+  const { data: plan, error: e1 } = await q.maybeSingle();
+  if (e1){ console.error('recargarNutricion plan error:', e1); return false; }
+  if (!plan){ c._nutrition = null; return true; }
+
+  const { data: opts } = await sb.from('nutrition_options')
+    .select('*')
+    .eq('nutrition_plan_id', plan.id)
+    .order('option_number', { ascending:true });
+  c._nutrition = { plan, options: opts || [] };
+  return true;
+}
+
+// Recarga info de planes programados de UN cliente (para refrescar badge).
+async function recargarScheduledDates(c){
+  if (!c) return;
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const [tFut, nFut] = await Promise.all([
+    sb.from('training_plans')
+      .select('activation_date')
+      .eq('client_id', c.id)
+      .eq('is_active', false)
+      .gt('activation_date', hoyStr)
+      .order('activation_date', { ascending: true })
+      .limit(1).maybeSingle(),
+    sb.from('nutrition_plans')
+      .select('activation_date')
+      .eq('client_id', c.id)
+      .eq('is_active', false)
+      .gt('activation_date', hoyStr)
+      .order('activation_date', { ascending: true })
+      .limit(1).maybeSingle(),
+  ]);
+  c._scheduledTrainingDate = (tFut && tFut.data) ? tFut.data.activation_date : null;
+  c._scheduledNutritionDate = (nFut && nFut.data) ? nFut.data.activation_date : null;
+}
+
+// ── Clonado de plan de entreno ──
+// Crea una fila nueva en training_plans copiando todos los campos del plan vigente
+// + clona todos los client_plans activos. Devuelve {plan, exercises} o null si falla.
+async function crearBorradorEntreno(c, fechaActivacion){
+  if (!c || !c._training || !c._training.plan){
+    showToast('Este cliente no tiene plan de entreno actual');
+    return null;
+  }
+  const orig = c._training.plan;
+  // Copiar todos los campos salvo id, created_at, archived_at. Sobreescribir is_active+activation_date.
+  const datosPlan = Object.assign({}, orig);
+  delete datosPlan.id;
+  delete datosPlan.created_at;
+  delete datosPlan.archived_at;
+  delete datosPlan.updated_at;
+  datosPlan.is_active = false;
+  datosPlan.activation_date = fechaActivacion;
+  const { data: nuevoPlan, error: e1 } = await sb
+    .from('training_plans')
+    .insert(datosPlan).select().single();
+  if (e1 || !nuevoPlan){
+    console.error('crearBorradorEntreno plan error:', e1);
+    showToast('No se pudo crear el borrador');
+    return null;
+  }
+
+  // Clonar client_plans activos del plan actual
+  const { data: cplanActuales } = await sb.from('client_plans')
+    .select('*').eq('client_id', c.id).eq('is_active', true);
+  const filasClonar = (cplanActuales || []).map(cp => {
+    const fila = Object.assign({}, cp);
+    delete fila.id;
+    delete fila.created_at;
+    // Si la columna training_plan_id existe, apuntar al nuevo plan
+    if ('training_plan_id' in fila) fila.training_plan_id = nuevoPlan.id;
+    return fila;
+  });
+  if (filasClonar.length){
+    const { error: e2 } = await sb.from('client_plans').insert(filasClonar);
+    if (e2){
+      console.error('crearBorradorEntreno cplans error:', e2);
+      // Limpiar el plan que acabamos de crear
+      await sb.from('training_plans').delete().eq('id', nuevoPlan.id);
+      showToast('No se pudo clonar los ejercicios');
+      return null;
+    }
+  }
+  return nuevoPlan;
+}
+
+// ── Clonado de plan nutricional ──
+async function crearBorradorDieta(c, fechaActivacion){
+  if (!c || !c._nutrition || !c._nutrition.plan){
+    showToast('Este cliente no tiene plan nutricional actual');
+    return null;
+  }
+  const orig = c._nutrition.plan;
+  const datosPlan = Object.assign({}, orig);
+  delete datosPlan.id;
+  delete datosPlan.created_at;
+  delete datosPlan.archived_at;
+  delete datosPlan.updated_at;
+  datosPlan.is_active = false;
+  datosPlan.activation_date = fechaActivacion;
+  const { data: nuevoPlan, error: e1 } = await sb
+    .from('nutrition_plans')
+    .insert(datosPlan).select().single();
+  if (e1 || !nuevoPlan){
+    console.error('crearBorradorDieta plan error:', e1);
+    showToast('No se pudo crear el borrador');
+    return null;
+  }
+  // Clonar nutrition_options
+  const { data: optsActuales } = await sb.from('nutrition_options')
+    .select('*').eq('nutrition_plan_id', orig.id);
+  const filasOpts = (optsActuales || []).map(op => {
+    const fila = Object.assign({}, op);
+    delete fila.id;
+    delete fila.created_at;
+    fila.nutrition_plan_id = nuevoPlan.id;
+    return fila;
+  });
+  if (filasOpts.length){
+    const { error: e2 } = await sb.from('nutrition_options').insert(filasOpts);
+    if (e2){
+      console.error('crearBorradorDieta opts error:', e2);
+      await sb.from('nutrition_plans').delete().eq('id', nuevoPlan.id);
+      showToast('No se pudo clonar las opciones de dieta');
+      return null;
+    }
+  }
+  return nuevoPlan;
+}
+
+// Entra al modo borrador del cliente actual (carga el plan-borrador en memoria).
+// kind='train' | 'diet'
+async function entrarModoBorrador(kind, planId){
+  const c = currentClient;
+  if (!c) return;
+  if (kind === 'train'){
+    await recargarTrainingDeCliente(c, planId);
+    editandoBorradorPlan = { kind:'train', planId };
+  } else if (kind === 'diet'){
+    await recargarNutricionDeCliente(c, planId);
+    editandoBorradorPlan = { kind:'diet', planId };
+  }
+  renderClientPanel();
+}
+
+// Sale del modo borrador y vuelve a cargar el plan vigente (is_active=true).
+async function salirModoBorrador(){
+  const c = currentClient;
+  if (!c || !editandoBorradorPlan) return;
+  if (editandoBorradorPlan.kind === 'train'){
+    await recargarTrainingDeCliente(c, null);
+  } else if (editandoBorradorPlan.kind === 'diet'){
+    await recargarNutricionDeCliente(c, null);
+  }
+  editandoBorradorPlan = null;
+  await recargarScheduledDates(c);
+  renderClientPanel();
+}
+
+// Descarta el borrador actual (borra la fila de BD y sus hijas).
+async function descartarBorradorActual(){
+  const c = currentClient;
+  if (!c || !editandoBorradorPlan) return;
+  const ok = await confirmDestructive({
+    title: 'Descartar borrador',
+    message: 'Vas a borrar el borrador. Los cambios que hiciste en él se perderán definitivamente. El plan vigente del cliente no se ve afectado.',
+    confirmText: 'Descartar', icon: 'trash', danger: true,
+  });
+  if (!ok) return;
+
+  const borradorId = editandoBorradorPlan.planId;
+  if (editandoBorradorPlan.kind === 'train'){
+    // Borrar client_plans de ese borrador (si tienen training_plan_id) y luego el plan
+    // Si no existe training_plan_id, no borramos los client_plans porque se confundirían con los del activo.
+    try {
+      const test = await sb.from('client_plans').select('training_plan_id').limit(1);
+      if (test && !test.error){
+        await sb.from('client_plans').delete().eq('training_plan_id', borradorId);
+      }
+    } catch(_){}
+    await sb.from('training_plans').delete().eq('id', borradorId);
+  } else {
+    // Dieta: borrar nutrition_options y luego el plan
+    await sb.from('nutrition_options').delete().eq('nutrition_plan_id', borradorId);
+    await sb.from('nutrition_plans').delete().eq('id', borradorId);
+  }
+  showToast('Borrador descartado');
+  await salirModoBorrador();
+}
+
+// Abre el modal de fecha y al confirmar crea borrador + entra en modo borrador.
+function abrirModalProgramarCambio(kind){
+  const c = currentClient;
+  if (!c) return;
+
+  // Validar precondiciones
+  if (kind === 'train' && (!c._training || !c._training.plan)){
+    showToast('Este cliente no tiene plan de entreno todavía');
+    return;
+  }
+  if (kind === 'diet' && (!c._nutrition || !c._nutrition.plan)){
+    showToast('Este cliente no tiene plan nutricional todavía');
+    return;
+  }
+
+  // Fecha mínima = mañana
+  const manana = new Date(); manana.setDate(manana.getDate() + 1);
+  const minStr = manana.toISOString().slice(0,10);
+
+  const titulo = kind === 'global' ? 'Programar activación global'
+               : kind === 'train'  ? 'Programar nuevo plan de entreno'
+               :                     'Programar nuevo plan nutricional';
+  const descripcion = kind === 'global'
+    ? 'Se creará un borrador del plan de entreno <strong>y</strong> del plan nutricional. Editarás cada uno por separado y ambos se activarán automáticamente en la fecha que elijas.'
+    : 'Se creará un borrador del plan actual con todos sus ejercicios/opciones. Lo editarás como un plan normal y se activará automáticamente en la fecha que elijas.';
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'DM Sans\',sans-serif;';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.18);width:100%;max-width:420px;overflow:hidden;">' +
+      '<div style="padding:22px 22px 6px;">' +
+        '<div style="width:44px;height:44px;border-radius:12px;background:#fffbeb;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;margin-bottom:14px;">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+        '</div>' +
+        '<div style="font-family:\'DM Serif Display\',serif;font-size:20px;color:#111;letter-spacing:-.3px;margin-bottom:6px;">' + titulo + '</div>' +
+        '<div style="font-size:12.5px;color:#888;line-height:1.6;margin-bottom:14px;">' + descripcion + '</div>' +
+        '<div style="font-size:11px;color:#bbb;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px;">Activación</div>' +
+        '<input id="pc-date" type="date" min="' + minStr + '" value="' + minStr + '" style="width:100%;height:38px;padding:0 12px;border:1.5px solid #eaeae6;border-radius:10px;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' +
+      '</div>' +
+      '<div style="padding:14px 22px 22px;display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="pc-cancel" style="height:38px;padding:0 18px;border-radius:10px;border:1.5px solid #eaeae6;background:#fff;color:#666;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Cancelar</button>' +
+        '<button id="pc-ok" style="height:38px;padding:0 18px;border-radius:10px;border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Crear borrador</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const inp = document.getElementById('pc-date');
+  inp.focus();
+  const close = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  document.getElementById('pc-cancel').onclick = close;
+  document.addEventListener('keydown', function escHandler(e){
+    if (e.key === 'Escape'){ close(); document.removeEventListener('keydown', escHandler); }
+  });
+
+  document.getElementById('pc-ok').onclick = async () => {
+    const fecha = inp.value;
+    if (!fecha || fecha < minStr){
+      showToast('Elige una fecha futura');
+      return;
+    }
+    const btn = document.getElementById('pc-ok');
+    btn.disabled = true; btn.style.opacity = '.6'; btn.textContent = 'Creando...';
+    overlay.remove();
+
+    const c = currentClient;
+    if (kind === 'global'){
+      // Crear ambos borradores. Si alguno falla, dejamos lo que se haya creado y avisamos.
+      let creadoTrain = null, creadoDieta = null;
+      if (c._training && c._training.plan)  creadoTrain = await crearBorradorEntreno(c, fecha);
+      if (c._nutrition && c._nutrition.plan) creadoDieta = await crearBorradorDieta(c, fecha);
+      await recargarScheduledDates(c);
+      // Entrar al modo borrador de entreno por defecto si se creó
+      if (creadoTrain){
+        await entrarModoBorrador('train', creadoTrain.id);
+      } else if (creadoDieta){
+        await entrarModoBorrador('diet', creadoDieta.id);
+      } else {
+        renderClientPanel();
+      }
+      const msg = (creadoTrain && creadoDieta) ? 'Borradores creados ✓'
+                 : (creadoTrain || creadoDieta) ? 'Borrador parcial creado'
+                 : 'No se pudo crear borrador';
+      showToast(msg);
+    } else if (kind === 'train'){
+      const nuevo = await crearBorradorEntreno(c, fecha);
+      if (nuevo){
+        await recargarScheduledDates(c);
+        await entrarModoBorrador('train', nuevo.id);
+        showToast('Borrador de entreno creado ✓');
+      }
+    } else if (kind === 'diet'){
+      const nuevo = await crearBorradorDieta(c, fecha);
+      if (nuevo){
+        await recargarScheduledDates(c);
+        await entrarModoBorrador('diet', nuevo.id);
+        showToast('Borrador de dieta creado ✓');
+      }
+    }
+  };
+}
+
+// Encuentra el plan futuro programado (is_active=false, activation_date>hoy)
+// más cercano y entra en modo borrador con él.
+async function entrarBorradorExistente(kind){
+  const c = currentClient;
+  if (!c) return;
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const tabla = kind === 'train' ? 'training_plans' : 'nutrition_plans';
+  const { data: borrador } = await sb.from(tabla)
+    .select('id')
+    .eq('client_id', c.id)
+    .eq('is_active', false)
+    .gt('activation_date', hoyStr)
+    .order('activation_date', { ascending: true })
+    .limit(1).maybeSingle();
+  if (!borrador){
+    showToast('No hay borrador programado');
+    return;
+  }
+  await entrarModoBorrador(kind, borrador.id);
+}
+
+// HTML de la banda amarilla "Editando versión futura" — sticky arriba del panel
+function bandaModoBorradorHtml(c){
+  if (!editandoBorradorPlan) return '';
+  const fecha = editandoBorradorPlan.kind === 'train'
+    ? (c._training && c._training.plan && c._training.plan.activation_date)
+    : (c._nutrition && c._nutrition.plan && c._nutrition.plan.activation_date);
+  const tipoTxt = editandoBorradorPlan.kind === 'train' ? 'plan de entreno' : 'plan nutricional';
+  return `<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="width:28px;height:28px;border-radius:8px;background:#fef3c7;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+    </div>
+    <div style="flex:1;font-size:12px;line-height:1.4;color:#92400e">
+      Editando <strong>borrador</strong> del ${tipoTxt} · entra en vigor el <strong>${formatearFechaCorta(fecha)}</strong>
+    </div>
+    <button onclick="salirModoBorrador()" style="height:28px;padding:0 12px;border:1.5px solid #fde68a;border-radius:8px;background:#fff;color:#92400e;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">← Volver al vigente</button>
+    <button onclick="descartarBorradorActual()" title="Borrar este borrador" style="height:28px;padding:0 10px;border:none;border-radius:8px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">🗑 Descartar</button>
+  </div>`;
 }
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
@@ -3533,6 +3964,7 @@ function selectClient(id) {
   editNutriOpcion = 0;
   editSesionEntreno = 0;
   splitDayActivo = null;
+  editandoBorradorPlan = null;
   editandoObjetivos = false;
   editandoEjercicioId = null;
   editandoComida = null;
@@ -8337,9 +8769,27 @@ function seccionPlanNutricional(c){
       <div style="display:flex;gap:9px;align-items:flex-start">${comidasHtml}</div>`;
   }
 
+  // Badge "Cambia el [fecha]" si hay plan nutricional futuro programado
+  const schedNutriBadge = c._scheduledNutritionDate
+    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan nutricional programado">📅 Cambia el ${formatearFechaCorta(c._scheduledNutritionDate)}</span>`
+    : '';
+
   return `<div style="${cardStyle};margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="${secTitle}">🥗 Plan nutricional</div>
+      <div style="display:flex;align-items:center;gap:9px">
+        <div style="${secTitle}">🥗 Plan nutricional</div>
+        ${(!editandoBorradorPlan && !c._scheduledNutritionDate)
+          ? `<button onclick="abrirModalProgramarCambio('diet')" title="Crear un borrador del plan que se activará en una fecha futura" style="
+              height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 Programar cambio</button>`
+          : ''}
+        ${(!editandoBorradorPlan && c._scheduledNutritionDate)
+          ? `<button onclick="entrarBorradorExistente('diet')" title="Editar el borrador programado" style="
+              height:26px;padding:0 11px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
+              background:#fffbeb;color:#92400e;font-size:11px;font-weight:700">✏️ Editar borrador</button>`
+          : ''}
+        ${schedNutriBadge}
+      </div>
       <span style="font-size:10px;color:var(--text3)">${opciones.length} ${opciones.length===1?'opción':'opciones'} de dieta</span>
     </div>
     ${objetivosHtml}
@@ -8741,6 +9191,10 @@ let creandoAlimento = false;             // formulario de nuevo alimento abierto
 let editandoAlimentoId = null;           // id del alimento que se está editando
 // Bloque 6E — modo edición del split
 let editandoSplit = false;
+// Activación programada (Tarea 3) — id de la fila clonada que se está editando
+// como borrador para activación futura. null = se está editando el plan vigente.
+// La lógica de redirección de updates a esta fila va en Sub-bloque 3.2.
+let editandoBorradorPlan = null;
 // Split variable + Mesociclo
 let mostrandoMesociclo = false;          // panel del mesociclo abierto
 let splitBorrador = null;   // copia de trabajo del split mientras se edita
@@ -9057,6 +9511,11 @@ function seccionPlanEntreno(c){
       ${selectorEjercicioHtml(tipoSel)}`;
   }
 
+  // Badge "Cambia el [fecha]" si hay plan futuro programado
+  const schedTrainBadge = c._scheduledTrainingDate
+    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan de entreno programado">📅 Cambia el ${formatearFechaCorta(c._scheduledTrainingDate)}</span>`
+    : '';
+
   return `<div style="${cardStyle}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:9px">
@@ -9064,6 +9523,17 @@ function seccionPlanEntreno(c){
         <button onclick="abrirMesociclo()" style="
           height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 ${etiquetaBotonMeso(c)}</button>
+        ${(!editandoBorradorPlan && !c._scheduledTrainingDate)
+          ? `<button onclick="abrirModalProgramarCambio('train')" title="Crear un borrador del plan que se activará en una fecha futura" style="
+              height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 Programar cambio</button>`
+          : ''}
+        ${(!editandoBorradorPlan && c._scheduledTrainingDate)
+          ? `<button onclick="entrarBorradorExistente('train')" title="Editar el borrador programado" style="
+              height:26px;padding:0 11px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
+              background:#fffbeb;color:#92400e;font-size:11px;font-weight:700">✏️ Editar borrador</button>`
+          : ''}
+        ${schedTrainBadge}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
@@ -9948,6 +10418,20 @@ async function guardarSplit(){
 function renderEditar() {
   const c = currentClient;
 
+  // Banda amarilla si estamos en modo borrador
+  const bandaBorrador = bandaModoBorradorHtml(c);
+
+  // Botón "Programar activación global" (solo si NO estamos en borrador y hay al menos un plan)
+  const tieneAlgo = (c._training && c._training.plan) || (c._nutrition && c._nutrition.plan);
+  const yaProgramado = !!(c._scheduledTrainingDate || c._scheduledNutritionDate);
+  const barraGlobal = (!editandoBorradorPlan && tieneAlgo && !yaProgramado)
+    ? `<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px">
+        <button onclick="abrirModalProgramarCambio('global')" title="Crear borradores de entreno y dieta a la vez con la misma fecha de activación" style="
+          height:30px;padding:0 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:600">📅 Programar activación global</button>
+      </div>`
+    : '';
+
   // ── Notas de revisión (se mantienen con su lógica demo; se conectarán
   //    a Supabase en un bloque posterior) ──
   const notasHtml = `
@@ -9978,6 +10462,8 @@ function renderEditar() {
     </div>`;
 
   return `
+    ${bandaBorrador}
+    ${barraGlobal}
     ${notasHtml}
     ${seccionPlanNutricional(c)}
     ${seccionPlanEntreno(c)}`;

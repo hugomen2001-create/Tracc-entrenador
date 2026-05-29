@@ -11442,60 +11442,6 @@ function renderChart() {
 // ── INIT ──────────────────────────────────────────────────────────────────
 loadStorage();
 
-// Seed Hugo demo diet if not in localStorage
-// Seed Hugo's training split if not in localStorage
-const _hugoTs = getTrainState(1);
-// Force reset Hugo's split if version doesn't match (ensures correct split always loads)
-const _hugoDs = getDietState(1);
-if (!_hugoDs.opciones) {
-  _hugoDs.params = {kcal:1960,ch:245,g:40,p:155,preferencias:'boniato, pollo, arroz blanco, merluza, gnocchi de patata',restricciones:''};
-  _hugoDs.asignacion = {L:0,M:1,X:2,J:3,V:1,S:3,D:4};
-  _hugoDs.opciones = [
-    {nombre:'Alta en hidratos',macros:{kcal:1980,ch:248,g:38,p:152},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Pan de centeno',cantidad:'80g',kcal:180},{nombre:'Lomo embuchado',cantidad:'90g',kcal:140},{nombre:'AOVE',cantidad:'5ml',kcal:45}]},
-      {nombre:'Comida 2',items:[{nombre:'Solomillo de pavo',cantidad:'170g',kcal:190},{nombre:'Arroz blanco cocido',cantidad:'80g',kcal:285},{nombre:'Verdura variada',cantidad:'200g',kcal:55}]},
-      {nombre:'Comida 3',items:[{nombre:'Tortas de arroz',cantidad:'40g',kcal:152},{nombre:'Embutido de pavo',cantidad:'100g',kcal:120},{nombre:'Aguacate',cantidad:'50g',kcal:80}]},
-      {nombre:'Comida 4',items:[{nombre:'Contramuslo de pollo',cantidad:'150g',kcal:200},{nombre:'Boniato cocido',cantidad:'200g',kcal:160},{nombre:'Verdura variada',cantidad:'200g',kcal:55}]},
-    ]},
-    {nombre:'Mediterránea',macros:{kcal:1960,ch:240,g:42,p:155},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Pan integral',cantidad:'80g',kcal:200},{nombre:'Jamón serrano / ibérico',cantidad:'70g',kcal:140}]},
-      {nombre:'Comida 2',items:[{nombre:'Arroz / Legumbres cocido',cantidad:'250g',kcal:290},{nombre:'Pechuga de pollo',cantidad:'150g',kcal:170},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
-      {nombre:'Comida 3',items:[{nombre:'Avena',cantidad:'60g',kcal:220},{nombre:'Proteína whey / caseína',cantidad:'20g',kcal:78}]},
-      {nombre:'Comida 4',items:[{nombre:'Ternera / Salmón',cantidad:'150g',kcal:230},{nombre:'Patata / Boniato',cantidad:'200g',kcal:160},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
-    ]},
-    {nombre:'Tortilla y huevos',macros:{kcal:1950,ch:235,g:44,p:158},comidas:[
-      {nombre:'Comida 1 (tortilla)',items:[{nombre:'Pan',cantidad:'100g',kcal:250},{nombre:'Huevos',cantidad:'3 ud',kcal:210},{nombre:'Claras de huevo',cantidad:'100ml',kcal:52}]},
-      {nombre:'Comida 2',items:[{nombre:'Pechuga de pavo / pollo',cantidad:'250g',kcal:280},{nombre:'Pasta / Arroz redondo seco',cantidad:'40g',kcal:145},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
-      {nombre:'Comida 3',items:[{nombre:'Contramuslo de pollo',cantidad:'200g',kcal:265},{nombre:'Patata / Boniato',cantidad:'200g',kcal:160},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
-      {nombre:'Precama',items:[{nombre:'Caseína',cantidad:'25g',kcal:95}]},
-    ]},
-    {nombre:'Sin gluten ligera',macros:{kcal:1900,ch:228,g:40,p:150},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Arroz inflado',cantidad:'60g',kcal:215},{nombre:'Pechuga de pavo',cantidad:'100g',kcal:110},{nombre:'Aceite de oliva',cantidad:'5ml',kcal:45}]},
-      {nombre:'Comida 2',items:[{nombre:'Patata cocida',cantidad:'250g',kcal:195},{nombre:'Merluza al vapor',cantidad:'200g',kcal:160},{nombre:'Ensalada verde',cantidad:'150g',kcal:30}]},
-      {nombre:'Comida 3',items:[{nombre:'Plátano',cantidad:'1 ud',kcal:90},{nombre:'Almendras',cantidad:'30g',kcal:175}]},
-      {nombre:'Comida 4',items:[{nombre:'Pollo asado',cantidad:'180g',kcal:200},{nombre:'Boniato',cantidad:'200g',kcal:160},{nombre:'Brócoli',cantidad:'150g',kcal:45}]},
-    ]},
-    {nombre:'Alta en proteína',macros:{kcal:2010,ch:220,g:42,p:175},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Claras de huevo',cantidad:'200ml',kcal:105},{nombre:'Avena',cantidad:'60g',kcal:220},{nombre:'Frutos rojos',cantidad:'100g',kcal:40}]},
-      {nombre:'Comida 2',items:[{nombre:'Pechuga de pollo',cantidad:'250g',kcal:280},{nombre:'Arroz basmati cocido',cantidad:'80g',kcal:285},{nombre:'Verdura asada',cantidad:'200g',kcal:55}]},
-      {nombre:'Comida 3',items:[{nombre:'Atún al natural',cantidad:'2 latas',kcal:140},{nombre:'Pan de centeno',cantidad:'60g',kcal:135}]},
-      {nombre:'Comida 4',items:[{nombre:'Salmón',cantidad:'200g',kcal:290},{nombre:'Gnocchi de patata',cantidad:'150g',kcal:195},{nombre:'Espinacas',cantidad:'100g',kcal:25}]},
-    ]},
-    {nombre:'Día de carga',macros:{kcal:2200,ch:280,g:38,p:155},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Avena',cantidad:'80g',kcal:295},{nombre:'Leche semi',cantidad:'200ml',kcal:92},{nombre:'Plátano',cantidad:'1 ud',kcal:90}]},
-      {nombre:'Comida 2',items:[{nombre:'Arroz blanco seco',cantidad:'120g',kcal:430},{nombre:'Pechuga de pollo',cantidad:'200g',kcal:220},{nombre:'Aceite oliva',cantidad:'5ml',kcal:45}]},
-      {nombre:'Comida 3',items:[{nombre:'Pan integral',cantidad:'60g',kcal:150},{nombre:'Pavo en lonchas',cantidad:'80g',kcal:90},{nombre:'Plátano',cantidad:'1 ud',kcal:90}]},
-      {nombre:'Comida 4',items:[{nombre:'Pasta integral seca',cantidad:'80g',kcal:285},{nombre:'Ternera magra',cantidad:'150g',kcal:195},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
-    ]},
-    {nombre:'Descanso / ligera',macros:{kcal:1750,ch:200,g:42,p:155},comidas:[
-      {nombre:'Comida 1',items:[{nombre:'Yogur griego 0%',cantidad:'200g',kcal:120},{nombre:'Frutos rojos',cantidad:'150g',kcal:60},{nombre:'Nueces',cantidad:'20g',kcal:130}]},
-      {nombre:'Comida 2',items:[{nombre:'Ensalada completa',cantidad:'300g',kcal:100},{nombre:'Atún al natural',cantidad:'160g',kcal:170},{nombre:'Pan de centeno',cantidad:'60g',kcal:135}]},
-      {nombre:'Comida 3',items:[{nombre:'Manzana',cantidad:'1 ud',kcal:75},{nombre:'Almendras',cantidad:'25g',kcal:145}]},
-      {nombre:'Comida 4',items:[{nombre:'Merluza al horno',cantidad:'200g',kcal:160},{nombre:'Boniato',cantidad:'150g',kcal:120},{nombre:'Espárragos',cantidad:'150g',kcal:35}]},
-    ]},
-  ];
-  saveStorage();
-}
 
 renderSidebar();
 // Color status filter buttons

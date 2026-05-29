@@ -3655,10 +3655,6 @@ function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function refreshContent() {
-  renderClientPanel();
-}
-
 // ── DIET ITEM HELPERS ─────────────────────────────────────────────────────
 function switchOpcionTab(i) {
   currentOpcionTab = i;
@@ -3825,43 +3821,6 @@ function rejectRequest(reqId) {
 }
 
 // ── REVISION ──────────────────────────────────────────────────────────────
-function getRevisionStatus(c) {
-  if (!c.ultimaRevision) return null;
-  const today    = new Date(); today.setHours(0,0,0,0);
-  const ultima   = new Date(c.ultimaRevision); ultima.setHours(0,0,0,0);
-  const cadDias  = (c.revisionCadaSemanas||2)*7;
-  const proxima  = new Date(ultima); proxima.setDate(ultima.getDate()+cadDias);
-  const jsDay    = today.getDay();
-  const mondayT  = new Date(today); mondayT.setDate(today.getDate()-(jsDay===0?6:jsDay-1));
-  const sundayT  = new Date(mondayT); sundayT.setDate(mondayT.getDate()+6);
-  const mondayN  = new Date(mondayT); mondayN.setDate(mondayT.getDate()+7);
-  const sundayN  = new Date(mondayN); sundayN.setDate(mondayN.getDate()+6);
-  const diffDays = Math.round((proxima-today)/86400000);
-  const proxFmt  = proxima.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
-  const marcadaEsta = ultima>=mondayT&&ultima<=today;
-  if (marcadaEsta)
-    return {label:'Revisión pasada esta semana',sub:'Próxima: '+proxFmt,cls:'rev-green',canMark:false};
-  if (proxima>=mondayT&&proxima<=sundayT)
-    return {label:'Revisión esta semana',sub:'Fecha: '+proxFmt,cls:'rev-amber',canMark:true};
-  if (proxima>=mondayN&&proxima<=sundayN)
-    return {label:'Revisión semana que viene',sub:'Fecha: '+proxFmt,cls:'rev-blue',canMark:false};
-  if (diffDays>7) {
-    const sems=Math.ceil(diffDays/7);
-    return {label:'Revisión en '+sems+' semana'+(sems>1?'s':''),sub:'Fecha: '+proxFmt,cls:'rev-blue',canMark:false};
-  }
-  if (diffDays<0)
-    return {label:'Revisión pendiente',sub:'Desde hace '+Math.abs(diffDays)+' días',cls:'rev-red',canMark:true};
-  return {label:'Revisión esta semana',sub:'Fecha: '+proxFmt,cls:'rev-amber',canMark:true};
-}
-
-function marcarRevision(clientId) {
-  const c = CLIENTS.find(x=>x.id===clientId);
-  if (!c) return;
-  c.ultimaRevision = new Date().toISOString().split('T')[0];
-  showToast('✓ Revisión marcada para '+c.name);
-  renderClientPanel();
-}
-
 // ── SIDEBAR FILTER & SORT ─────────────────────────────────────────────────
 let activeFilter = 'all';
 

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- saved from url=(0070)file:///C:/Users/HugoMengual/Downloads/Tracc___Panel_Entrenador_1.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3477,8 +3478,60 @@ function getWeekSchedule(ts, fromDate) {
 }
 
 // ── PENDING REQUESTS (demo) ───────────────────────────────────────────────
-// Solicitudes pendientes: se cargan desde Supabase (sin mocks)
-const PENDING_REQUESTS = [];
+const PENDING_REQUESTS = [
+  {
+    id: 'req1',
+    name: 'Carlos Mendez',
+    initials: 'CM',
+    edad: 29,
+    altura: 181,
+    peso: 82.5,
+    objetivo: 'Pérdida de grasa',
+    fecha: 'Hoy, 09:14',
+    nota: 'Me lo ha recomendado Jordi. Quiero definir para el verano.',
+    cuestionario: {
+      expGym: '1 año y medio, autodidacta',
+      diasSemana: '4 días',
+      horario: 'Tardes después del trabajo',
+      lesiones: 'Ninguna',
+      exNoGusta: 'Ninguno en particular',
+      alimentosGusta: 'Arroz, pollo, pasta, fruta',
+      alimentosNoGusta: 'Pescado azul',
+      alergias: 'Ninguna',
+      suplementos: 'Proteína whey',
+      trabajo: 'Comercial, mucho tiempo de pie',
+      sueno: '7 horas aprox',
+      deportes: 'Pádel los fines de semana',
+      notas: 'Tengo bastante grasa en abdomen. Quiero perder antes del verano.',
+    },
+  },
+  {
+    id: 'req2',
+    name: 'Elena Torres',
+    initials: 'ET',
+    edad: 25,
+    altura: 163,
+    peso: 57.2,
+    objetivo: 'Tonificación',
+    fecha: 'Ayer, 18:42',
+    nota: 'Nunca he ido al gym. Empezar desde cero, 3 días a la semana máximo.',
+    cuestionario: {
+      expGym: 'Sin experiencia previa',
+      diasSemana: '3 días máximo',
+      horario: 'Mediodía o tardes',
+      lesiones: 'Dolor lumbar leve ocasional',
+      exNoGusta: 'No lo sé aún',
+      alimentosGusta: 'Verduras, legumbres, pollo',
+      alimentosNoGusta: 'Carne roja',
+      alergias: 'Intolerante a la lactosa',
+      suplementos: 'Ninguna',
+      trabajo: 'Profesora, de pie bastantes horas',
+      sueno: '8 horas',
+      deportes: 'Yoga una vez por semana',
+      notas: 'Quiero tonificarme. No busco volumen, solo estar más fuerte y activa.',
+    },
+  },
+];
 let pendingRequests = [...PENDING_REQUESTS];
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────
@@ -3519,6 +3572,10 @@ function renderSidebar() {
   renderMiniSidebar();
 }
 
+// ── HUGO FULL HISTORY (8 weeks) ──────────────────────────────────────────
+const HUGO_METRICS_HISTORY    = {"-7": {"L": {"steps": 8418, "sleep": 7.6, "weight": 76.3}, "M": {"steps": 11520, "sleep": 6.7, "weight": 76.2}, "X": {"steps": 8682, "sleep": 8.4, "weight": 76.5}, "J": {"steps": 8326, "sleep": 7.8, "weight": 76.2}, "V": {"steps": 10044, "sleep": 7.5, "weight": 76.2}, "S": {"steps": 12586, "sleep": 7.8, "weight": 76.3}, "D": {"steps": 7542, "sleep": 8.1, "weight": 76.5}}, "-6": {"L": {"steps": 5969, "sleep": 8.3, "weight": 76.5}, "M": {"steps": 9450, "sleep": 7.8, "weight": 76.1}, "X": {"steps": 8016, "sleep": 8.4, "weight": 76.4}, "J": {"steps": 11372, "sleep": 7.7, "weight": 76.4}, "V": {"steps": 10032, "sleep": 6.9, "weight": 76.4}, "S": {"steps": 8885, "sleep": 7.1, "weight": 76.1}, "D": {"steps": 6927, "sleep": 7.3, "weight": 76.4}}, "-5": {"L": {"steps": 6885, "sleep": 7.5, "weight": 76.4}, "M": {"steps": 9864, "sleep": 6.8, "weight": 76.4}, "X": {"steps": 6632, "sleep": 7.5, "weight": 76.4}, "J": {"steps": 10286, "sleep": 7.0, "weight": 76.3}, "V": {"steps": 13566, "sleep": 8.0, "weight": 76.3}, "S": {"steps": 8226, "sleep": 6.7, "weight": 76.5}, "D": {"steps": 5731, "sleep": 7.9, "weight": 76.5}}, "-4": {"L": {"steps": 5156, "sleep": 7.2, "weight": 76.3}, "M": {"steps": 13968, "sleep": 7.7, "weight": 76.3}, "X": {"steps": 7094, "sleep": 7.2, "weight": 76.5}, "J": {"steps": 9557, "sleep": 6.9, "weight": 76.4}, "V": {"steps": 8013, "sleep": 7.3, "weight": 76.4}, "S": {"steps": 13626, "sleep": 7.6, "weight": 76.4}, "D": {"steps": 7746, "sleep": 7.3, "weight": 76.3}}, "-3": {"L": {"steps": 8886, "sleep": 8.0, "weight": 76.2}, "M": {"steps": 10571, "sleep": 7.5, "weight": 76.1}, "X": {"steps": 8686, "sleep": 7.5, "weight": 76.2}, "J": {"steps": 11345, "sleep": 7.0, "weight": 76.4}, "V": {"steps": 12541, "sleep": 6.7, "weight": 76.3}, "S": {"steps": 11105, "sleep": 7.5, "weight": 76.5}, "D": {"steps": 7521, "sleep": 7.9, "weight": 76.3}}, "-2": {"L": {"steps": 8414, "sleep": 7.0, "weight": 76.2}, "M": {"steps": 11521, "sleep": 7.7, "weight": 76.3}, "X": {"steps": 6319, "sleep": 7.7, "weight": 76.3}, "J": {"steps": 9750, "sleep": 7.3, "weight": 76.4}, "V": {"steps": 9390, "sleep": 7.5, "weight": 76.2}, "S": {"steps": 13438, "sleep": 7.4, "weight": 76.2}, "D": {"steps": 8352, "sleep": 8.4, "weight": 76.2}}, "-1": {"L": {"steps": 6271, "sleep": 7.3, "weight": 76.2}, "M": {"steps": 8200, "sleep": 6.6, "weight": 76.5}, "X": {"steps": 7503, "sleep": 8.3, "weight": 76.1}, "J": {"steps": 11395, "sleep": 7.8, "weight": 76.3}, "V": {"steps": 13884, "sleep": 7.5, "weight": 76.3}, "S": {"steps": 9998, "sleep": 6.7, "weight": 76.4}, "D": {"steps": 8656, "sleep": 8.1, "weight": 76.4}}, "0": {"L": {"steps": 6200, "sleep": 7.5, "weight": 76.3}, "M": {"steps": 11400, "sleep": 7.0, "weight": 76.2}, "X": {"steps": 9800, "sleep": 7.5, "weight": 76.2}, "J": {"steps": 10420, "sleep": 8.0, "weight": 76.2}, "V": null, "S": null, "D": null}};
+const HUGO_TRAINING_HISTORY   = {"S1": {"TORSO": {"Press banca plano": "10x80 / 10x80 / 8x80 / 8x80", "Remo cable agarre neutro": "10x65 / 10x65 / 9x65 / 8x65", "Press inclinado mancuernas": "12x28 / 10x28 / 10x28", "Jalón polea frontal": "12x60 / 12x60 / 10x60", "Elevaciones laterales": "15x12 / 12x12 / 15x12", "Face pull": "20x20 / 15x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x45 / 10x45 / 11x45", "Extensión cuádriceps": "15x55 / 11x55 / 14x55", "Sentadilla hack": "10x80 / 10x80 / 6x80 / 10x80", "Prensa de piernas": "12x160 / 9x160 / 12x160", "Hip thrust": "12x100 / 11x100 / 9x100", "Gemelo en prensa": "15x120 / 15x120 / 14x120"}, "PUSH": {"Press banca inclinado barra": "10x70 / 6x70 / 7x70 / 9x70", "Press militar mancuernas": "12x24 / 10x24 / 10x24", "Aperturas pec deck": "15x35 / 13x35 / 13x35", "Extensión tríceps polea": "15x32.5 / 12x32.5 / 10x32.5", "Press francés": "12x30 / 8x30 / 11x30"}, "PULL": {"Jalón al pecho agarre ancho": "12x60 / 8x60 / 10x60", "Remo con barra": "10x70 / 8x70 / 10x70", "Pull-over con mancuerna": "15x24 / 12x24 / 10x24", "Curl martillo": "12x16 / 11x16 / 12x16", "Curl concentración": "15x12 / 10x12 / 13x12"}}, "S2": {"TORSO": {"Press banca plano": "10x82.5 / 8x82.5 / 10x82.5 / 9x81.2", "Remo cable agarre neutro": "10x67.5 / 10x67.5 / 10x67.5 / 9x66.2", "Press inclinado mancuernas": "12x29.2 / 12x29.2 / 10x28.5", "Jalón polea frontal": "12x62.5 / 12x62.5 / 10x61.2", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 17x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x47.5 / 11x47.5 / 10x46.2", "Extensión cuádriceps": "15x57.5 / 13x57.5 / 12x56.2", "Sentadilla hack": "10x85 / 9x85 / 8x85 / 7x82.5", "Prensa de piernas": "12x170 / 10x170 / 10x165", "Hip thrust": "12x105 / 9x105 / 10x102.5", "Gemelo en prensa": "15x120 / 12x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x72.5 / 10x72.5 / 7x72.5 / 7x71.2", "Press militar mancuernas": "12x25.2 / 11x25.2 / 11x24.5", "Aperturas pec deck": "15x37.5 / 14x37.5 / 13x36.2", "Extensión tríceps polea": "15x35 / 15x35 / 12x33.8", "Press francés": "12x32.5 / 8x32.5 / 9x31.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x62.5 / 8x62.5 / 10x61.2", "Remo con barra": "10x72.5 / 9x72.5 / 8x71.2", "Pull-over con mancuerna": "15x25.2 / 10x25.2 / 11x24.5", "Curl martillo": "12x17.2 / 12x17.2 / 10x16.5", "Curl concentración": "15x13.2 / 11x13.2 / 15x12.5"}}, "S3": {"TORSO": {"Press banca plano": "10x85 / 9x85 / 9x85 / 10x83.8", "Remo cable agarre neutro": "10x70 / 9x70 / 8x70 / 9x68.8", "Press inclinado mancuernas": "12x30.5 / 10x30.5 / 10x30", "Jalón polea frontal": "12x65 / 12x65 / 12x63.8", "Elevaciones laterales": "15x12 / 14x12 / 15x12", "Face pull": "20x20 / 19x20 / 18x20"}, "LEG": {"Curl femoral tumbado": "15x50 / 12x50 / 11x48.8", "Extensión cuádriceps": "15x60 / 11x60 / 14x58.8", "Sentadilla hack": "10x90 / 9x90 / 6x90 / 6x87.5", "Prensa de piernas": "12x180 / 8x180 / 9x175", "Hip thrust": "12x110 / 9x110 / 11x107.5", "Gemelo en prensa": "15x120 / 12x120 / 15x120"}, "PUSH": {"Press banca inclinado barra": "10x75 / 9x75 / 10x75 / 9x73.8", "Press militar mancuernas": "12x26.5 / 12x26.5 / 10x26", "Aperturas pec deck": "15x40 / 12x40 / 12x38.8", "Extensión tríceps polea": "15x37.5 / 15x37.5 / 14x36.2", "Press francés": "12x35 / 10x35 / 10x33.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x65 / 8x65 / 10x63.8", "Remo con barra": "10x75 / 9x75 / 7x73.8", "Pull-over con mancuerna": "15x26.5 / 13x26.5 / 10x26", "Curl martillo": "12x18.5 / 10x18.5 / 12x18", "Curl concentración": "15x14.5 / 11x14.5 / 14x14"}}, "S4": {"TORSO": {"Press banca plano": "10x87.5 / 8x87.5 / 10x87.5 / 9x86.2", "Remo cable agarre neutro": "10x72.5 / 10x72.5 / 10x72.5 / 10x71.2", "Press inclinado mancuernas": "12x31.8 / 10x31.8 / 10x31", "Jalón polea frontal": "12x67.5 / 11x67.5 / 10x66.2", "Elevaciones laterales": "15x12 / 12x12 / 14x12", "Face pull": "20x20 / 18x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x52.5 / 10x52.5 / 12x51.2", "Extensión cuádriceps": "15x62.5 / 12x62.5 / 11x61.2", "Sentadilla hack": "10x95 / 6x95 / 7x95 / 10x92.5", "Prensa de piernas": "12x190 / 8x190 / 8x185", "Hip thrust": "12x115 / 11x115 / 8x112.5", "Gemelo en prensa": "15x120 / 13x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x77.5 / 9x77.5 / 10x77.5 / 7x76.2", "Press militar mancuernas": "12x27.8 / 10x27.8 / 12x27", "Aperturas pec deck": "15x42.5 / 15x42.5 / 13x41.2", "Extensión tríceps polea": "15x40 / 14x40 / 15x38.8", "Press francés": "12x37.5 / 9x37.5 / 10x36.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x67.5 / 11x67.5 / 10x66.2", "Remo con barra": "10x77.5 / 9x77.5 / 10x76.2", "Pull-over con mancuerna": "15x27.8 / 13x27.8 / 10x27", "Curl martillo": "12x19.8 / 9x19.8 / 9x19", "Curl concentración": "15x15.8 / 10x15.8 / 12x15"}}, "S5": {"TORSO": {"Press banca plano": "10x90 / 8x90 / 10x90 / 10x88.8", "Remo cable agarre neutro": "10x75 / 8x75 / 10x75 / 8x73.8", "Press inclinado mancuernas": "12x33 / 10x33 / 10x32.5", "Jalón polea frontal": "12x70 / 12x70 / 12x68.8", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 15x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x55 / 12x55 / 10x53.8", "Extensión cuádriceps": "15x65 / 14x65 / 11x63.8", "Sentadilla hack": "10x100 / 8x100 / 9x100 / 7x97.5", "Prensa de piernas": "12x200 / 12x200 / 9x195", "Hip thrust": "12x120 / 12x120 / 12x117.5", "Gemelo en prensa": "15x120 / 15x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x80 / 9x80 / 9x80 / 7x78.8", "Press militar mancuernas": "12x29 / 8x29 / 8x28.5", "Aperturas pec deck": "15x45 / 15x45 / 14x43.8", "Extensión tríceps polea": "15x42.5 / 13x42.5 / 13x41.2", "Press francés": "12x40 / 11x40 / 8x38.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x70 / 8x70 / 8x68.8", "Remo con barra": "10x80 / 9x80 / 8x78.8", "Pull-over con mancuerna": "15x29 / 10x29 / 11x28.5", "Curl martillo": "12x21 / 9x21 / 9x20.5", "Curl concentración": "15x17 / 14x17 / 13x16.5"}}, "S6": {"TORSO": {"Press banca plano": "10x92.5 / 8x92.5 / 9x92.5 / 8x91.2", "Remo cable agarre neutro": "10x77.5 / 9x77.5 / 9x77.5 / 8x76.2", "Press inclinado mancuernas": "12x34.2 / 10x34.2 / 11x33.5", "Jalón polea frontal": "12x72.5 / 12x72.5 / 10x71.2", "Elevaciones laterales": "15x12 / 12x12 / 12x12", "Face pull": "20x20 / 15x20 / 16x20"}, "LEG": {"Curl femoral tumbado": "15x57.5 / 11x57.5 / 13x56.2", "Extensión cuádriceps": "15x67.5 / 13x67.5 / 13x66.2", "Sentadilla hack": "10x105 / 7x105 / 9x105 / 6x102.5", "Prensa de piernas": "12x210 / 9x210 / 11x205", "Hip thrust": "12x125 / 8x125 / 11x122.5", "Gemelo en prensa": "15x120 / 14x120 / 15x120"}, "PUSH": {"Press banca inclinado barra": "10x82.5 / 8x82.5 / 9x82.5 / 10x81.2", "Press militar mancuernas": "12x30.2 / 11x30.2 / 9x29.5", "Aperturas pec deck": "15x47.5 / 13x47.5 / 14x46.2", "Extensión tríceps polea": "15x45 / 11x45 / 10x43.8", "Press francés": "12x42.5 / 12x42.5 / 12x41.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x72.5 / 8x72.5 / 10x71.2", "Remo con barra": "10x82.5 / 6x82.5 / 6x81.2", "Pull-over con mancuerna": "15x30.2 / 14x30.2 / 13x29.5", "Curl martillo": "12x22.2 / 12x22.2 / 12x21.5", "Curl concentración": "15x18.2 / 11x18.2 / 10x17.5"}}, "S7": {"TORSO": {"Press banca plano": "10x95 / 10x95 / 8x95 / 8x93.8", "Remo cable agarre neutro": "10x80 / 8x80 / 10x80 / 8x78.8", "Press inclinado mancuernas": "12x35.5 / 12x35.5 / 10x35", "Jalón polea frontal": "12x75 / 11x75 / 10x73.8", "Elevaciones laterales": "15x12 / 13x12 / 12x12", "Face pull": "20x20 / 19x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x60 / 13x60 / 15x58.8", "Extensión cuádriceps": "15x70 / 14x70 / 14x68.8", "Sentadilla hack": "10x110 / 10x110 / 8x110 / 8x107.5", "Prensa de piernas": "12x220 / 9x220 / 10x215", "Hip thrust": "12x130 / 9x130 / 10x127.5", "Gemelo en prensa": "15x120 / 15x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x85 / 8x85 / 9x85 / 8x83.8", "Press militar mancuernas": "12x31.5 / 8x31.5 / 8x31", "Aperturas pec deck": "15x50 / 15x50 / 12x48.8", "Extensión tríceps polea": "15x47.5 / 10x47.5 / 14x46.2", "Press francés": "12x45 / 9x45 / 12x43.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x75 / 10x75 / 9x73.8", "Remo con barra": "10x85 / 8x85 / 6x83.8", "Pull-over con mancuerna": "15x31.5 / 11x31.5 / 12x31", "Curl martillo": "12x23.5 / 10x23.5 / 9x23", "Curl concentración": "15x19.5 / 13x19.5 / 14x19"}}, "S8": {"TORSO": {"Press banca plano": "10x97.5 / 10x97.5 / 9x97.5 / 10x96.2", "Remo cable agarre neutro": "10x82.5 / 10x82.5 / 10x82.5 / 8x81.2", "Press inclinado mancuernas": "12x36.8 / 12x36.8 / 12x36", "Jalón polea frontal": "12x77.5 / 11x77.5 / 12x76.2", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 17x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x62.5 / 10x62.5 / 15x61.2", "Extensión cuádriceps": "15x72.5 / 14x72.5 / 11x71.2", "Sentadilla hack": "10x115 / 8x115 / 8x115 / 10x112.5", "Prensa de piernas": "12x230 / 9x230 / 10x225", "Hip thrust": "12x135 / 9x135 / 10x132.5", "Gemelo en prensa": "15x120 / 15x120 / 14x120"}, "PUSH": {"Press banca inclinado barra": "10x87.5 / 6x87.5 / 6x87.5 / 9x86.2", "Press militar mancuernas": "12x32.8 / 10x32.8 / 8x32", "Aperturas pec deck": "15x52.5 / 12x52.5 / 14x51.2", "Extensión tríceps polea": "15x50 / 11x50 / 15x48.8", "Press francés": "12x47.5 / 10x47.5 / 9x46.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x77.5 / 11x77.5 / 12x76.2", "Remo con barra": "10x87.5 / 9x87.5 / 10x86.2", "Pull-over con mancuerna": "15x32.8 / 10x32.8 / 10x32", "Curl martillo": "12x24.8 / 8x24.8 / 9x24", "Curl concentración": "15x20.8 / 14x20.8 / 10x20"}}};
+const HUGO_ACTIVITIES_HISTORY = {"-7": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Sábado", "kcal": 480, "min": 70}], "-6": [{"nombre": "Caminar", "tipo": "🚶", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "🎾", "dia": "Sábado", "kcal": 420, "min": 60}], "-5": [], "-4": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Viernes", "kcal": 510, "min": 75}], "-3": [{"nombre": "Caminar", "tipo": "🚶", "dia": "Miércoles", "kcal": 150, "min": 35}], "-2": [{"nombre": "Pádel", "tipo": "🎾", "dia": "Jueves", "kcal": 440, "min": 65}], "-1": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "🚶", "dia": "Viernes", "kcal": 160, "min": 40}], "0": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "🚶", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "🎾", "dia": "Jueves", "kcal": 420, "min": 60}]};
 
 
 // ── UTILITIES ────────────────────────────────────────────────────────────
@@ -3653,6 +3710,10 @@ function emptyState(opts){
 
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function refreshContent() {
+  renderClientPanel();
 }
 
 // ── DIET ITEM HELPERS ─────────────────────────────────────────────────────
@@ -3821,6 +3882,43 @@ function rejectRequest(reqId) {
 }
 
 // ── REVISION ──────────────────────────────────────────────────────────────
+function getRevisionStatus(c) {
+  if (!c.ultimaRevision) return null;
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const ultima   = new Date(c.ultimaRevision); ultima.setHours(0,0,0,0);
+  const cadDias  = (c.revisionCadaSemanas||2)*7;
+  const proxima  = new Date(ultima); proxima.setDate(ultima.getDate()+cadDias);
+  const jsDay    = today.getDay();
+  const mondayT  = new Date(today); mondayT.setDate(today.getDate()-(jsDay===0?6:jsDay-1));
+  const sundayT  = new Date(mondayT); sundayT.setDate(mondayT.getDate()+6);
+  const mondayN  = new Date(mondayT); mondayN.setDate(mondayT.getDate()+7);
+  const sundayN  = new Date(mondayN); sundayN.setDate(mondayN.getDate()+6);
+  const diffDays = Math.round((proxima-today)/86400000);
+  const proxFmt  = proxima.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+  const marcadaEsta = ultima>=mondayT&&ultima<=today;
+  if (marcadaEsta)
+    return {label:'Revisión pasada esta semana',sub:'Próxima: '+proxFmt,cls:'rev-green',canMark:false};
+  if (proxima>=mondayT&&proxima<=sundayT)
+    return {label:'Revisión esta semana',sub:'Fecha: '+proxFmt,cls:'rev-amber',canMark:true};
+  if (proxima>=mondayN&&proxima<=sundayN)
+    return {label:'Revisión semana que viene',sub:'Fecha: '+proxFmt,cls:'rev-blue',canMark:false};
+  if (diffDays>7) {
+    const sems=Math.ceil(diffDays/7);
+    return {label:'Revisión en '+sems+' semana'+(sems>1?'s':''),sub:'Fecha: '+proxFmt,cls:'rev-blue',canMark:false};
+  }
+  if (diffDays<0)
+    return {label:'Revisión pendiente',sub:'Desde hace '+Math.abs(diffDays)+' días',cls:'rev-red',canMark:true};
+  return {label:'Revisión esta semana',sub:'Fecha: '+proxFmt,cls:'rev-amber',canMark:true};
+}
+
+function marcarRevision(clientId) {
+  const c = CLIENTS.find(x=>x.id===clientId);
+  if (!c) return;
+  c.ultimaRevision = new Date().toISOString().split('T')[0];
+  showToast('✓ Revisión marcada para '+c.name);
+  renderClientPanel();
+}
+
 // ── SIDEBAR FILTER & SORT ─────────────────────────────────────────────────
 let activeFilter = 'all';
 
@@ -4729,7 +4827,8 @@ function renderResumen() {
       </div>`;
 
   // Activities widget - week view
-  const acts = (actWeekOffset===0 ? (c.actividades||[]) : []);
+  const isHugoAct = c.id === 1;
+  const acts = isHugoAct ? (HUGO_ACTIVITIES_HISTORY[String(actWeekOffset)] || []) : (actWeekOffset===0?(c.actividades||[]):[]);
   const actTotalKcal = acts.reduce((s,a)=>s+(a.kcal||0),0);
   const actMetricColor = acts.length>0?'var(--amber)':'var(--text3)';
 
@@ -6549,6 +6648,17 @@ function revisionColumna(c, rev){
     <div style="font-size:9px;color:var(--text3);text-align:center">&nbsp;</div>
   </div>`;
 
+  // Nota para el cliente (se muestra en su pestaña "Progreso")
+  const nota = rev.notes && String(rev.notes).trim();
+  const notaHtml = `<div style="padding:9px 12px;background:var(--bg2);border-top:1.5px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;${nota?'margin-bottom:5px':''}">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">📋 Nota para el cliente</div>
+      <button onclick="editarNotaRevision('${escHtml(rev.id)}')"
+        style="height:22px;padding:0 9px;border-radius:7px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:10.5px;font-weight:600;cursor:pointer">${nota?'Editar':'+ Añadir'}</button>
+    </div>
+    ${nota?`<div style="font-size:11.5px;color:var(--text2);line-height:1.5;white-space:pre-wrap">${escHtml(rev.notes)}</div>`:''}
+  </div>`;
+
   return `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
     <div style="padding:9px 12px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px">
       <div style="flex:1;min-width:0">
@@ -6560,6 +6670,7 @@ function revisionColumna(c, rev){
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
       </button>
     </div>
+    ${notaHtml}
     <div style="padding:10px 12px">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px">${fotosHtml}${addBtn}</div>
     </div>
@@ -6628,6 +6739,11 @@ function abrirModalNuevaRevision(){
           <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">Peso <span style="font-weight:400;color:var(--text3)">(opcional)</span></div>
           <input id="rev-weight" type="number" step="0.1" placeholder="Ej: 69.4" style="width:100%;height:36px;padding:0 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box">
         </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">Nota para el cliente <span style="font-weight:400;color:var(--text3)">(opcional)</span></div>
+          <textarea id="rev-notes" placeholder="Ej: Buen progreso en abdomen. Esta semana subimos 200 kcal..." style="width:100%;min-height:64px;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.4"></textarea>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">El cliente la verá en su pestaña "Progreso".</div>
+        </div>
         <div id="rev-error" style="display:none;font-size:11.5px;color:var(--red)"></div>
         <button id="rev-save-btn" onclick="guardarNuevaRevision()" style="height:38px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">Crear revisión</button>
         <div style="font-size:11px;color:var(--text3);text-align:center">Después podrás subir las fotos de esta revisión</div>
@@ -6640,6 +6756,7 @@ async function guardarNuevaRevision(){
   const week = parseInt(document.getElementById('rev-week').value, 10);
   const date = document.getElementById('rev-date').value;
   const weightRaw = document.getElementById('rev-weight').value;
+  const notesRaw = (document.getElementById('rev-notes')?.value || '').trim();
   const errEl = document.getElementById('rev-error');
   const btn = document.getElementById('rev-save-btn');
 
@@ -6657,6 +6774,7 @@ async function guardarNuevaRevision(){
       revision_date: date,
     };
     if (weightRaw) fila.weight_kg = parseFloat(weightRaw);
+    if (notesRaw) fila.notes = notesRaw;
 
     const { data, error } = await sb
       .from('progress_photos')
@@ -6686,6 +6804,61 @@ async function guardarNuevaRevision(){
     errEl.textContent = 'Error de conexión. Inténtalo de nuevo.';
     errEl.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Crear revisión';
+  }
+}
+
+// ── Editar la nota de una revisión (la verá el cliente en "Progreso") ──
+function editarNotaRevision(revId){
+  const rev = (currentClient._photos || []).find(r => String(r.id) === String(revId));
+  if (!rev) return;
+  let modal = document.getElementById('modal-editar-nota');
+  if (!modal){
+    modal = document.createElement('div');
+    modal.id = 'modal-editar-nota';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:260;display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="background:var(--bg2);border-radius:18px;width:400px;max-width:100%;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;color:var(--text)">Nota · Semana ${rev.revision_week ?? '—'}</div>
+        <button onclick="document.getElementById('modal-editar-nota').style.display='none'" style="width:28px;height:28px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);cursor:pointer;color:var(--text3);font-size:14px">✕</button>
+      </div>
+      <div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+        <textarea id="edit-nota-input" placeholder="Escribe la nota que verá el cliente..." style="width:100%;min-height:120px;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:var(--bg2);color:var(--text);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.45">${escHtml(rev.notes || '')}</textarea>
+        <div id="edit-nota-error" style="display:none;font-size:11.5px;color:var(--red)"></div>
+        <button id="edit-nota-save" onclick="guardarNotaRevision('${escHtml(rev.id)}')" style="height:38px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Guardar nota</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+  setTimeout(()=>{ const t=document.getElementById('edit-nota-input'); if(t)t.focus(); }, 50);
+}
+
+async function guardarNotaRevision(revId){
+  const rev = (currentClient._photos || []).find(r => String(r.id) === String(revId));
+  if (!rev) return;
+  const val = (document.getElementById('edit-nota-input')?.value || '').trim();
+  const btn = document.getElementById('edit-nota-save');
+  const errEl = document.getElementById('edit-nota-error');
+  if (errEl) errEl.style.display = 'none';
+  if (btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
+  try {
+    const { error } = await sb.from('progress_photos').update({ notes: val || null }).eq('id', revId);
+    if (error){
+      console.error('guardarNotaRevision error:', error);
+      if (errEl){ errEl.textContent = 'No se pudo guardar la nota.'; errEl.style.display = 'block'; }
+      if (btn){ btn.disabled = false; btn.textContent = 'Guardar nota'; }
+      return;
+    }
+    rev.notes = val || null;
+    const m = document.getElementById('modal-editar-nota'); if (m) m.style.display = 'none';
+    renderClientPanel();
+    hydratePhotoUrls();
+    showToast('✓ Nota guardada');
+  } catch(e){
+    console.error('guardarNotaRevision exception:', e);
+    if (errEl){ errEl.textContent = 'Error de conexión. Inténtalo de nuevo.'; errEl.style.display = 'block'; }
+    if (btn){ btn.disabled = false; btn.textContent = 'Guardar nota'; }
   }
 }
 
@@ -7202,14 +7375,6 @@ function renderDietOpciones(ds) {
       </div>
       <div class="comidas-grid-wrap"><div class="comidas-grid">${comidasHtml}</div></div>
     </div>`;
-}
-
-// NOTA: builder antiguo basado en editPlan. Candidato a eliminar (ver renderPlanRows).
-function removeExercise(bi,ei){
-  if(!editPlan||!editPlan[bi])return;
-  editPlan[bi].ejercicios.splice(ei,1);
-  const cont=document.getElementById('plan-rows');
-  if(cont)cont.innerHTML=renderPlanRows();
 }
 
 function renderPlanRows() {
@@ -11091,7 +11256,9 @@ const CHART_CONFIG = {
   actividad:{title:'Actividad física semanal',sub:'actividades registradas',color:'#d97706',unit:'actividades',chartType:'bar',decimals:0,ranges:['semana'],
     getData:(c,r)=>{
       const DIAS_FULL_MAP=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-      const acts = [];
+      const acts = (c.id===1 && HUGO_ACTIVITIES_HISTORY)
+        ? (HUGO_ACTIVITIES_HISTORY[String(weekOffset)] || [])
+        : (c.actividades||[]);
       if(r==='semana') return ['L','M','X','J','V','S','D'].map((label,i)=>({label,v:acts.filter(a=>a.dia===DIAS_FULL_MAP[i]).length}));
       return Array.from({length:r==='mes'?4:c.weeks},(_,i)=>({label:`S${i+1}`,v:Math.round(Math.random()*4)}));
     }},
@@ -11218,6 +11385,7 @@ function renderSessionsChart() {
   function sessW(wo){
     if(wo===0){const jsN=new Date();jsN.setHours(23,59,59,0);const mon=new Date();const jd=mon.getDay();mon.setDate(mon.getDate()-(jd===0?6:jd-1));mon.setHours(0,0,0,0);return(c.week||[]).filter((d,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);dd.setHours(23,59,59,0);return d.trained&&dd<=jsN;}).length;}
     const hist=c.weekHistory?.[String(wo)];if(hist)return hist.sessions.filter(Boolean).length;
+    if(c.id===1)return Object.values(HUGO_TRAINING_HISTORY['S'+(8+wo)]||{}).length;
     return Math.round(totalDays*0.85);
   }
   const range=currentChartRange;
@@ -11232,7 +11400,7 @@ function renderSessionsChart() {
       return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;color:var(--text2)">'+lbl+'</span><span style="font-size:15px;font-weight:600;font-family:Geist Mono,monospace;color:'+gc(done)+'">'+done+'/'+totalDays+'</span></div>';
     }).join('');
   } else {
-    const allW=Array.from({length:c.weeks},(_,i)=>({label:'S'+(i+1),done:Math.round(totalDays*0.85)}));
+    const allW=c.id===1&&c.weekHistory?Object.entries(c.weekHistory).sort((a,b)=>+a[0]-+b[0]).map(([wo,h],i)=>({label:'S'+(i+1),done:h.sessions.filter(Boolean).length})):Array.from({length:c.weeks},(_,i)=>({label:'S'+(i+1),done:Math.round(totalDays*0.85)}));
     rows=allW.map(w=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text2)">'+w.label+'</span><div style="display:flex;align-items:center;gap:8px"><div style="width:80px;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:'+Math.round(w.done/totalDays*100)+'%;height:100%;background:'+(w.done>=totalDays?'var(--green)':'var(--amber)')+';border-radius:3px"></div></div><span style="font-size:12px;font-weight:600;font-family:Geist Mono,monospace;color:'+gc(w.done)+'">'+w.done+'/'+totalDays+'</span></div></div>').join('');
   }
   const cv=document.getElementById('main-chart');if(cv)cv.style.display='none';
@@ -11357,6 +11525,107 @@ function renderChart() {
 // ── INIT ──────────────────────────────────────────────────────────────────
 loadStorage();
 
+// Seed Hugo demo diet if not in localStorage
+// Seed Hugo's training split if not in localStorage
+const _hugoTs = getTrainState(1);
+// Force reset Hugo's split if version doesn't match (ensures correct split always loads)
+const HUGO_SPLIT_VERSION = 'v3-L_OFF-M_TORSO-X_OFF-J_LEG-V_PUSH-S_PULL-D_OFF';
+if (!_hugoTs.split || !_hugoTs.split.length || _hugoTs.splitVersion !== HUGO_SPLIT_VERSION) {
+  _hugoTs.splitVersion = HUGO_SPLIT_VERSION;
+  // Set startDate to Monday of current week so split always starts on Monday
+  const _monday = new Date();
+  const _jsDay = _monday.getDay();
+  _monday.setDate(_monday.getDate() - (_jsDay === 0 ? 6 : _jsDay - 1));
+  _hugoTs.startDate = _monday.toISOString().split('T')[0];
+  _hugoTs.splitDays = 7;
+  _hugoTs.split = [
+    {day:1, type:'OFF',   exercises:[]},
+    {day:2, type:'TORSO', exercises:[
+      {nombre:'Press banca plano',series:4,reps:'8-10',descanso:'3min'},
+      {nombre:'Remo cable agarre neutro',series:4,reps:'8-10',descanso:'3min'},
+      {nombre:'Press inclinado mancuernas',series:3,reps:'10-12',descanso:'2min'},
+      {nombre:'Jalón polea frontal',series:3,reps:'10-12',descanso:'2min'},
+      {nombre:'Elevaciones laterales',series:3,reps:'12-15',descanso:'2min'},
+      {nombre:'Face pull',series:3,reps:'15-20',descanso:'1.5min'},
+    ]},
+    {day:3, type:'OFF',  exercises:[]},
+    {day:4, type:'LEG',  exercises:[
+      {nombre:'Curl femoral tumbado',series:3,reps:'10-15',descanso:'2min'},
+      {nombre:'Extensión cuádriceps',series:3,reps:'10-15',descanso:'2min'},
+      {nombre:'Sentadilla hack',series:4,reps:'6-10',descanso:'4min'},
+      {nombre:'Prensa de piernas',series:3,reps:'8-12',descanso:'4min'},
+      {nombre:'Hip thrust',series:3,reps:'8-12',descanso:'3min'},
+      {nombre:'Gemelo en prensa',series:3,reps:'12-15',descanso:'2min'},
+    ]},
+    {day:5, type:'PUSH', exercises:[
+      {nombre:'Press banca inclinado barra',series:4,reps:'6-10',descanso:'3min'},
+      {nombre:'Press militar mancuernas',series:3,reps:'8-12',descanso:'3min'},
+      {nombre:'Aperturas pec deck',series:3,reps:'12-15',descanso:'2min'},
+      {nombre:'Extensión tríceps polea',series:3,reps:'10-15',descanso:'2min'},
+      {nombre:'Press francés',series:3,reps:'8-12',descanso:'2min'},
+    ]},
+    {day:6, type:'PULL', exercises:[
+      {nombre:'Jalón al pecho agarre ancho',series:3,reps:'8-12',descanso:'3min'},
+      {nombre:'Remo con barra',series:3,reps:'6-10',descanso:'3min'},
+      {nombre:'Pull-over con mancuerna',series:3,reps:'10-15',descanso:'2min'},
+      {nombre:'Curl martillo',series:3,reps:'8-12',descanso:'2min'},
+      {nombre:'Curl concentración',series:3,reps:'10-15',descanso:'2min'},
+    ]},
+    {day:7, type:'OFF',  exercises:[]},
+  ];
+  saveTrainStorage();
+}
+
+const _hugoDs = getDietState(1);
+if (!_hugoDs.opciones) {
+  _hugoDs.params = {kcal:1960,ch:245,g:40,p:155,preferencias:'boniato, pollo, arroz blanco, merluza, gnocchi de patata',restricciones:''};
+  _hugoDs.asignacion = {L:0,M:1,X:2,J:3,V:1,S:3,D:4};
+  _hugoDs.opciones = [
+    {nombre:'Alta en hidratos',macros:{kcal:1980,ch:248,g:38,p:152},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Pan de centeno',cantidad:'80g',kcal:180},{nombre:'Lomo embuchado',cantidad:'90g',kcal:140},{nombre:'AOVE',cantidad:'5ml',kcal:45}]},
+      {nombre:'Comida 2',items:[{nombre:'Solomillo de pavo',cantidad:'170g',kcal:190},{nombre:'Arroz blanco cocido',cantidad:'80g',kcal:285},{nombre:'Verdura variada',cantidad:'200g',kcal:55}]},
+      {nombre:'Comida 3',items:[{nombre:'Tortas de arroz',cantidad:'40g',kcal:152},{nombre:'Embutido de pavo',cantidad:'100g',kcal:120},{nombre:'Aguacate',cantidad:'50g',kcal:80}]},
+      {nombre:'Comida 4',items:[{nombre:'Contramuslo de pollo',cantidad:'150g',kcal:200},{nombre:'Boniato cocido',cantidad:'200g',kcal:160},{nombre:'Verdura variada',cantidad:'200g',kcal:55}]},
+    ]},
+    {nombre:'Mediterránea',macros:{kcal:1960,ch:240,g:42,p:155},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Pan integral',cantidad:'80g',kcal:200},{nombre:'Jamón serrano / ibérico',cantidad:'70g',kcal:140}]},
+      {nombre:'Comida 2',items:[{nombre:'Arroz / Legumbres cocido',cantidad:'250g',kcal:290},{nombre:'Pechuga de pollo',cantidad:'150g',kcal:170},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
+      {nombre:'Comida 3',items:[{nombre:'Avena',cantidad:'60g',kcal:220},{nombre:'Proteína whey / caseína',cantidad:'20g',kcal:78}]},
+      {nombre:'Comida 4',items:[{nombre:'Ternera / Salmón',cantidad:'150g',kcal:230},{nombre:'Patata / Boniato',cantidad:'200g',kcal:160},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
+    ]},
+    {nombre:'Tortilla y huevos',macros:{kcal:1950,ch:235,g:44,p:158},comidas:[
+      {nombre:'Comida 1 (tortilla)',items:[{nombre:'Pan',cantidad:'100g',kcal:250},{nombre:'Huevos',cantidad:'3 ud',kcal:210},{nombre:'Claras de huevo',cantidad:'100ml',kcal:52}]},
+      {nombre:'Comida 2',items:[{nombre:'Pechuga de pavo / pollo',cantidad:'250g',kcal:280},{nombre:'Pasta / Arroz redondo seco',cantidad:'40g',kcal:145},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
+      {nombre:'Comida 3',items:[{nombre:'Contramuslo de pollo',cantidad:'200g',kcal:265},{nombre:'Patata / Boniato',cantidad:'200g',kcal:160},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
+      {nombre:'Precama',items:[{nombre:'Caseína',cantidad:'25g',kcal:95}]},
+    ]},
+    {nombre:'Sin gluten ligera',macros:{kcal:1900,ch:228,g:40,p:150},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Arroz inflado',cantidad:'60g',kcal:215},{nombre:'Pechuga de pavo',cantidad:'100g',kcal:110},{nombre:'Aceite de oliva',cantidad:'5ml',kcal:45}]},
+      {nombre:'Comida 2',items:[{nombre:'Patata cocida',cantidad:'250g',kcal:195},{nombre:'Merluza al vapor',cantidad:'200g',kcal:160},{nombre:'Ensalada verde',cantidad:'150g',kcal:30}]},
+      {nombre:'Comida 3',items:[{nombre:'Plátano',cantidad:'1 ud',kcal:90},{nombre:'Almendras',cantidad:'30g',kcal:175}]},
+      {nombre:'Comida 4',items:[{nombre:'Pollo asado',cantidad:'180g',kcal:200},{nombre:'Boniato',cantidad:'200g',kcal:160},{nombre:'Brócoli',cantidad:'150g',kcal:45}]},
+    ]},
+    {nombre:'Alta en proteína',macros:{kcal:2010,ch:220,g:42,p:175},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Claras de huevo',cantidad:'200ml',kcal:105},{nombre:'Avena',cantidad:'60g',kcal:220},{nombre:'Frutos rojos',cantidad:'100g',kcal:40}]},
+      {nombre:'Comida 2',items:[{nombre:'Pechuga de pollo',cantidad:'250g',kcal:280},{nombre:'Arroz basmati cocido',cantidad:'80g',kcal:285},{nombre:'Verdura asada',cantidad:'200g',kcal:55}]},
+      {nombre:'Comida 3',items:[{nombre:'Atún al natural',cantidad:'2 latas',kcal:140},{nombre:'Pan de centeno',cantidad:'60g',kcal:135}]},
+      {nombre:'Comida 4',items:[{nombre:'Salmón',cantidad:'200g',kcal:290},{nombre:'Gnocchi de patata',cantidad:'150g',kcal:195},{nombre:'Espinacas',cantidad:'100g',kcal:25}]},
+    ]},
+    {nombre:'Día de carga',macros:{kcal:2200,ch:280,g:38,p:155},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Avena',cantidad:'80g',kcal:295},{nombre:'Leche semi',cantidad:'200ml',kcal:92},{nombre:'Plátano',cantidad:'1 ud',kcal:90}]},
+      {nombre:'Comida 2',items:[{nombre:'Arroz blanco seco',cantidad:'120g',kcal:430},{nombre:'Pechuga de pollo',cantidad:'200g',kcal:220},{nombre:'Aceite oliva',cantidad:'5ml',kcal:45}]},
+      {nombre:'Comida 3',items:[{nombre:'Pan integral',cantidad:'60g',kcal:150},{nombre:'Pavo en lonchas',cantidad:'80g',kcal:90},{nombre:'Plátano',cantidad:'1 ud',kcal:90}]},
+      {nombre:'Comida 4',items:[{nombre:'Pasta integral seca',cantidad:'80g',kcal:285},{nombre:'Ternera magra',cantidad:'150g',kcal:195},{nombre:'Verdura',cantidad:'200g',kcal:55}]},
+    ]},
+    {nombre:'Descanso / ligera',macros:{kcal:1750,ch:200,g:42,p:155},comidas:[
+      {nombre:'Comida 1',items:[{nombre:'Yogur griego 0%',cantidad:'200g',kcal:120},{nombre:'Frutos rojos',cantidad:'150g',kcal:60},{nombre:'Nueces',cantidad:'20g',kcal:130}]},
+      {nombre:'Comida 2',items:[{nombre:'Ensalada completa',cantidad:'300g',kcal:100},{nombre:'Atún al natural',cantidad:'160g',kcal:170},{nombre:'Pan de centeno',cantidad:'60g',kcal:135}]},
+      {nombre:'Comida 3',items:[{nombre:'Manzana',cantidad:'1 ud',kcal:75},{nombre:'Almendras',cantidad:'25g',kcal:145}]},
+      {nombre:'Comida 4',items:[{nombre:'Merluza al horno',cantidad:'200g',kcal:160},{nombre:'Boniato',cantidad:'150g',kcal:120},{nombre:'Espárragos',cantidad:'150g',kcal:35}]},
+    ]},
+  ];
+  saveStorage();
+}
 
 renderSidebar();
 // Color status filter buttons

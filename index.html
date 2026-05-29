@@ -4207,7 +4207,7 @@ function renderResumen() {
         // Estados visuales (clases .wp):
         //  - hoy → today (negro, blanco)
         //  - entrenó (cualquier día) → done (verde)
-        //  - descanso pasado → past-off (gris suave)
+        //  - descanso pasado → done (verde, descansar también es cumplir el plan)
         //  - pasado de entreno NO hecho → missed (rojo)
         //  - futuro → pending (vacío)
         const pastOff = off && strictlyPast;
@@ -4217,7 +4217,7 @@ function renderResumen() {
         let cls, check;
         if (isRealToday){ cls='today'; check='·'; }
         else if (entreno){ cls='done'; check='✓'; }
-        else if (pastOff){ cls='past-off'; check='—'; }
+        else if (pastOff){ cls='done'; check='✓'; }
         else if (faltó){ cls='missed'; check='✕'; }
         else { cls='pending'; check=off?'—':'○'; }
 

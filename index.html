@@ -7535,7 +7535,10 @@ function panelBibliotecaHtml(){
       <div style="font-size:12px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
       <div style="display:flex;gap:6px">
         <input type="file" id="import-food-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarAlimentosExcel(this)">
-        <button onclick="document.getElementById('import-food-input').click()" title="Formato: Alimento | Kcal/100g | CH | G | P | Grupo" style="
+        <button onclick="descargarPlantillaAlimentos()" title="Descargar plantilla Excel con el formato esperado" style="
+          height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📄 Plantilla</button>
+        <button onclick="document.getElementById('import-food-input').click()" title="Importar un Excel/CSV con alimentos" style="
           height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel/CSV</button>
         <button onclick="cerrarBiblioteca()" style="
@@ -7616,6 +7619,93 @@ function leerFormularioAlimento(pre){
     protein_g: protein, carbs_g: carbs, fat_g: fat,
     food_group: grupo || null,
   };
+}
+
+// ════════════════════════════════════════════════════════════
+// Plantillas Excel descargables (para que el entrenador rellene
+// los datos en el formato correcto antes de importar).
+// ════════════════════════════════════════════════════════════
+
+function descargarPlantillaAlimentos(){
+  // Hoja 1 — datos con cabecera + filas de ejemplo
+  const datos = [
+    ['Alimento',          'Kcal/100g', 'CH',  'G',  'P',  'Grupo'],
+    ['Pan integral',       240,        47,    1.4,  9,    'Hidratos'],
+    ['Pavo filetes',       110,        0,     1,    24,   'Proteína'],
+    ['Aceite de oliva',    884,        0,     100,  0,    'Grasa'],
+    ['Manzana',            52,         14,    0.2,  0.3,  'Fruta'],
+    ['Arroz blanco cocido',130,        28,    0.3,  2.7,  'Hidratos'],
+  ];
+
+  // Hoja 2 — instrucciones
+  const instrucciones = [
+    ['INSTRUCCIONES — Importación de alimentos'],
+    [''],
+    ['1. Mantén el orden de las columnas como aparece en la primera hoja.'],
+    ['2. La primera fila (cabecera) se ignora automáticamente.'],
+    ['3. Columnas:'],
+    ['   · Alimento (texto, obligatorio) — nombre del alimento.'],
+    ['   · Kcal/100g (número, obligatorio) — kilocalorías por 100 g.'],
+    ['   · CH (número) — gramos de hidratos por 100 g.'],
+    ['   · G (número) — gramos de grasa por 100 g.'],
+    ['   · P (número) — gramos de proteína por 100 g.'],
+    ['   · Grupo (texto, opcional) — categoría tipo "Proteína", "Hidratos", "Verdura", etc.'],
+    [''],
+    ['4. Si el nombre del alimento ya existe en tu biblioteca, se SOBRESCRIBEN sus macros.'],
+    ['5. Las filas sin kcal válida se ignoran.'],
+    ['6. Acepta también .csv (con coma o punto y coma como separador).'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(datos);
+  ws1['!cols'] = [{wch:24},{wch:11},{wch:8},{wch:8},{wch:8},{wch:16}];
+  const ws2 = XLSX.utils.aoa_to_sheet(instrucciones);
+  ws2['!cols'] = [{wch:90}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Alimentos');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Instrucciones');
+  XLSX.writeFile(wb, 'plantilla-alimentos.xlsx');
+  showToast('Plantilla descargada — abre "plantilla-alimentos.xlsx"');
+}
+
+function descargarPlantillaEjercicios(){
+  const datos = [
+    ['Ejercicio',                'Tipo',   'Series', 'Reps',   'Descanso (s)', 'Aproximación', 'Link vídeo'],
+    ['Press banca plano',         'PUSH',   4,        '8-10',   120,            '75% 1RM',      'https://youtu.be/'],
+    ['Sentadilla con barra',      'LEG',    4,        '5-8',    180,            '80% 1RM',      'https://youtu.be/'],
+    ['Remo con barra',            'PULL',   4,        '8-10',   120,            'RIR 2',        ''],
+    ['Press militar',             'PUSH',   3,        '10-12',  90,             'RIR 1-2',      'https://youtu.be/'],
+    ['Curl femoral tumbado',      'LEG',    3,        '12-15',  90,             '',             ''],
+    ['Jalón al pecho',            'PULL',   3,        '10',     120,            '',             ''],
+  ];
+
+  const instrucciones = [
+    ['INSTRUCCIONES — Importación de ejercicios'],
+    [''],
+    ['1. Mantén el orden de las columnas como aparece en la primera hoja.'],
+    ['2. La primera fila (cabecera) se ignora automáticamente.'],
+    ['3. Columnas:'],
+    ['   · Ejercicio (texto, obligatorio) — nombre del ejercicio.'],
+    ['   · Tipo (texto, opcional) — PUSH, PULL, LEG, TORSO, BRAZO, etc.'],
+    ['   · Series (número entero) — series por defecto.'],
+    ['   · Reps (texto) — rango "8-10", número "10", o lo que prefieras como texto.'],
+    ['   · Descanso (s) (número entero) — descanso entre series en segundos.'],
+    ['   · Aproximación (texto, opcional) — "75% 1RM", "RIR 2", etc.'],
+    ['   · Link vídeo (texto, opcional) — URL de YouTube, Vimeo, etc.'],
+    [''],
+    ['4. Si el nombre del ejercicio ya existe en tu biblioteca, se SOBRESCRIBEN sus datos.'],
+    ['5. Los ejercicios solo se añaden a la BIBLIOTECA. Luego los añades manualmente al plan del cliente.'],
+    ['6. Acepta también .csv (con coma o punto y coma como separador).'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(datos);
+  ws1['!cols'] = [{wch:24},{wch:10},{wch:8},{wch:12},{wch:14},{wch:14},{wch:30}];
+  const ws2 = XLSX.utils.aoa_to_sheet(instrucciones);
+  ws2['!cols'] = [{wch:90}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Ejercicios');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Instrucciones');
+  XLSX.writeFile(wb, 'plantilla-ejercicios.xlsx');
+  showToast('Plantilla descargada — abre "plantilla-ejercicios.xlsx"');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -8978,7 +9068,10 @@ function seccionPlanEntreno(c){
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
         <input type="file" id="import-ex-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarEjerciciosExcel(this)">
-        <button onclick="document.getElementById('import-ex-input').click()" title="Formato: Ejercicio | Tipo | Series | Reps | Descanso(s) | Aproximación | Link vídeo" style="
+        <button onclick="descargarPlantillaEjercicios()" title="Descargar plantilla Excel con el formato esperado" style="
+          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📄 Plantilla</button>
+        <button onclick="document.getElementById('import-ex-input').click()" title="Importar un Excel/CSV con ejercicios" style="
           height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel</button>
         <button onclick="abrirPlantillas()" style="

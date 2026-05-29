@@ -3532,6 +3532,7 @@ function selectClient(id) {
   segWeekOffset = 0;
   editNutriOpcion = 0;
   editSesionEntreno = 0;
+  splitDayActivo = null;
   editandoObjetivos = false;
   editandoEjercicioId = null;
   editandoComida = null;
@@ -8265,6 +8266,9 @@ async function guardarComida(comida){
 
 // Qué sesión de entreno está seleccionada en el tab Editar plan
 let editSesionEntreno = 0;
+// Índice del día del split que el usuario ha pulsado (para resaltar SOLO ese cuadrado).
+// null si no hay día activo aún.
+let splitDayActivo = null;
 // Bloque 6B — id del ejercicio que se está editando (null = ninguno)
 let editandoEjercicioId = null;
 // Bloque 6D — biblioteca completa de ejercicios y estado del selector
@@ -8314,7 +8318,11 @@ function seccionPlanEntreno(c){
     </div>`;
   }
 
-  const split = nut.split || [];
+  // Split tal cual viene de BD (puede tener ['PUSH','OFF','PUSH'] sin numerar).
+  const splitRaw = nut.split || [];
+  // Split numerado SOLO para mostrar/usar en la UI (cuadrados, pills, selección de sesión).
+  // No se persiste en BD hasta que el usuario pulse "Guardar split" en el editor.
+  const split = numerarSplit(splitRaw);
   const ejercicios = nut.exercises || [];
   const diasEntreno = split.filter(s => s && s !== 'OFF').length;
 
@@ -8452,13 +8460,14 @@ function seccionPlanEntreno(c){
               // El color del cuadrado se basa en el tipo BASE
               // ("PUSH 2" tiene el color de "PUSH").
               const col = colorSesion(off ? 'OFF' : tipoBase(s));
-              // Saber si esta sesión es la activa para resaltarla
-              const tipoActivoSplit = !off && tiposSesion[editSesionEntreno] === s;
+              // Halo solo en el cuadrado que el usuario ha pulsado (por índice del día,
+              // no por nombre — si el tipo se repite, solo se resalta el clicado).
+              const isActiveDay = !off && splitDayActivo === i;
               const cursor = off ? 'default' : 'pointer';
-              const ringStyle = tipoActivoSplit
+              const ringStyle = isActiveDay
                 ? 'border:2px solid '+col+';box-shadow:0 0 0 3px '+col+'22'
                 : 'border:1.5px solid var(--border)';
-              const onclick = off ? '' : `onclick="seleccionarSesionPorTipo('${escHtml(s)}')"`;
+              const onclick = off ? '' : `onclick="seleccionarSesionPorTipo('${escHtml(s)}',${i})"`;
               const title = off ? 'Día de descanso' : 'Ver ejercicios de '+escHtml(s);
               return `<div ${onclick} title="${title}" style="flex:1;min-width:62px;background:var(--bg);${ringStyle};border-radius:10px;padding:8px 4px;text-align:center;cursor:${cursor};transition:transform .12s, box-shadow .12s" ${off?'':`onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''"`}>
                 <div style="width:22px;height:22px;border-radius:6px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
@@ -8878,30 +8887,31 @@ function filaAEjercicio(data, ex){
 
 function seleccionarSesionEntreno(i){
   editSesionEntreno = i;
+  splitDayActivo = null;  // al elegir por pill, no queremos halo en ningún cuadrado
   editandoEjercicioId = null;  // al cambiar de sesión, salir de edición
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = '';
   renderClientPanel();
 }
 
-// Selecciona la sesión por su tipo (ej. 'PUSH'), no por índice.
-// Se usa al pinchar un cuadrado del split. Si el tipo aún no existe entre
-// las sesiones con ejercicios, igualmente lo activa porque tiposSesion
-// ahora incluye los del split aunque estén vacíos.
-function seleccionarSesionPorTipo(tipo){
+// Selecciona la sesión por su tipo (ej. 'PUSH 2'), no por índice.
+// Se usa al pinchar un cuadrado del split. dayIdx es opcional pero ayuda a
+// resaltar exactamente el cuadrado que has pulsado (no todos los del mismo tipo).
+function seleccionarSesionPorTipo(tipo, dayIdx){
   const c = currentClient;
   if (!c || !c._training) return;
-  const split = c._training.split || [];
+  const splitNum = numerarSplit(c._training.split || []);
   const ejercicios = c._training.exercises || [];
   const porSesion = {};
   ejercicios.forEach(e => { const t=e.session_type||'OTROS'; (porSesion[t]=porSesion[t]||[]).push(e); });
   const ordenSplit = [];
-  split.forEach(s => { if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s); });
+  splitNum.forEach(s => { if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s); });
   const tiposSesion = ordenSplit
     .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t) && t !== 'OTROS'));
   const i = tiposSesion.indexOf(tipo);
   if (i < 0) return;
   editSesionEntreno = i;
+  splitDayActivo = (typeof dayIdx === 'number') ? dayIdx : null;
   editandoEjercicioId = null;
   mostrandoSelectorEjercicio = false;
   busquedaEjercicio = '';

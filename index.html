@@ -7669,13 +7669,13 @@ function descargarPlantillaAlimentos(){
 
 function descargarPlantillaEjercicios(){
   const datos = [
-    ['Ejercicio',                'Tipo',   'Series', 'Reps',   'Descanso (s)', 'Aproximación', 'Link vídeo'],
-    ['Press banca plano',         'PUSH',   4,        '8-10',   120,            '75% 1RM',      'https://youtu.be/'],
-    ['Sentadilla con barra',      'LEG',    4,        '5-8',    180,            '80% 1RM',      'https://youtu.be/'],
-    ['Remo con barra',            'PULL',   4,        '8-10',   120,            'RIR 2',        ''],
-    ['Press militar',             'PUSH',   3,        '10-12',  90,             'RIR 1-2',      'https://youtu.be/'],
-    ['Curl femoral tumbado',      'LEG',    3,        '12-15',  90,             '',             ''],
-    ['Jalón al pecho',            'PULL',   3,        '10',     120,            '',             ''],
+    ['Ejercicio',                'Tipo',   'Series', 'Repeticiones',          'Descanso (s)', 'Aproximación', 'Link vídeo'],
+    ['Press en multipower 45º',   'TORSO',  3,        '1 x 6-8 / 2 x 8-10',    180,            2,              'https://youtu.be/'],
+    ['Press banca plano',         'PUSH',   4,        '8-10',                  120,            2,              'https://youtu.be/'],
+    ['Sentadilla con barra',      'LEG',    4,        '5-8',                   180,            3,              'https://youtu.be/'],
+    ['Remo con barra',            'PULL',   4,        '8-10',                  120,            2,              ''],
+    ['Curl femoral tumbado',      'LEG',    3,        '12-15',                 90,             1,              ''],
+    ['Jalón al pecho',            'PULL',   3,        '10',                    120,            1,              ''],
   ];
 
   const instrucciones = [
@@ -7686,10 +7686,10 @@ function descargarPlantillaEjercicios(){
     ['3. Columnas:'],
     ['   · Ejercicio (texto, obligatorio) — nombre del ejercicio.'],
     ['   · Tipo (texto, opcional) — PUSH, PULL, LEG, TORSO, BRAZO, etc.'],
-    ['   · Series (número entero) — series por defecto.'],
-    ['   · Reps (texto) — rango "8-10", número "10", o lo que prefieras como texto.'],
-    ['   · Descanso (s) (número entero) — descanso entre series en segundos.'],
-    ['   · Aproximación (texto, opcional) — "75% 1RM", "RIR 2", etc.'],
+    ['   · Series (número entero) — número total de series.'],
+    ['   · Repeticiones (texto libre) — admite formatos: "8-10", "10", "1 x 6-8 / 2 x 8-10".'],
+    ['   · Descanso (s) (número entero) — segundos de descanso entre series.'],
+    ['   · Aproximación (número entero) — número de aproximaciones/calentamiento (0, 1, 2, 3...).'],
     ['   · Link vídeo (texto, opcional) — URL de YouTube, Vimeo, etc.'],
     [''],
     ['4. Si el nombre del ejercicio ya existe en tu biblioteca, se SOBRESCRIBEN sus datos.'],
@@ -7699,7 +7699,7 @@ function descargarPlantillaEjercicios(){
 
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.aoa_to_sheet(datos);
-  ws1['!cols'] = [{wch:24},{wch:10},{wch:8},{wch:12},{wch:14},{wch:14},{wch:30}];
+  ws1['!cols'] = [{wch:26},{wch:10},{wch:8},{wch:24},{wch:14},{wch:14},{wch:30}];
   const ws2 = XLSX.utils.aoa_to_sheet(instrucciones);
   ws2['!cols'] = [{wch:90}];
   XLSX.utils.book_append_sheet(wb, ws1, 'Ejercicios');
@@ -7997,9 +7997,9 @@ async function importarEjerciciosExcel(input){
     if (!nombre){ continue; }
     const tipo     = aStr(r[1]);       // PUSH, PULL, etc — guarda en muscle_group
     const sets     = aInt(r[2]);
-    const reps     = aStr(r[3]);       // "8-10", "10", "5x5" — string libre
+    const reps     = aStr(r[3]);       // "8-10", "10", "1 x 6-8 / 2 x 8-10" — texto libre
     const restSec  = aInt(r[4]);
-    const aprox    = aStr(r[5]);
+    const aprox    = aInt(r[5]);       // número entero de aproximaciones
     const video    = aStr(r[6]);
     candidatos.push({ nombre, tipo, sets, reps, restSec, aprox, video });
   }

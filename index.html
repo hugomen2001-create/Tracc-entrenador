@@ -8324,14 +8324,15 @@ function seccionPlanEntreno(c){
     const t = ej.session_type || 'OTROS';
     (porSesion[t] = porSesion[t] || []).push(ej);
   });
-  // Orden de las sesiones: primero según aparecen en el split, luego el resto
+  // Orden de las sesiones: primero según aparecen en el split (incluso sin ejercicios),
+  // luego los tipos que existan en ejercicios pero NO estén en el split.
+  // Así el cliente puede seleccionar una sesión vacía y empezar a meter ejercicios.
   const ordenSplit = [];
   split.forEach(s => {
     if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s);
   });
   const tiposSesion = ordenSplit
-    .filter(t => porSesion[t])
-    .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t)));
+    .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t) && t !== 'OTROS'));
 
   // ── Distribución del split (ciclo de N días) — editable (Bloque 6E) ──
   // Tipos de sesión sugeridos + los que ya existen en el plan del cliente
@@ -8350,12 +8351,15 @@ function seccionPlanEntreno(c){
       const tiposChips = SUGERENCIAS_SESION.slice();  // 7 tipos sugeridos
       const filasDias = work.map((s,i) => {
         const valor = (!s || s === 'OFF') ? 'OFF' : s;
-        const col = colorSesion(valor);
+        // El color y la activación del chip se basan en el tipo BASE
+        // ("PUSH 2" tiene el color de "PUSH" y activa el chip "PUSH").
+        const valorBase = valor === 'OFF' ? 'OFF' : tipoBase(valor);
+        const col = colorSesion(valorBase);
         // ¿el valor actual es un tipo a mano que no está entre los sugeridos?
-        const esExtra = valor !== 'OFF' && !tiposChips.includes(valor);
+        const esExtra = valor !== 'OFF' && !tiposChips.includes(valorBase);
         // Chips de los 7 tipos
         let chips = tiposChips.map(t => {
-          const act = valor === t;
+          const act = valorBase === t;
           const c2 = colorSesion(t);
           return `<button onclick="cambiarDiaSplit(${i},'${escHtml(t)}')" style="
             height:23px;padding:0 9px;border-radius:7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap;
@@ -8367,8 +8371,8 @@ function seccionPlanEntreno(c){
           chips += `<span style="
             display:inline-flex;align-items:center;height:23px;border-radius:7px;
             border:1.5px solid ${col};background:${col};color:#fff;font-size:10px;font-weight:700;white-space:nowrap">
-            <span style="padding:0 4px 0 9px">${escHtml(valor)}</span>
-            <button onclick="borrarTipoSesion('${escHtml(valor)}')" title="Eliminar este tipo de sesión" style="
+            <span style="padding:0 4px 0 9px">${escHtml(valorBase)}</span>
+            <button onclick="borrarTipoSesion('${escHtml(valorBase)}')" title="Eliminar este tipo de sesión" style="
               background:none;border:none;cursor:pointer;color:#fff;font-size:11px;padding:0 6px 0 2px;
               line-height:1;opacity:.85">✕</button>
           </span>`;
@@ -8445,8 +8449,18 @@ function seccionPlanEntreno(c){
           <div style="display:flex;gap:5px;flex-wrap:wrap">
             ${split.map((s,i) => {
               const off = !s || s === 'OFF';
-              const col = colorSesion(off?'OFF':s);
-              return `<div style="flex:1;min-width:62px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 4px;text-align:center">
+              // El color del cuadrado se basa en el tipo BASE
+              // ("PUSH 2" tiene el color de "PUSH").
+              const col = colorSesion(off ? 'OFF' : tipoBase(s));
+              // Saber si esta sesión es la activa para resaltarla
+              const tipoActivoSplit = !off && tiposSesion[editSesionEntreno] === s;
+              const cursor = off ? 'default' : 'pointer';
+              const ringStyle = tipoActivoSplit
+                ? 'border:2px solid '+col+';box-shadow:0 0 0 3px '+col+'22'
+                : 'border:1.5px solid var(--border)';
+              const onclick = off ? '' : `onclick="seleccionarSesionPorTipo('${escHtml(s)}')"`;
+              const title = off ? 'Día de descanso' : 'Ver ejercicios de '+escHtml(s);
+              return `<div ${onclick} title="${title}" style="flex:1;min-width:62px;background:var(--bg);${ringStyle};border-radius:10px;padding:8px 4px;text-align:center;cursor:${cursor};transition:transform .12s, box-shadow .12s" ${off?'':`onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''"`}>
                 <div style="width:22px;height:22px;border-radius:6px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
                   font-size:9px;font-weight:700;color:#fff;background:${col}">D${i+1}</div>
                 <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${off?'var(--text3)':col}">${off?'Descanso':escHtml(s)}</div>
@@ -8460,8 +8474,8 @@ function seccionPlanEntreno(c){
   // ── Ejercicios por sesión ──
   let sesionesHtml;
   if (!tiposSesion.length){
-    sesionesHtml = `<div style="font-size:12px;color:var(--text3);padding:12px;background:var(--bg);border-radius:11px">
-      El plan no tiene ejercicios cargados.
+    sesionesHtml = `<div style="font-size:12px;color:var(--text3);padding:14px;background:var(--bg);border-radius:11px;text-align:center;line-height:1.6">
+      Configura primero la <strong style="color:var(--text2)">distribución del split</strong> arriba para asignar sesiones a los días. Luego pulsa un cuadrado para añadir ejercicios.
     </div>`;
   } else {
     if (editSesionEntreno >= tiposSesion.length) editSesionEntreno = 0;
@@ -8562,7 +8576,11 @@ function seccionPlanEntreno(c){
     sesionesHtml = `
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:11px;color:var(--text3)">${lista.length} ${lista.length===1?'ejercicio':'ejercicios'} en esta sesión</span>
+        <span style="font-size:11px;color:var(--text3)">
+          ${lista.length
+            ? `<strong style="color:var(--text2)">${escHtml(tipoSel)}</strong> · ${lista.length} ${lista.length===1?'ejercicio':'ejercicios'}`
+            : `<strong style="color:var(--text2)">${escHtml(tipoSel)}</strong> · sin ejercicios todavía`}
+        </span>
         ${lista.length ? `<button onclick="guardarSesionComoPlantilla()" style="
           height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">💾 Guardar sesión como plantilla</button>` : ''}
@@ -8590,7 +8608,7 @@ function seccionPlanEntreno(c){
     ${panelPlantillasHtml(c)}
     ${splitHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div data-section="ejercicios-por-sesion" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Ejercicios por sesión</div>
       <button onclick="guardarPlanComoPlantilla()" style="
         height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
@@ -8866,6 +8884,35 @@ function seleccionarSesionEntreno(i){
   renderClientPanel();
 }
 
+// Selecciona la sesión por su tipo (ej. 'PUSH'), no por índice.
+// Se usa al pinchar un cuadrado del split. Si el tipo aún no existe entre
+// las sesiones con ejercicios, igualmente lo activa porque tiposSesion
+// ahora incluye los del split aunque estén vacíos.
+function seleccionarSesionPorTipo(tipo){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const split = c._training.split || [];
+  const ejercicios = c._training.exercises || [];
+  const porSesion = {};
+  ejercicios.forEach(e => { const t=e.session_type||'OTROS'; (porSesion[t]=porSesion[t]||[]).push(e); });
+  const ordenSplit = [];
+  split.forEach(s => { if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s); });
+  const tiposSesion = ordenSplit
+    .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t) && t !== 'OTROS'));
+  const i = tiposSesion.indexOf(tipo);
+  if (i < 0) return;
+  editSesionEntreno = i;
+  editandoEjercicioId = null;
+  mostrandoSelectorEjercicio = false;
+  busquedaEjercicio = '';
+  // Hacer scroll suave a la zona de ejercicios para guiar visualmente
+  renderClientPanel();
+  setTimeout(() => {
+    const el = document.querySelector('[data-section="ejercicios-por-sesion"]');
+    if (el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 50);
+}
+
 // ── Bloque 6B — edición de un ejercicio del plan de entreno ──
 function editarEjercicio(id){
   editandoEjercicioId = id;
@@ -9135,8 +9182,12 @@ function colorSesion(tipo){
 
 function editarSplit(){
   editandoSplit = true;
-  splitBorrador = (currentClient && currentClient._training && currentClient._training.split)
+  const original = (currentClient && currentClient._training && currentClient._training.split)
     ? currentClient._training.split.slice() : [];
+  // Aplicar numeración automática al entrar al editor.
+  // Si un cliente antiguo tiene ['PUSH','OFF','PUSH','PULL'], al editar verá ['PUSH','OFF','PUSH 2','PULL'].
+  // El cambio NO se guarda en BD hasta que pulse "Guardar split".
+  splitBorrador = numerarSplit(original);
   splitDiaNuevo = null;
   renderClientPanel();
 }
@@ -9154,6 +9205,8 @@ function cambiarLongitudSplit(delta){
     // Quitar los últimos días (no se borra ningún ejercicio: solo deja de mostrarse)
     splitBorrador = splitBorrador.slice(0, nueva);
   }
+  // Renumerar tras el cambio de longitud
+  splitBorrador = numerarSplit(splitBorrador);
   splitDiaNuevo = null;
   renderClientPanel();
 }
@@ -9297,7 +9350,10 @@ function cancelarSplit(){
 // Tocar un chip: cambia el tipo de sesión del día en el borrador
 function cambiarDiaSplit(i, tipo){
   if (!splitBorrador) return;
-  splitBorrador[i] = tipo;
+  // Insertamos el tipo BASE (sin número) y dejamos que numerarSplit reasigne.
+  // Si el usuario eligió "PUSH 2" desde un chip, tipoBase lo normaliza a "PUSH".
+  splitBorrador[i] = tipoBase(tipo);
+  splitBorrador = numerarSplit(splitBorrador);
   splitDiaNuevo = null;
   renderClientPanel();
 }
@@ -9319,7 +9375,8 @@ function confirmarDiaNuevo(i){
     alert('Escribe un nombre para la sesión nueva.');
     return;
   }
-  splitBorrador[i] = valor;
+  splitBorrador[i] = tipoBase(valor);
+  splitBorrador = numerarSplit(splitBorrador);
   splitDiaNuevo = null;
   renderClientPanel();
 }
@@ -9339,14 +9396,53 @@ async function borrarTipoSesion(tipo){
   });
   if (!ok) return;
   dias.forEach(i => { splitBorrador[i] = 'OFF'; });
+  // Renumerar lo que quede (PUSH 3 puede pasar a ser PUSH 2 si quitaste el PUSH 2)
+  splitBorrador = numerarSplit(splitBorrador);
   splitDiaNuevo = null;
   renderClientPanel();
+}
+
+// ════════════════════════════════════════════════════════════
+// Numeración automática del split: si un tipo (PUSH, PULL...) aparece
+// más de una vez, las repeticiones se renombran a "PUSH 2", "PUSH 3", etc.
+// La primera aparición conserva el nombre base. Esto permite editar
+// ejercicios distintos para cada instancia.
+//
+// Entrada: ['PUSH','OFF','LEG','OFF','PUSH','PULL','OFF']
+// Salida:  ['PUSH','OFF','LEG','OFF','PUSH 2','PULL','OFF']
+//
+// Ya numerados se mantienen idempotentes: numerarSplit(numerarSplit(x)) === numerarSplit(x).
+// ════════════════════════════════════════════════════════════
+function numerarSplit(split){
+  if (!Array.isArray(split)) return split;
+  const result = new Array(split.length);
+  const contador = {};  // { 'PUSH': cuántas veces ha aparecido ya }
+  for (let i = 0; i < split.length; i++){
+    const s = split[i];
+    if (!s || s === 'OFF'){
+      result[i] = s || 'OFF';
+      continue;
+    }
+    // Despojar el sufijo numérico " 2", " 3" si lo tiene
+    const base = tipoBase(s);
+    contador[base] = (contador[base] || 0) + 1;
+    result[i] = contador[base] === 1 ? base : (base + ' ' + contador[base]);
+  }
+  return result;
+}
+
+// Devuelve el "tipo base" sin sufijo: "PUSH 2" → "PUSH", "PUSH" → "PUSH"
+function tipoBase(tipo){
+  if (!tipo) return tipo;
+  return String(tipo).replace(/\s+\d+$/, '').trim();
 }
 
 async function guardarSplit(){
   const c = currentClient;
   if (!c || !c._training || !c._training.plan || !splitBorrador) return;
-  const nuevoSplit = splitBorrador.slice();
+  // Aplicar numeración automática antes de guardar.
+  // PUSH, OFF, LEG, OFF, PUSH, PULL → PUSH, OFF, LEG, OFF, PUSH 2, PULL
+  const nuevoSplit = numerarSplit(splitBorrador);
 
   // Guardar en Supabase (training_plans.split + split_days coherente con la longitud)
   const { error } = await sb

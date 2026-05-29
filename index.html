@@ -7245,6 +7245,14 @@ function renderDietOpciones(ds) {
     </div>`;
 }
 
+// NOTA: builder antiguo basado en editPlan. Candidato a eliminar (ver renderPlanRows).
+function removeExercise(bi,ei){
+  if(!editPlan||!editPlan[bi])return;
+  editPlan[bi].ejercicios.splice(ei,1);
+  const cont=document.getElementById('plan-rows');
+  if(cont)cont.innerHTML=renderPlanRows();
+}
+
 function renderPlanRows() {
   if (!editPlan||!editPlan.length) return '<div style="padding:12px 14px;font-size:12px;color:var(--text3)">Sin ejercicios.</div>';
   return editPlan.map((bloque,bi)=>

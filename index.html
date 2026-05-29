@@ -3477,60 +3477,8 @@ function getWeekSchedule(ts, fromDate) {
 }
 
 // ── PENDING REQUESTS (demo) ───────────────────────────────────────────────
-const PENDING_REQUESTS = [
-  {
-    id: 'req1',
-    name: 'Carlos Mendez',
-    initials: 'CM',
-    edad: 29,
-    altura: 181,
-    peso: 82.5,
-    objetivo: 'Pérdida de grasa',
-    fecha: 'Hoy, 09:14',
-    nota: 'Me lo ha recomendado Jordi. Quiero definir para el verano.',
-    cuestionario: {
-      expGym: '1 año y medio, autodidacta',
-      diasSemana: '4 días',
-      horario: 'Tardes después del trabajo',
-      lesiones: 'Ninguna',
-      exNoGusta: 'Ninguno en particular',
-      alimentosGusta: 'Arroz, pollo, pasta, fruta',
-      alimentosNoGusta: 'Pescado azul',
-      alergias: 'Ninguna',
-      suplementos: 'Proteína whey',
-      trabajo: 'Comercial, mucho tiempo de pie',
-      sueno: '7 horas aprox',
-      deportes: 'Pádel los fines de semana',
-      notas: 'Tengo bastante grasa en abdomen. Quiero perder antes del verano.',
-    },
-  },
-  {
-    id: 'req2',
-    name: 'Elena Torres',
-    initials: 'ET',
-    edad: 25,
-    altura: 163,
-    peso: 57.2,
-    objetivo: 'Tonificación',
-    fecha: 'Ayer, 18:42',
-    nota: 'Nunca he ido al gym. Empezar desde cero, 3 días a la semana máximo.',
-    cuestionario: {
-      expGym: 'Sin experiencia previa',
-      diasSemana: '3 días máximo',
-      horario: 'Mediodía o tardes',
-      lesiones: 'Dolor lumbar leve ocasional',
-      exNoGusta: 'No lo sé aún',
-      alimentosGusta: 'Verduras, legumbres, pollo',
-      alimentosNoGusta: 'Carne roja',
-      alergias: 'Intolerante a la lactosa',
-      suplementos: 'Ninguna',
-      trabajo: 'Profesora, de pie bastantes horas',
-      sueno: '8 horas',
-      deportes: 'Yoga una vez por semana',
-      notas: 'Quiero tonificarme. No busco volumen, solo estar más fuerte y activa.',
-    },
-  },
-];
+// Solicitudes pendientes: se cargan desde Supabase (sin mocks)
+const PENDING_REQUESTS = [];
 let pendingRequests = [...PENDING_REQUESTS];
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────

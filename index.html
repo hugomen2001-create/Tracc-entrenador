@@ -7533,9 +7533,15 @@ function panelBibliotecaHtml(){
   return `<div style="border:1.5px solid var(--green);border-radius:13px;padding:13px;margin-bottom:14px;background:var(--bg)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
       <div style="font-size:12px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
-      <button onclick="cerrarBiblioteca()" style="
-        height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">Cerrar</button>
+      <div style="display:flex;gap:6px">
+        <input type="file" id="import-food-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarAlimentosExcel(this)">
+        <button onclick="document.getElementById('import-food-input').click()" title="Formato: Alimento | Kcal/100g | CH | G | P | Grupo" style="
+          height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel/CSV</button>
+        <button onclick="cerrarBiblioteca()" style="
+          height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">Cerrar</button>
+      </div>
     </div>
     <div style="background:var(--bg2);border-radius:10px;overflow:hidden">
       ${hdr}
@@ -7610,6 +7616,366 @@ function leerFormularioAlimento(pre){
     protein_g: protein, carbs_g: carbs, fat_g: fat,
     food_group: grupo || null,
   };
+}
+
+// ════════════════════════════════════════════════════════════
+// Importar alimentos desde Excel/CSV
+// Formato esperado: Alimento | Kcal/100g | CH | G | P | Grupo (opcional)
+// Duplicados (por nombre normalizado): se SOBRESCRIBEN con los nuevos macros.
+// ════════════════════════════════════════════════════════════
+async function importarAlimentosExcel(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  // Reset el input para que se pueda volver a subir el mismo archivo
+  input.value = '';
+  if (!coachData){
+    showToast('No hay coach activo');
+    return;
+  }
+
+  // Leer archivo
+  const rows = await leerArchivoTabular(file);
+  if (!rows || !rows.length){
+    showToast('No se pudo leer el archivo');
+    return;
+  }
+
+  // Saltar fila cabecera si la primera celda parece texto descriptivo
+  let inicio = 0;
+  const primera = rows[0];
+  if (primera && typeof primera[0] === 'string'){
+    const txt = primera[0].toLowerCase();
+    if (/aliment|nombre|food|item/.test(txt)) inicio = 1;
+  }
+
+  const aNum = (v) => {
+    if (v === '' || v == null) return null;
+    const s = String(v).replace(',','.').replace(/[^\d.\-]/g,'');
+    const n = parseFloat(s);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
+  // Parsear filas
+  const candidatos = [];
+  const errores = [];
+  for (let i = inicio; i < rows.length; i++){
+    const r = rows[i];
+    if (!r || r.every(c => c === '' || c == null)) continue;
+    const nombre = String(r[0]||'').trim();
+    if (!nombre){ continue; }
+    const kcal = aNum(r[1]);
+    const ch   = aNum(r[2]);
+    const g    = aNum(r[3]);
+    const p    = aNum(r[4]);
+    const grupo = (r[5] != null && String(r[5]).trim()) ? String(r[5]).trim() : null;
+    // Mínimo nombre y kcal — el resto puede quedar en null pero típicamente vienen
+    if (kcal == null){
+      errores.push('Fila '+(i+1)+': "'+nombre+'" sin kcal válida');
+      continue;
+    }
+    candidatos.push({ nombre, kcal, ch, g, p, grupo });
+  }
+
+  if (!candidatos.length){
+    showToast('No se encontraron filas válidas');
+    return;
+  }
+
+  // Preview + confirmación
+  const sobrescriben = candidatos.filter(c =>
+    (FOOD_LIBRARY||[]).some(f => normalizarNombre(f.name) === normalizarNombre(c.nombre))
+  ).length;
+  const nuevos = candidatos.length - sobrescriben;
+  const ok = await confirmDestructive({
+    title: 'Importar '+candidatos.length+' alimentos',
+    message:
+      '<strong style="color:#111">'+nuevos+' nuevos</strong> y <strong style="color:#111">'+sobrescriben+' que ya existen</strong> (se actualizarán sus macros).'
+      + (errores.length ? '<br><br><span style="color:#dc2626">'+errores.length+' fila(s) se saltarán por datos incompletos</span>' : ''),
+    confirmText: 'Importar', icon: 'inbox', danger: false,
+  });
+  if (!ok) return;
+
+  // Procesar — sobrescribimos por nombre. Si existe, update; si no, insert.
+  let okCount = 0, failCount = 0;
+  for (const c of candidatos){
+    const existente = (FOOD_LIBRARY||[]).find(f =>
+      normalizarNombre(f.name) === normalizarNombre(c.nombre)
+    );
+    const fila = {
+      coach_id: coachData.id,
+      name: c.nombre,
+      kcal_per_100g: c.kcal,
+      protein_g: c.p,
+      carbs_g: c.ch,
+      fat_g: c.g,
+      food_group: c.grupo,
+    };
+    if (existente){
+      // Sobrescribir
+      const { data, error } = await sb
+        .from('food_library')
+        .update(fila)
+        .eq('id', existente.id)
+        .select()
+        .single();
+      if (error || !data){ failCount++; console.error('importar update error:', error); continue; }
+      // Actualizar memoria
+      const idx = FOOD_LIBRARY.findIndex(f => f.id === existente.id);
+      if (idx >= 0) FOOD_LIBRARY[idx] = data;
+      okCount++;
+    } else {
+      const { data, error } = await sb
+        .from('food_library')
+        .insert(fila)
+        .select()
+        .single();
+      if (error || !data){ failCount++; console.error('importar insert error:', error); continue; }
+      FOOD_LIBRARY.push(data);
+      okCount++;
+    }
+  }
+
+  FOOD_LIBRARY.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  renderClientPanel();
+  const msg = okCount + ' alimento(s) importado(s)'
+    + (failCount ? ' · '+failCount+' fallaron' : '')
+    + (errores.length ? ' · '+errores.length+' fila(s) inválida(s)' : '');
+  showToast(msg);
+}
+
+// Helper común: lee un .xlsx, .xls o .csv como matriz de filas [[...],[...]].
+// Devuelve null si falla.
+async function leerArchivoTabular(file){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+    reader.onload = function(e){
+      try {
+        if (isCSV){
+          const txt = e.target.result || '';
+          const lines = txt.split(/\r?\n/).filter(l => l.trim());
+          // Soporta separador coma o punto y coma
+          const sep = (lines[0] && lines[0].includes(';')) ? ';' : ',';
+          const rows = lines.map(l => l.split(sep).map(c => c.trim().replace(/^"(.*)"$/, '$1')));
+          resolve(rows);
+        } else {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+            .filter(r => r && r.length);
+          resolve(rows);
+        }
+      } catch (err){
+        console.error('leerArchivoTabular error:', err);
+        resolve(null);
+      }
+    };
+    reader.onerror = () => resolve(null);
+    if (isCSV) reader.readAsText(file, 'UTF-8');
+    else reader.readAsArrayBuffer(file);
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// pegarLinkVideo — abre un modal pequeño para pegar/editar el link
+// de vídeo del ejercicio de la BIBLIOTECA (tabla `exercises.video_url`).
+// El cambio afecta a TODOS los clientes que usen ese ejercicio.
+// ════════════════════════════════════════════════════════════
+async function pegarLinkVideo(clientPlanId){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const ej = (c._training.exercises||[]).find(e => e.id === clientPlanId);
+  if (!ej) return;
+  // Buscar el exercise_id real desde client_plans
+  const { data: cp } = await sb
+    .from('client_plans')
+    .select('exercise_id')
+    .eq('id', clientPlanId)
+    .single();
+  if (!cp || !cp.exercise_id){
+    showToast('No se pudo localizar el ejercicio en la biblioteca');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'DM Sans\',sans-serif;';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.18);width:100%;max-width:420px;overflow:hidden;">' +
+      '<div style="padding:22px 22px 6px;">' +
+        '<div style="font-family:\'DM Serif Display\',serif;font-size:20px;color:#111;letter-spacing:-.3px;margin-bottom:6px;">Link de vídeo</div>' +
+        '<div style="font-size:12.5px;color:#888;line-height:1.5;margin-bottom:14px;"><strong style="color:#111">'+escHtml(ej.name||'Ejercicio')+'</strong> · YouTube, Vimeo o cualquier URL.</div>' +
+        '<input id="pl-input" type="url" placeholder="https://youtu.be/..." value="'+escHtml(ej.video_url||'')+'" style="width:100%;height:38px;padding:0 12px;border:1.5px solid #eaeae6;border-radius:10px;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none" autofocus>' +
+        '<div style="font-size:11px;color:#bbb;margin-top:6px;line-height:1.5">Deja vacío para quitar el vídeo.</div>' +
+      '</div>' +
+      '<div style="padding:14px 22px 22px;display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="pl-cancel" style="height:38px;padding:0 18px;border-radius:10px;border:1.5px solid #eaeae6;background:#fff;color:#666;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Cancelar</button>' +
+        '<button id="pl-ok" style="height:38px;padding:0 18px;border-radius:10px;border:none;background:#16a34a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">Guardar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  const inp = document.getElementById('pl-input');
+  inp.focus();
+  inp.setSelectionRange(0, inp.value.length);
+
+  const close = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  document.getElementById('pl-cancel').onclick = close;
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter') guardar(); });
+
+  const guardar = async () => {
+    const valor = (inp.value||'').trim();
+    const url = valor || null;
+    if (url){
+      // Validación mínima: que parezca URL
+      if (!/^https?:\/\//i.test(url)){
+        showToast('La URL debe empezar por http(s)://');
+        return;
+      }
+    }
+    const btn = document.getElementById('pl-ok');
+    btn.disabled = true; btn.style.opacity = '.6'; btn.textContent = 'Guardando...';
+    const { error } = await sb
+      .from('exercises')
+      .update({ video_url: url })
+      .eq('id', cp.exercise_id);
+    if (error){
+      console.error('pegarLinkVideo error:', error);
+      showToast('No se pudo guardar el link');
+      btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Guardar';
+      return;
+    }
+    // Actualizar memoria: biblioteca + todos los clientes que tengan este ejercicio
+    const libIdx = EXERCISE_LIBRARY.findIndex(e => e.id === cp.exercise_id);
+    if (libIdx >= 0) EXERCISE_LIBRARY[libIdx].video_url = url;
+    // Actualizar en el plan del cliente actual (todas las filas con ese exercise_id)
+    if (c._training && c._training.exercises){
+      // Necesitamos el exercise_id por cada fila — pero solo tenemos client_plans.id en memoria.
+      // Lo más simple: actualizar la fila del clientPlanId que se editó. Las otras (si existen
+      // en otros clientes) se refrescan al recargar.
+      const fila = c._training.exercises.find(e => e.id === clientPlanId);
+      if (fila) fila.video_url = url;
+    }
+    overlay.remove();
+    showToast(url ? 'Link guardado ✓' : 'Link quitado');
+    renderClientPanel();
+  };
+  document.getElementById('pl-ok').onclick = guardar;
+}
+
+// ════════════════════════════════════════════════════════════
+// Importar ejercicios desde Excel/CSV a la BIBLIOTECA (tabla `exercises`)
+// Formato esperado:
+//   Ejercicio | Tipo | Series | Reps | Descanso(s) | Aproximación | Link vídeo
+// Duplicados (por nombre normalizado): se SOBRESCRIBEN.
+// Los ejercicios NO se añaden al plan del cliente automáticamente.
+// ════════════════════════════════════════════════════════════
+async function importarEjerciciosExcel(input){
+  const file = input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const rows = await leerArchivoTabular(file);
+  if (!rows || !rows.length){
+    showToast('No se pudo leer el archivo');
+    return;
+  }
+
+  // Saltar cabecera si la primera celda parece descriptiva
+  let inicio = 0;
+  const primera = rows[0];
+  if (primera && typeof primera[0] === 'string'){
+    const txt = primera[0].toLowerCase();
+    if (/ejercici|nombre|exercise/.test(txt)) inicio = 1;
+  }
+
+  const aInt = (v) => {
+    if (v === '' || v == null) return null;
+    const s = String(v).replace(/[^\d\-]/g,'');
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const aStr = (v) => (v == null || v === '') ? null : String(v).trim();
+
+  // Parsear
+  const candidatos = [];
+  const errores = [];
+  for (let i = inicio; i < rows.length; i++){
+    const r = rows[i];
+    if (!r || r.every(c => c === '' || c == null)) continue;
+    const nombre = aStr(r[0]);
+    if (!nombre){ continue; }
+    const tipo     = aStr(r[1]);       // PUSH, PULL, etc — guarda en muscle_group
+    const sets     = aInt(r[2]);
+    const reps     = aStr(r[3]);       // "8-10", "10", "5x5" — string libre
+    const restSec  = aInt(r[4]);
+    const aprox    = aStr(r[5]);
+    const video    = aStr(r[6]);
+    candidatos.push({ nombre, tipo, sets, reps, restSec, aprox, video });
+  }
+
+  if (!candidatos.length){
+    showToast('No se encontraron filas válidas');
+    return;
+  }
+
+  // Preview
+  const sobrescriben = candidatos.filter(c =>
+    (EXERCISE_LIBRARY||[]).some(e => normalizarNombre(e.name) === normalizarNombre(c.nombre))
+  ).length;
+  const nuevos = candidatos.length - sobrescriben;
+  const ok = await confirmDestructive({
+    title: 'Importar '+candidatos.length+' ejercicios',
+    message:
+      '<strong style="color:#111">'+nuevos+' nuevos</strong> y <strong style="color:#111">'+sobrescriben+' que ya existen</strong> (se actualizarán sus datos por defecto).<br><br>'
+      + '<span style="color:#666">Solo se añaden a la <strong>biblioteca de ejercicios</strong>. Tendrás que añadirlos manualmente al plan del cliente.</span>',
+    confirmText: 'Importar', icon: 'inbox', danger: false,
+  });
+  if (!ok) return;
+
+  // Procesar
+  let okCount = 0, failCount = 0;
+  for (const c of candidatos){
+    const existente = (EXERCISE_LIBRARY||[]).find(e =>
+      normalizarNombre(e.name) === normalizarNombre(c.nombre)
+    );
+    const fila = {
+      name: c.nombre,
+      muscle_group: c.tipo,
+      video_url: c.video,
+      default_sets: c.sets,
+      default_reps: c.reps,
+      default_rest_sec: c.restSec,
+      default_approx: c.aprox,
+    };
+    if (existente){
+      const { data, error } = await sb
+        .from('exercises')
+        .update(fila)
+        .eq('id', existente.id)
+        .select()
+        .single();
+      if (error || !data){ failCount++; console.error('importar ej update error:', error); continue; }
+      const idx = EXERCISE_LIBRARY.findIndex(e => e.id === existente.id);
+      if (idx >= 0) EXERCISE_LIBRARY[idx] = data;
+      okCount++;
+    } else {
+      const { data, error } = await sb
+        .from('exercises')
+        .insert(fila)
+        .select()
+        .single();
+      if (error || !data){ failCount++; console.error('importar ej insert error:', error); continue; }
+      EXERCISE_LIBRARY.push(data);
+      okCount++;
+    }
+  }
+
+  EXERCISE_LIBRARY.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  renderClientPanel();
+  const msg = okCount + ' ejercicio(s) importado(s)'
+    + (failCount ? ' · '+failCount+' fallaron' : '');
+  showToast(msg);
 }
 
 async function guardarNuevoAlimento(){
@@ -8573,8 +8939,11 @@ function seccionPlanEntreno(c){
             </div>
           </div>
           ${ej.video_url
-            ? `<a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;flex-shrink:0;font-weight:600">▶ Vídeo</a>`
-            : ''}
+            ? `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                <a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;font-weight:600">▶ Ver vídeo</a>
+                <button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Editar el link del vídeo" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:2px 4px">✎</button>
+              </div>`
+            : `<button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Añadir link de vídeo (YouTube/Vimeo)" style="font-size:10.5px;color:var(--text3);background:var(--bg);border:1.5px dashed var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif">🔗 Pegar link</button>`}
           ${flechas}
           ${botonEditar}
           ${botonQuitar}
@@ -8608,6 +8977,10 @@ function seccionPlanEntreno(c){
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
+        <input type="file" id="import-ex-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarEjerciciosExcel(this)">
+        <button onclick="document.getElementById('import-ex-input').click()" title="Formato: Ejercicio | Tipo | Series | Reps | Descanso(s) | Aproximación | Link vídeo" style="
+          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel</button>
         <button onclick="abrirPlantillas()" style="
           height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📋 Plantillas</button>

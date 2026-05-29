@@ -6633,7 +6633,7 @@ function revisionColumna(c, rev){
               title="Cambiar nombre"
               style="position:absolute;bottom:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);border:1.5px solid #fff;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✎</button>
           </div>
-          <div style="font-size:9px;color:var(--text2);text-align:center;font-weight:600">${escHtml(foto.label || 'Sin nombre')}</div>
+          <div style="font-size:9px;color:${foto.label?'var(--text2)':'var(--text3)'};text-align:center;font-weight:600;font-style:${foto.label?'normal':'italic'}">${foto.label?escHtml(foto.label):'Sin nombre'}</div>
         </div>
       `).join('')
     : '';
@@ -6826,7 +6826,7 @@ function pedirNombreFoto(titulo, valorInicial){
       '<div style="background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.18);width:100%;max-width:380px;overflow:hidden">' +
         '<div style="padding:22px 22px 6px">' +
           '<div style="font-family:\'DM Serif Display\',serif;font-size:20px;color:#111;letter-spacing:-.3px;margin-bottom:6px">' + escHtml(titulo) + '</div>' +
-          '<div style="font-size:12.5px;color:#888;line-height:1.5;margin-bottom:14px">Pon un nombre descriptivo para identificar esta foto (ej: <em>Frontal</em>, <em>Espalda relajada</em>, <em>Cuádriceps</em>).</div>' +
+          '<div style="font-size:12.5px;color:#888;line-height:1.5;margin-bottom:14px">Nombre <strong style="color:#111">opcional</strong> para identificar la foto (ej: <em>Frontal</em>, <em>Espalda relajada</em>, <em>Cuádriceps</em>). Déjalo en blanco si no quieres ponerle nombre.</div>' +
           '<input id="nf-input" type="text" maxlength="60" placeholder="Frontal" value="' + escHtml(valorInicial||'') + '" style="width:100%;height:38px;padding:0 12px;border:1.5px solid #eaeae6;border-radius:10px;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' +
         '</div>' +
         '<div style="padding:14px 22px 22px;display:flex;gap:8px;justify-content:flex-end">' +
@@ -6840,7 +6840,7 @@ function pedirNombreFoto(titulo, valorInicial){
     const done = (v) => { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
     const submit = () => {
       const v = (inp.value||'').trim();
-      done(v || 'Foto');
+      done(v); // permitir cadena vacía (foto sin nombre)
     };
     const onKey = (e) => { if (e.key === 'Escape') done(null); else if (e.key === 'Enter') submit(); };
     document.addEventListener('keydown', onKey);
@@ -6866,7 +6866,7 @@ async function procesarSubidaFotoNueva(revisionId, file, label){
     }
     const { data, error: dbErr } = await sb
       .from('revision_photos')
-      .insert({ revision_id: revisionId, label: label, photo_path: path })
+      .insert({ revision_id: revisionId, label: (label && label.trim()) || null, photo_path: path })
       .select().single();
     if (dbErr || !data){
       console.error('insert revision_photos error:', dbErr);
@@ -6949,11 +6949,12 @@ async function renombrarFoto(fotoId){
 
   const nombre = await pedirNombreFoto('Renombrar foto', foto.label || '');
   if (nombre === null) return;
-  if (nombre === foto.label) return; // sin cambios
+  const labelGuardar = (nombre && nombre.trim()) || null;
+  if (labelGuardar === foto.label) return; // sin cambios
 
   const { data, error } = await sb
     .from('revision_photos')
-    .update({ label: nombre })
+    .update({ label: labelGuardar })
     .eq('id', fotoId)
     .select().single();
   if (error || !data){

@@ -2520,6 +2520,21 @@ function statusFromLastSession(lastSessionDate){
   return 'red';
 }
 
+// Texto "entrenó hace X" a partir de la fecha de la última sesión
+function lastSessionLabel(lastSessionDate){
+  if (!lastSessionDate) return 'Sin sesiones';
+  const last = new Date(String(lastSessionDate).slice(0,10)+'T00:00:00');
+  if (isNaN(last)) return 'Sin sesiones';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = Math.floor((today - last) / 86400000);
+  if (days <= 0)  return 'Hoy';
+  if (days === 1) return 'Ayer';
+  if (days < 7)   return 'Hace ' + days + ' días';
+  if (days < 14)  return 'Hace 1 semana';
+  if (days < 30)  return 'Hace ' + Math.floor(days/7) + ' semanas';
+  return 'Hace +1 mes';
+}
+
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
@@ -3985,10 +4000,15 @@ function renderClientList() {
   list.innerHTML = clients.map(c => {
     const dot = getDotClass(c);
     const isActive = currentClient && currentClient.id === c.id;
+    const lastLbl = lastSessionLabel(c._lastSessionDate);
+    const lastColor = dot==='green' ? 'var(--green)' : dot==='amber' ? 'var(--amber)' : 'var(--text3)';
     return `<div class="client-item${isActive?' active':''}" id="ci-${c.id}" onclick="selectClient('${c.id}')">
       <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
-      <div class="client-name">${c.name}</div>
+      <div style="flex:1;min-width:0">
+        <div class="client-name">${c.name}</div>
+        <div style="font-size:10.5px;color:${lastColor};font-weight:600;margin-top:1px">${lastLbl}</div>
+      </div>
       <div class="client-tag">${c.stats.sessions}/${c.stats.sessionGoal}</div>
     </div>`;
   }).join('');
@@ -6775,6 +6795,7 @@ async function guardarNuevaRevision(){
     };
     if (weightRaw) fila.weight_kg = parseFloat(weightRaw);
     if (notesRaw) fila.notes = notesRaw;
+    fila.seen_by_client = false; // el cliente verá el aviso en su pestaña Progreso
 
     const { data, error } = await sb
       .from('progress_photos')
@@ -6843,7 +6864,7 @@ async function guardarNotaRevision(revId){
   if (errEl) errEl.style.display = 'none';
   if (btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
   try {
-    const { error } = await sb.from('progress_photos').update({ notes: val || null }).eq('id', revId);
+    const { error } = await sb.from('progress_photos').update({ notes: val || null, seen_by_client: false }).eq('id', revId);
     if (error){
       console.error('guardarNotaRevision error:', error);
       if (errEl){ errEl.textContent = 'No se pudo guardar la nota.'; errEl.style.display = 'block'; }
@@ -6955,6 +6976,8 @@ async function procesarSubidaFotoNueva(revisionId, file, label){
       rev._photos = rev._photos || [];
       rev._photos.push(data);
     }
+    // Volver a avisar al cliente (hay contenido nuevo en la revisión)
+    sb.from('progress_photos').update({ seen_by_client: false }).eq('id', revisionId).then(()=>{}, ()=>{});
     renderClientPanel();
     hydratePhotoUrls();
     showToast('✓ Foto añadida');

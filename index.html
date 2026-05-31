@@ -13064,13 +13064,13 @@ async function aceptarContrapropuesta(id){
 // ══════════════════════════════════════════════════════════════════════════
 let _importRows = null;
 // Mapea el sexo del Excel (H/M, hombre/mujer, male/female...) a los valores
-// que admite la BD: 'male' / 'female' / 'other'. Devuelve null si no se reconoce.
+// que admite la BD: 'hombre' / 'mujer' / 'otro'. Devuelve null si no se reconoce.
 function _mapGenero(v){
   const s=String(v||'').trim().toLowerCase();
   if(!s) return null;
-  if(['h','hombre','masculino','varon','varón','male','m (hombre)'].includes(s)) return 'male';
-  if(['m','mujer','femenino','female','f'].includes(s)) return 'female';
-  if(['o','otro','other','x','nb'].includes(s)) return 'other';
+  if(['h','hombre','masculino','varon','varón','male','m (hombre)'].includes(s)) return 'hombre';
+  if(['m','mujer','femenino','female','f'].includes(s)) return 'mujer';
+  if(['o','otro','other','x','nb'].includes(s)) return 'otro';
   return null;
 }
 

@@ -13324,7 +13324,15 @@ async function ejecutarImportClientes(){
       revision_every_weeks:r.revw, member_since:new Date().toISOString().slice(0,10), active:true, status:'active'
     }));
     if(toInsert.length){
-      try{ const {error}=await sb.from('clients').insert(toInsert);
+      try{
+        let {error}=await sb.from('clients').insert(toInsert);
+        // Si la BD rechaza el valor de 'sexo' por una restricción, reintentar sin ese campo
+        if(error && /gender/i.test(error.message||'')){
+          const sinGenero=toInsert.map(c=>{ const x=Object.assign({},c); delete x.gender; return x; });
+          const r2=await sb.from('clients').insert(sinGenero);
+          error=r2.error;
+          if(!error) showToast('Importado (el campo "Sexo" se omitió: revisa los valores permitidos)');
+        }
         if(error){ console.error('import clients:',error); showToast('Error al importar clientes: '+(error.message||'')); return; }
         nClientes=toInsert.length;
       }catch(e){ console.error(e); showToast('Error al importar clientes'); return; }

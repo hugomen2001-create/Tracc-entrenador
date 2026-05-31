@@ -13539,7 +13539,7 @@ async function _importarRutina(idDe, errores){
     const cont={};
     const cpRows=filas.map(f=>{ const exId=libByName[f.exercise.trim().toLowerCase()]||null; const st=f.sesion;
       cont[st]=(cont[st]||0)+1;
-      const row={ client_id:cid, is_active:true, exercise_id:exId,
+      const row={ client_id:cid, coach_id:coachData.id, is_active:true, exercise_id:exId,
         session_type:st, exercise_order:f.orden!=null?f.orden:cont[st], sets:f.series, reps:f.reps, approx:f.approx, rest_sec:f.rest };
       if(tieneTPI) row.training_plan_id=plan.id;
       return row; })

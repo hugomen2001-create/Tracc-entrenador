@@ -4528,6 +4528,304 @@ async function toggleClienteBaja(){
   }catch(e){ console.error(e); showToast('✕ Error'); }
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   FASE 3: capa de plataforma (admin) + "Mi plan" del entrenador.
+   El admin (coaches.is_admin = true) ve a todos los entrenadores y lo que cada
+   uno paga a la plataforma (tabla coach_billing). Reutiliza billingSchedule/
+   Status/Monthly. Los entrenadores normales ven su propia cuota en "Mi plan".
+   ─────────────────────────────────────────────────────────────────────────── */
+let ADMIN_COACHES = [];
+let _adminMode = null;     // 'overview' | 'coach' | 'config'
+let _adminCoachId = null;
+let _adminCfgIv = null;    // intervalo seleccionado en el form
+
+async function loadAdminData(){
+  try{
+    const [coachesRes, cbRes, clientsRes, clibRes] = await Promise.all([
+      sb.from('coaches').select('*'),
+      sb.from('coach_billing').select('*'),
+      sb.from('clients').select('id,coach_id,active'),
+      sb.from('client_billing').select('client_id,amount,interval_months,num_payments,active')
+    ]);
+    const cbById = {}; (cbRes.data||[]).forEach(r=>{ cbById[r.coach_id]=r; });
+    const clibById = {}; (clibRes.data||[]).forEach(r=>{ clibById[r.client_id]=r; });
+    const clients = clientsRes.data||[];
+    let list = (coachesRes.data||[]).filter(c=>!c.is_admin);
+    list.forEach(co=>{
+      const mine = clients.filter(cl=>cl.coach_id===co.id && cl.active!==false);
+      co._billing = cbById[co.id]||null;
+      co._clientCount = mine.length;
+      let mrr=0; mine.forEach(cl=>{ const b=clibById[cl.id]; if(b) mrr+=billingMonthly(b); });
+      co._clientMRR = mrr;
+    });
+    list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    ADMIN_COACHES = list;
+  }catch(e){ console.error('loadAdminData:', e); ADMIN_COACHES=[]; }
+}
+
+function initAdmin(){
+  // Cabecera lateral → modo admin
+  const sub = document.querySelector('.logo-sub'); if(sub) sub.textContent='Panel Admin';
+  const nameEl = document.querySelector('.coach-name'); if(nameEl) nameEl.textContent=(coachData.name||'Admin').split(' ')[0];
+  const roleEl = document.querySelector('.coach-role'); if(roleEl) roleEl.textContent='Administrador';
+  const av = document.querySelector('.coach-card .avatar'); if(av) av.textContent=(coachData.name||'A').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  // Ocultar botones que no aplican al admin
+  ['pagos-btn','plan-btn','pending-btn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display='none'; });
+  const ov = document.getElementById('overview-btn'); if(ov){ ov.setAttribute('onclick','adminGoOverview()'); }
+  // Etiqueta de la sección y barra de filtros
+  const lbl = document.querySelector('.sb-label'); if(lbl) lbl.textContent='Entrenadores';
+  const fb = document.querySelector('.sb-filter-bar'); if(fb) fb.style.display='none';
+  // Cargar y pintar
+  loadAdminData().then(()=>{ renderAdminSidebar(); adminGoOverview(); });
+}
+
+function renderAdminSidebar(){
+  const list = document.getElementById('client-list'); if(!list) return;
+  if(!ADMIN_COACHES.length){
+    list.innerHTML = '<div style="padding:30px 18px;text-align:center;color:var(--text3);font-size:12.5px;line-height:1.6">Aún no hay entrenadores en la plataforma.</div>';
+  } else {
+    list.innerHTML = ADMIN_COACHES.map(co=>{
+      const st = billingStatus(co._billing);
+      const dot = st.state==='vencido'?'var(--red)':st.state==='pendiente'?'var(--amber)':st.state==='al_dia'||st.state==='saldado'?'var(--green)':'#ccc';
+      const ini = (co.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+      const active = _adminMode!=='overview' && _adminCoachId===co.id;
+      return `<div class="client-item${active?' active':''}" onclick="adminOpenCoach('${co.id}')">
+        <div class="cdot" style="background:${dot}"></div>
+        <div class="c-av">${ini}</div>
+        <div style="flex:1;min-width:0"><div class="client-name">${escHtml(co.name||'—')}</div>
+          <div style="font-size:10.5px;color:var(--text3);font-weight:600">${co._clientCount} cliente${co._clientCount===1?'':'s'}</div></div>
+      </div>`;
+    }).join('');
+  }
+  const ac=document.getElementById('active-count'); if(ac) ac.textContent=ADMIN_COACHES.length;
+  const tc=document.getElementById('total-count'); if(tc){ const totalClients=ADMIN_COACHES.reduce((a,c)=>a+c._clientCount,0); const footer=tc.closest('.sb-footer'); if(footer) footer.innerHTML=`<span>${ADMIN_COACHES.length}</span> entrenadores · <span>${totalClients}</span> clientes`; }
+}
+
+function _adminEur(n){ return Math.round(n).toLocaleString('es-ES')+' €'; }
+function _adminStatePill(state){
+  const m={al_dia:['Al día','var(--green)','rgba(22,163,74,.12)'], pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2'], saldado:['Saldado','var(--text3)','var(--bg3)'], none:['Sin plan','var(--text3)','var(--bg3)']};
+  return m[state]||m.none;
+}
+
+function adminGoOverview(){
+  _adminMode='overview'; _adminCoachId=null;
+  const ov=document.getElementById('overview-btn'); if(ov){ ov.style.background='#1a1a18'; ov.style.color='#fff'; }
+  renderAdminSidebar();
+  renderAdminOverview();
+}
+
+function renderAdminOverview(){
+  const now=new Date();
+  const ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const finMes=new Date(now.getFullYear(), now.getMonth()+1, 0);
+  let mrr=0, cobrado=0, pendientes=0, pagados=0;
+  ADMIN_COACHES.forEach(co=>{
+    mrr += billingMonthly(co._billing);
+    const sch=billingSchedule(co._billing);
+    let cobradoEste=false;
+    sch.forEach(p=>{
+      if(p.paid && String(p.due).slice(0,7)===ym){ cobrado+=p.amount; }
+      if(!p.paid){ const dd=new Date(String(p.due).slice(0,10)+'T00:00:00'); if(dd<=finMes) pendientes++; }
+    });
+    const st=billingStatus(co._billing);
+    if(st.state==='al_dia'||st.state==='saldado') pagados++;
+  });
+
+  const cards = ADMIN_COACHES.map(co=>{
+    const st=billingStatus(co._billing);
+    const pill=_adminStatePill(st.state);
+    const ini=(co.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const teP = billingMonthly(co._billing);
+    const teTxt = co._billing ? (teP>0?_adminEur(teP):(co._billing.num_payments>1?'fracc.':'único')) : '—';
+    const desde = co.created_at ? new Date(co.created_at).toLocaleDateString('es-ES',{month:'short',year:'numeric'}) : '';
+    return `<div class="ccard" onclick="adminOpenCoach('${co.id}')">
+      <div class="ccard-top">
+        <div class="ccard-av" style="background:var(--bg3);color:var(--text2)">${ini}</div>
+        <div style="flex:1;min-width:0"><div class="ccard-name">${escHtml(co.name||'—')}</div><div class="ccard-meta">${desde?'desde '+desde:''}</div></div>
+        <span style="font-size:10.5px;font-weight:700;color:${pill[1]};background:${pill[2]};padding:3px 9px;border-radius:6px">${pill[0]}</span>
+      </div>
+      <div class="ccard-stats">
+        <div class="cs"><div class="cs-v">${teTxt}</div><div class="cs-l">te paga</div></div>
+        <div class="cs"><div class="cs-v">${co._clientCount}</div><div class="cs-l">clientes</div></div>
+        <div class="cs"><div class="cs-v g">${_adminEur(co._clientMRR)}</div><div class="cs-l">factura</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('main-panel').innerHTML = `
+    <div class="vg-header">
+      <div>
+        <div class="vg-title">${_vgSaludo()}, ${(coachData.name||'Hugo').split(' ')[0]}.</div>
+        <div class="vg-date">${_vgFechaLarga()} · ${ADMIN_COACHES.length} entrenadores · ${ADMIN_COACHES.reduce((a,c)=>a+c._clientCount,0)} clientes</div>
+      </div>
+    </div>
+    <div class="vg-body">
+      <div class="kpi-strip">
+        <div class="kpi"><div class="kpi-lbl">Ingresos plataforma</div><div class="kpi-val g">${_adminEur(mrr)}</div><div class="kpi-sub">al mes (MRR)</div></div>
+        <div class="kpi"><div class="kpi-lbl">Cobrado este mes</div><div class="kpi-val">${_adminEur(cobrado)}</div><div class="kpi-sub">${pagados} de ${ADMIN_COACHES.length} al día</div></div>
+        <div class="kpi"><div class="kpi-lbl">Pendiente</div><div class="kpi-val ${pendientes>0?'am':''}">${pendientes}</div><div class="kpi-sub ${pendientes>0?'am':''}">pago${pendientes===1?'':'s'} este mes</div></div>
+        <div class="kpi"><div class="kpi-lbl">Entrenadores</div><div class="kpi-val">${ADMIN_COACHES.length}</div><div class="kpi-sub">activos</div></div>
+      </div>
+      <div class="sec-hd" style="margin-bottom:10px"><div class="sec-t">Entrenadores</div></div>
+      <div class="clients-grid">${cards||'<div style="color:var(--text3);font-size:13px;padding:20px">Sin entrenadores.</div>'}</div>
+    </div>`;
+}
+
+function adminOpenCoach(id){
+  _adminMode='coach'; _adminCoachId=id; _adminCfgIv=null;
+  const ov=document.getElementById('overview-btn'); if(ov){ ov.style.background='var(--bg2)'; ov.style.color='var(--text2)'; }
+  renderAdminSidebar();
+  renderAdminCoach();
+}
+
+function _adminCoach(){ return ADMIN_COACHES.find(c=>c.id===_adminCoachId); }
+
+function renderAdminCoach(){
+  const co=_adminCoach(); if(!co){ adminGoOverview(); return; }
+  const b=co._billing;
+  const st=billingStatus(b);
+  const pill=_adminStatePill(st.state);
+  const ini=(co.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const desde = co.created_at ? new Date(co.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) : '—';
+
+  let planCard;
+  if(!b){
+    planCard = `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:18px;text-align:center">
+      <div style="font-size:13px;color:var(--text3);margin-bottom:12px">Este entrenador no tiene plan de plataforma configurado.</div>
+      <button onclick="adminConfigPlan()" style="padding:10px 18px;font-size:13px;font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Configurar plan</button>
+    </div>`;
+  } else {
+    const total=Number(b.amount)*b.num_payments;
+    const resumen = b.num_payments>1 ? `${b.num_payments} pagos de ${Number(b.amount).toLocaleString('es-ES')} € · ${billingIntervalLabel(b.interval_months)}` : `1 pago de ${Number(b.amount).toLocaleString('es-ES')} € (pago único)`;
+    const rows = st.sch.map(p=>{
+      const right = p.paid
+        ? `<button onclick="adminTogglePago(${p.n})" style="font-size:11.5px;font-weight:700;color:var(--green);background:rgba(22,163,74,.12);border:none;padding:5px 11px;border-radius:8px;cursor:pointer;font-family:inherit">✓ Cobrado</button>`
+        : (st.next&&st.next.n===p.n
+            ? `<button onclick="adminTogglePago(${p.n})" style="font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;font-family:inherit">Marcar cobrado</button>`
+            : `<button onclick="adminTogglePago(${p.n})" style="font-size:11.5px;font-weight:600;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit">Pendiente</button>`);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;${p.n<st.sch.length?'border-bottom:1px solid var(--border)':''}">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Pago ${p.n} · ${Number(p.amount).toLocaleString('es-ES')} €</div><div style="font-size:11px;color:var(--text3)">${fmtFecha(p.due)}</div></div>${right}
+      </div>`;
+    }).join('');
+    planCard = `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Su plan de plataforma</div>
+          <button onclick="adminConfigPlan()" style="font-size:11px;padding:5px 11px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text2);cursor:pointer;font-family:inherit">Configurar plan</button>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between">
+          <div><div style="font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);line-height:1">${Number(total).toLocaleString('es-ES')} €</div><div style="font-size:12px;color:var(--text2);font-weight:600;margin-top:3px">${resumen}</div></div>
+          ${st.next?`<div style="font-size:11.5px;color:var(--text3);text-align:right">próximo · ${fmtFecha(st.next.due)}</div>`:`<div style="font-size:11.5px;color:var(--green);text-align:right">saldado</div>`}
+        </div>
+      </div>
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Pagos del plan</div>
+        ${rows}
+      </div>`;
+  }
+
+  document.getElementById('main-panel').innerHTML = `
+    <div class="vg-header" style="display:flex;align-items:center;gap:12px">
+      <div onclick="adminGoOverview()" style="font-size:20px;color:var(--text3);cursor:pointer;line-height:1">←</div>
+      <div class="ccard-av" style="width:44px;height:44px;background:var(--bg3);color:var(--text2);font-size:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">${ini}</div>
+      <div style="flex:1"><div class="vg-title" style="font-size:21px">${escHtml(co.name||'—')}</div><div class="vg-date">Entrenador desde ${desde} · ${co._clientCount} cliente${co._clientCount===1?'':'s'}</div></div>
+      <span style="font-size:11px;font-weight:700;color:${pill[1]};background:${pill[2]};padding:5px 11px;border-radius:8px">${pill[0]}</span>
+    </div>
+    <div class="vg-body">
+      ${planCard}
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Su negocio · factura ${_adminEur(co._clientMRR)}/mes</div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.6">${co._clientCount} cliente${co._clientCount===1?'':'s'} activo${co._clientCount===1?'':'s'} · ingresos recurrentes estimados ${_adminEur(co._clientMRR)}/mes.</div>
+      </div>
+    </div>`;
+}
+
+function adminConfigPlan(){ _adminMode='config'; _adminCfgIv=null; renderAdminConfig(); }
+
+function setAdminCfgIv(v){ _adminCfgIv=v; renderAdminConfig(); }
+
+function updateAdminCfgPreview(){
+  const amount=parseFloat((document.getElementById('acfg-amount')||{}).value)||0;
+  const num=parseInt((document.getElementById('acfg-num')||{}).value)||1;
+  const co=_adminCoach(); const iv=(_adminCfgIv!=null)?_adminCfgIv:(co&&co._billing?co._billing.interval_months:1);
+  const el=document.getElementById('acfg-preview'); if(!el) return;
+  if(!amount){ el.innerHTML='Rellena el importe para ver el resumen.'; return; }
+  const total=amount*num;
+  el.innerHTML=(num>1?('<b>'+num+' pagos de '+amount.toLocaleString('es-ES')+' €</b> · '+billingIntervalLabel(iv)):('<b>1 pago de '+amount.toLocaleString('es-ES')+' €</b> (pago único)'))+'<br>Total: <b>'+total.toLocaleString('es-ES')+' €</b>';
+}
+
+function renderAdminConfig(){
+  const co=_adminCoach(); if(!co){ adminGoOverview(); return; }
+  const b=co._billing;
+  const ivSel=(_adminCfgIv!=null)?_adminCfgIv:(b?b.interval_months:1);
+  const segOpts=[[0,'Pago único'],[1,'Cada mes'],[2,'Cada 2 m'],[3,'Cada 3 m']];
+  const seg=segOpts.map(o=>{ const on=ivSel===o[0]; return `<div onclick="setAdminCfgIv(${o[0]})" style="flex:1;text-align:center;font-size:11.5px;font-weight:600;padding:9px 4px;border-radius:9px;cursor:pointer;${on?'background:var(--accent);color:#fff':'background:var(--bg);color:var(--text2);border:1.5px solid var(--border)'}">${o[1]}</div>`; }).join('');
+  const inp='border:1.5px solid var(--border);border-radius:9px;padding:10px;background:var(--bg);font-size:14px;color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;outline:none';
+  const lbl='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
+
+  document.getElementById('main-panel').innerHTML = `
+    <div class="vg-header" style="display:flex;align-items:center;gap:10px">
+      <div onclick="renderAdminCoach()" style="font-size:20px;color:var(--text3);cursor:pointer;line-height:1">←</div>
+      <div><div class="vg-title" style="font-size:20px">Plan de ${escHtml(co.name||'—')}</div><div class="vg-date">Lo que te paga a la plataforma</div></div>
+    </div>
+    <div class="vg-body">
+      <div style="max-width:440px">
+        <div style="display:flex;gap:10px;margin-bottom:13px">
+          <div style="flex:1"><div style="${lbl}">Importe por pago</div><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;padding:0 10px;background:var(--bg)"><input id="acfg-amount" type="number" step="0.01" value="${b?b.amount:''}" oninput="updateAdminCfgPreview()" placeholder="49" style="border:none;background:none;font-size:14px;padding:10px 0;width:100%;color:var(--text);outline:none;font-family:inherit"><span style="font-size:13px;color:var(--text3)">€</span></div></div>
+          <div style="flex:1"><div style="${lbl}">Nº de pagos</div><input id="acfg-num" type="number" min="1" value="${b?b.num_payments:12}" oninput="updateAdminCfgPreview()" style="${inp}"></div>
+        </div>
+        <div style="margin-bottom:13px"><div style="${lbl}">Cada cuánto se paga</div><div style="display:flex;gap:6px">${seg}</div></div>
+        <div style="margin-bottom:13px"><div style="${lbl}">Primer cobro</div><input id="acfg-first" type="date" value="${b?String(b.first_charge).slice(0,10):''}" style="${inp}"></div>
+        <div style="margin-bottom:14px"><div style="${lbl}">Enlace de pago (Stripe)</div><input id="acfg-link" type="url" value="${b&&b.pay_link?escHtml(b.pay_link):''}" placeholder="https://buy.stripe.com/..." style="${inp};font-size:12.5px"></div>
+        <div style="background:var(--bg3);border-radius:10px;padding:11px 13px;margin-bottom:16px"><div style="${lbl};margin-bottom:5px">Resumen del plan</div><div id="acfg-preview" style="font-size:13px;color:var(--text);line-height:1.6">Rellena el importe para ver el resumen.</div></div>
+        <button onclick="adminGuardarPlan()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Guardar plan</button>
+        ${b?`<button onclick="adminEliminarPlan()" style="width:100%;margin-top:8px;padding:10px;font-size:12.5px;font-weight:600;background:none;color:#dc2626;border:1.5px solid var(--border);border-radius:11px;cursor:pointer;font-family:inherit">Eliminar plan</button>`:''}
+      </div>
+    </div>`;
+}
+
+async function adminGuardarPlan(){
+  const co=_adminCoach(); if(!co) return;
+  const amount=parseFloat((document.getElementById('acfg-amount')||{}).value);
+  const num=parseInt((document.getElementById('acfg-num')||{}).value)||1;
+  const iv=(_adminCfgIv!=null)?_adminCfgIv:(co._billing?co._billing.interval_months:1);
+  const first=(document.getElementById('acfg-first')||{}).value;
+  const link=((document.getElementById('acfg-link')||{}).value||'').trim();
+  if(!amount||amount<=0){ showToast('Pon un importe válido'); return; }
+  if(!first){ showToast('Pon la fecha del primer cobro'); return; }
+  const row={coach_id:co.id, amount:amount, num_payments:num, interval_months:iv, first_charge:first, pay_link:link||null, pay_label:'Stripe', currency:'EUR', active:true, updated_at:new Date().toISOString()};
+  if(co._billing && Array.isArray(co._billing.paid_numbers)) row.paid_numbers=co._billing.paid_numbers.filter(n=>n<=num);
+  try{
+    const {data,error}=await sb.from('coach_billing').upsert(row,{onConflict:'coach_id'}).select('*').single();
+    if(error){ console.error('adminGuardarPlan:', error); showToast('✕ No se pudo guardar'); return; }
+    co._billing=data; _adminCfgIv=null;
+    renderAdminSidebar(); renderAdminCoach(); showToast('✓ Plan guardado');
+  }catch(e){ console.error(e); showToast('✕ Error al guardar'); }
+}
+
+async function adminTogglePago(n){
+  const co=_adminCoach(); if(!co||!co._billing) return;
+  let paid=Array.isArray(co._billing.paid_numbers)?co._billing.paid_numbers.slice():[];
+  const i=paid.indexOf(n); if(i>=0) paid.splice(i,1); else paid.push(n);
+  paid.sort((a,b)=>a-b);
+  co._billing.paid_numbers=paid;
+  renderAdminSidebar(); renderAdminCoach();
+  try{
+    const {error}=await sb.from('coach_billing').update({paid_numbers:paid, updated_at:new Date().toISOString()}).eq('coach_id',co.id);
+    if(error){ console.error('adminTogglePago:', error); showToast('✕ No se pudo actualizar'); }
+  }catch(e){ console.error(e); }
+}
+
+async function adminEliminarPlan(){
+  const co=_adminCoach(); if(!co||!co._billing) return;
+  if(!confirm('¿Eliminar el plan de plataforma de este entrenador?')) return;
+  try{
+    const {error}=await sb.from('coach_billing').delete().eq('coach_id',co.id);
+    if(error){ console.error('adminEliminarPlan:', error); showToast('✕ No se pudo eliminar'); return; }
+    co._billing=null; _adminCfgIv=null;
+    renderAdminSidebar(); renderAdminCoach(); showToast('✓ Plan eliminado');
+  }catch(e){ console.error(e); showToast('✕ Error'); }
+}
+
 /* ── FASE 2: resumen de negocio (Vista general) ── */
 // Carga las cuotas de TODOS los clientes en una sola consulta (para la Vista general)
 async function cargarBillingTodos(){
@@ -8300,24 +8598,65 @@ function renderPagosPanel(){
     </div>`;
 }
 
-// Panel "Mi plan" (suscripción del entrenador con la plataforma) — llega en Fase 3
+// Panel "Mi plan" (suscripción del entrenador con la plataforma)
+let _coachPlan = undefined;   // fila coach_billing del coach actual (o null)
+async function cargarMiPlan(){
+  if(_coachPlan !== undefined) return;
+  _coachPlan = null;
+  try{
+    const {data,error} = await sb.from('coach_billing').select('*').eq('coach_id', coachData.id).maybeSingle();
+    if(error){ console.warn('cargarMiPlan:', error); return; }
+    _coachPlan = data || null;
+  }catch(e){ console.warn('cargarMiPlan exception:', e); }
+}
+function pagarMiPlan(){
+  if(_coachPlan && _coachPlan.pay_link){ window.open(_coachPlan.pay_link,'_blank'); }
+  else { showToast('Sin enlace de pago disponible'); }
+}
 function renderPlanPanel(){
-  document.getElementById('main-panel').innerHTML = `
-    <div class="vg-header">
-      <div>
-        <div class="vg-title">Mi plan</div>
-        <div class="vg-date">Tu suscripción con la plataforma</div>
-      </div>
-    </div>
-    <div class="vg-body">
-      <div style="max-width:520px;margin:30px auto;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:34px 24px">
-        <div style="width:52px;height:52px;border-radius:14px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--text3)"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd"/></svg>
+  cargarMiPlan().then(()=>{ if(_vgMode==='plan') _renderPlanPanelBody(); });
+  _renderPlanPanelBody();
+}
+function _renderPlanPanelBody(){
+  const b=_coachPlan;
+  let body;
+  if(_coachPlan===undefined){
+    body = `<div style="text-align:center;padding:40px;color:var(--text3)">Cargando…</div>`;
+  } else if(!b){
+    body = `<div style="max-width:520px;margin:30px auto;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:34px 24px">
+        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text);margin-bottom:8px">Sin plan activo</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6;max-width:380px;margin:0 auto">Todavía no tienes una suscripción de plataforma configurada.</div>
+      </div>`;
+  } else {
+    const st=billingStatus(b);
+    const stMap={al_dia:['Al día','var(--green)','rgba(22,163,74,.12)','rgba(22,163,74,.3)'], pendiente:['Pendiente','#b45309','#fef3c7','#fcd34d'], vencido:['Vencido','#dc2626','#fee2e2','#fca5a5'], saldado:['Saldado','var(--green)','rgba(22,163,74,.12)','rgba(22,163,74,.3)']};
+    const si=stMap[st.state]||stMap.al_dia;
+    const amount = st.next?st.next.amount:b.amount;
+    const isPay = (st.state==='pendiente'||st.state==='vencido');
+    const subline = st.state==='saldado' ? 'Plan completado' : (isPay ? ('Pago '+st.next.n+' de '+st.total+' · vence '+fmtFecha(st.next.due)) : (st.paidCount>0?('Pago '+st.paidCount+' hecho · próximo el '+fmtFecha(st.next.due)):('Próximo pago el '+fmtFecha(st.next.due))));
+    const payBtn = isPay ? (b.pay_link
+      ? `<button onclick="pagarMiPlan()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#635bff;color:#fff;border:none;border-radius:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:14px">💳 Pagar con Stripe</button>`
+      : `<div style="font-size:12px;color:var(--text3);text-align:center;padding:10px;background:var(--bg3);border-radius:11px;margin-top:14px">Aún no hay enlace de pago disponible.</div>`) : '';
+    const histRows = st.sch.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;color:${p.paid?'var(--text2)':'var(--text3)'};padding:4px 0"><span>Pago ${p.n} · ${fmtFecha(p.due)}</span><span style="${p.paid?'color:var(--green);font-weight:700':''}">${Number(p.amount).toLocaleString('es-ES')} € · ${p.paid?'pagado':'pendiente'}</span></div>`).join('');
+    body = `<div style="max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+        <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:20px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+            <div><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Cuota de plataforma</div>
+              <div style="font-family:'DM Serif Display',serif;font-size:34px;color:var(--text);line-height:1">${Number(amount).toLocaleString('es-ES')} €</div></div>
+            <span style="font-size:12px;font-weight:700;color:${si[1]};background:${si[2]};border:1px solid ${si[3]};padding:5px 11px;border-radius:9px">${si[0]}</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--text2);font-weight:600;margin-top:8px">${subline}</div>
+          ${payBtn}
         </div>
-        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text);margin-bottom:8px">Próximamente</div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.6;max-width:380px;margin:0 auto">Aquí verás tu suscripción con la plataforma: qué pagas, cuándo, y tu estado. Lo activaremos en la siguiente fase.</div>
-      </div>
-    </div>`;
+        <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:18px">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Pagos del plan</div>
+          ${histRows}
+        </div>
+      </div>`;
+  }
+  document.getElementById('main-panel').innerHTML = `
+    <div class="vg-header"><div><div class="vg-title">Mi plan</div><div class="vg-date">Tu suscripción con la plataforma</div></div></div>
+    <div class="vg-body">${body}</div>`;
 }
 
 function renderOverview() {
@@ -12231,6 +12570,11 @@ let _dashboardInited = false;
 async function initDashboard(){
   if (_dashboardInited) return;
   _dashboardInited = true;
+  // Modo admin de plataforma
+  if (coachData && coachData.is_admin){
+    initAdmin();
+    return;
+  }
   await loadRealClients();
   renderSidebar();
   if (CLIENTS.length){

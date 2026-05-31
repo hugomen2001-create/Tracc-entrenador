@@ -13402,7 +13402,7 @@ async function ejecutarImportClientes(){
   // Recargar SIEMPRE para tener los ids actualizados (aunque el cliente ya existiera)
   await loadRealClients();
   const byEmail={}, byName={};
-  (CLIENTS||[]).forEach(c=>{ if(c.email)byEmail[c.email.toLowerCase()]=c.id; if(c.name)byName[c.name.trim().toLowerCase()]=c.id; });
+  (CLIENTS||[]).forEach(c=>{ const em=(c.email||(c._raw&&c._raw.email)||'').toLowerCase(); if(em)byEmail[em]=c.id; if(c.name)byName[c.name.trim().toLowerCase()]=c.id; });
   const idDe=(row)=> (row.email&&byEmail[row.email])||(row.name&&byName[row.name.trim().toLowerCase()])||null;
   const errores=[]; let sinCruce=0;
 

@@ -7326,6 +7326,14 @@ function cardFotosProgreso(c){
     Nueva revisión
   </button>`;
 
+  // Botón para comparar dos revisiones (solo si hay al menos 2)
+  const btnComparar = revisiones.length >= 2
+    ? `<button onclick="abrirComparativaFotos()" style="height:30px;padding:0 13px;border-radius:9px;background:var(--bg);border:1.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+        Comparar
+      </button>`
+    : '';
+
   let cuerpo;
   if (!revisiones.length){
     cuerpo = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6;background:var(--bg);border:1px dashed var(--border2);border-radius:13px">
@@ -7342,7 +7350,7 @@ function cardFotosProgreso(c){
         <div style="${secTitle}">Fotos de progreso</div>
         <span style="font-size:11px;color:var(--text3)">El cliente envía las fotos por WhatsApp · el entrenador las sube aquí</span>
       </div>
-      ${btnNueva}
+      <div style="display:flex;gap:8px">${btnComparar}${btnNueva}</div>
     </div>
     ${cuerpo}
   </div>`;
@@ -7416,7 +7424,148 @@ function revisionColumna(c, rev){
   </div>`;
 }
 
-// Rellena los marcos de foto con las imágenes firmadas (asíncrono).
+// ── COMPARATIVA DE FOTOS (antes / después) ──
+// Enfrenta dos revisiones. Eliges la foto de cada lado a mano (miniaturas),
+// sin depender de etiquetas. Calcula la variación de peso y de semanas.
+let _cmp = { revA:null, revB:null, idxA:0, idxB:0 };
+const _cmpUrlCache = {};
+
+function _cmpRev(id){ const c=currentClient; return ((c&&c._photos)||[]).find(r=>r.id===id); }
+
+async function _cmpSignedUrl(path){
+  if(_cmpUrlCache[path]) return _cmpUrlCache[path];
+  const url = await signedPhotoUrl(path);
+  if(url) _cmpUrlCache[path] = url;
+  return url;
+}
+
+function abrirComparativaFotos(){
+  const c = currentClient; if(!c) return;
+  const revs = (c._photos || []);
+  if(revs.length < 2){ showToast('Necesitas al menos 2 revisiones para comparar'); return; }
+  // revs vienen ordenadas por semana desc → [0]=más reciente, último=más antiguo
+  _cmp.revB = revs[0].id;                 // Después (reciente)
+  _cmp.revA = revs[revs.length-1].id;     // Antes (antiguo)
+  _cmp.idxA = 0; _cmp.idxB = 0;
+  renderComparativa();
+}
+
+function cerrarComparativa(){
+  const ov = document.getElementById('cmp-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function cmpSetRev(side, id){
+  if(side==='A'){ _cmp.revA = id; _cmp.idxA = 0; }
+  else { _cmp.revB = id; _cmp.idxB = 0; }
+  renderComparativa();
+}
+
+function cmpSetPhoto(side, idx){
+  if(side==='A') _cmp.idxA = idx; else _cmp.idxB = idx;
+  renderComparativa();
+}
+
+function cmpAmpliar(imgEl){ if(imgEl && imgEl.src) verFotoGrande(imgEl.src); }
+
+function _cmpSideHtml(side){
+  const id = side==='A' ? _cmp.revA : _cmp.revB;
+  const idx = side==='A' ? _cmp.idxA : _cmp.idxB;
+  const rev = _cmpRev(id);
+  const fotos = (rev && rev._photos) || [];
+  const sel = fotos[idx] || fotos[0];
+  const cap = rev
+    ? (fmtFecha(rev.revision_date) + (rev.weight_kg!=null ? (' · '+rev.weight_kg+' kg') : '') + (sel && sel.label ? (' · "'+escHtml(sel.label)+'"') : ''))
+    : '—';
+  const big = sel
+    ? `<div class="cmp-slot"><img class="cmp-img" data-path="${escHtml(sel.photo_path)}" alt="Foto" style="width:100%;height:100%;object-fit:cover;border-radius:10px;cursor:zoom-in" onclick="cmpAmpliar(this)"></div>`
+    : `<div class="cmp-slot" style="display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px">Sin fotos</div>`;
+  const thumbs = fotos.length
+    ? fotos.map((f,i)=>`<div class="cmp-thumb${i===idx?' on':''}" onclick="cmpSetPhoto('${side}',${i})"><img class="cmp-img" data-path="${escHtml(f.photo_path)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:6px"></div>`).join('')
+    : '<span style="font-size:11px;color:var(--text3)">Sin fotos</span>';
+  return `<div>
+    ${big}
+    <div style="font-size:11.5px;color:var(--text2);text-align:center;margin:7px 0 9px;font-weight:600">${cap}</div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap">${thumbs}</div>
+  </div>`;
+}
+
+async function hydrateComparativaUrls(){
+  const imgs = document.querySelectorAll('#cmp-overlay .cmp-img[data-path]');
+  for(const el of imgs){
+    const path = el.getAttribute('data-path');
+    if(!path) continue;
+    const url = await _cmpSignedUrl(path);
+    if(url) el.src = url;
+  }
+}
+
+function renderComparativa(){
+  const c = currentClient; if(!c) return;
+  const revs = (c._photos || []);
+  let ov = document.getElementById('cmp-overlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'cmp-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:250;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.onclick = (e)=>{ if(e.target===ov) cerrarComparativa(); };
+    document.body.appendChild(ov);
+  }
+
+  const optionsHtml = (selectedId) => revs.map(r=>{
+    const lbl = 'Semana ' + (r.revision_week ?? '—') + ' · ' + fmtFecha(r.revision_date) + (r.weight_kg!=null ? (' · '+r.weight_kg+' kg') : '');
+    return `<option value="${r.id}" ${r.id===selectedId?'selected':''}>${escHtml(lbl)}</option>`;
+  }).join('');
+
+  const selStyle = 'border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;background:var(--bg);font-size:12.5px;color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;cursor:pointer';
+
+  // Variación de peso y semanas
+  const ra = _cmpRev(_cmp.revA), rb = _cmpRev(_cmp.revB);
+  let deltaHtml = '';
+  if(ra && rb && ra.weight_kg!=null && rb.weight_kg!=null){
+    const d = Number(rb.weight_kg) - Number(ra.weight_kg);
+    const sem = (ra.revision_week!=null && rb.revision_week!=null) ? Math.abs(rb.revision_week - ra.revision_week) : null;
+    const txt = (d>0?'+':'') + d.toFixed(1) + ' kg' + (sem!=null ? (' en ' + sem + ' semana' + (sem!==1?'s':'')) : '');
+    deltaHtml = `<div style="display:flex;justify-content:center;margin-bottom:16px"><span style="font-size:12.5px;font-weight:700;color:var(--text);background:var(--bg3);padding:6px 14px;border-radius:8px">${txt}</span></div>`;
+  }
+
+  ov.innerHTML = `
+    <style>
+      #cmp-overlay .cmp-slot{aspect-ratio:3/4;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);overflow:hidden}
+      #cmp-overlay .cmp-thumb{width:46px;height:60px;border-radius:7px;background:var(--bg);border:2px solid var(--border);overflow:hidden;cursor:pointer;flex-shrink:0}
+      #cmp-overlay .cmp-thumb.on{border-color:var(--green)}
+      #cmp-overlay .cmp-img{display:block}
+    </style>
+    <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:720px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div><div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);line-height:1">Comparar progreso</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${escHtml(c.name||'')}</div></div>
+        <button onclick="cerrarComparativa()" style="width:32px;height:32px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-size:15px;line-height:1">✕</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;margin-bottom:14px">
+        <div><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Antes</div>
+          <select onchange="cmpSetRev('A',this.value)" style="${selStyle}">${optionsHtml(_cmp.revA)}</select></div>
+        <div style="padding-bottom:9px;color:var(--text3)">→</div>
+        <div><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Después</div>
+          <select onchange="cmpSetRev('B',this.value)" style="${selStyle}">${optionsHtml(_cmp.revB)}</select></div>
+      </div>
+
+      ${deltaHtml}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        ${_cmpSideHtml('A')}
+        ${_cmpSideHtml('B')}
+      </div>
+
+      <div style="margin-top:12px;font-size:11px;color:var(--text3);text-align:center">Toca una miniatura de cada lado para enfrentarlas · toca la grande para ampliar</div>
+    </div>`;
+
+  ov.style.display = 'flex';
+  hydrateComparativaUrls();
+}
+
+
 // Se llama después de pintar el tab Perfil.
 async function hydratePhotoUrls(){
   const slots = document.querySelectorAll('.photo-slot[data-path]');

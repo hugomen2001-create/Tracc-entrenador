@@ -4161,7 +4161,7 @@ function selectClient(id) {
   renderMiniSidebar();
   // El tab por defecto al seleccionar cliente es Resumen → cargar ajustes
   // (retrasos/reorganización) y re-renderizar cuando lleguen.
-  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); await cargarCheckinsCliente(); renderClientPanel(); }, 0);
+  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); await cargarCheckinsCliente(); await cargarBillingCliente(); renderClientPanel(); }, 0);
 }
 
 
@@ -4377,6 +4377,130 @@ async function cargarCheckinsCliente(){
     }
   }catch(e){ console.warn('cargarCheckinsCliente exception:', e); }
   renderClientPanel();
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   PAGOS (Fase 1): helpers compartidos + carga de la cuota del cliente.
+   Modelo: una fila por cliente en client_billing con la config + paid_numbers
+   (array de nº de pago ya cobrados). El calendario y los estados se calculan
+   al vuelo, sin tabla de pagos aparte.
+   ─────────────────────────────────────────────────────────────────────────── */
+function billingAddMonths(dateStr, months){
+  const d = new Date(String(dateStr).slice(0,10)+'T00:00:00');
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth()+months);
+  const dim = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(day, dim));
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear()+'-'+mm+'-'+dd;
+}
+function billingSchedule(b){
+  if(!b) return [];
+  const n = Math.max(1, parseInt(b.num_payments)||1);
+  const iv = parseInt(b.interval_months); const interval = isNaN(iv)?1:iv;
+  const paid = Array.isArray(b.paid_numbers)?b.paid_numbers:[];
+  const out = [];
+  for(let i=1;i<=n;i++){
+    const due = interval>0 ? billingAddMonths(b.first_charge, interval*(i-1)) : String(b.first_charge).slice(0,10);
+    out.push({n:i, due:due, amount:Number(b.amount)||0, paid:paid.indexOf(i)>=0});
+  }
+  return out;
+}
+function billingStatus(b){
+  if(!b || !b.amount || !b.first_charge) return {state:'none', next:null, paidCount:0, total:0, sch:[]};
+  const sch = billingSchedule(b);
+  const paidCount = sch.filter(p=>p.paid).length;
+  if(paidCount>=sch.length) return {state:'saldado', next:null, paidCount:paidCount, total:sch.length, sch:sch};
+  const next = sch.find(p=>!p.paid);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due = new Date(next.due+'T00:00:00');
+  const grace = new Date(due); grace.setDate(grace.getDate()+5);
+  let state = 'al_dia';
+  if(today > grace) state = 'vencido';
+  else if(today >= due) state = 'pendiente';
+  return {state:state, next:next, paidCount:paidCount, total:sch.length, sch:sch};
+}
+async function cargarBillingCliente(){
+  const c = currentClient;
+  if (!c || c._billing !== undefined) return;
+  c._billing = null;
+  try{
+    const { data, error } = await sb
+      .from('client_billing')
+      .select('*')
+      .eq('client_id', c.id)
+      .maybeSingle();
+    if (error){ console.warn('cargarBillingCliente:', error); return; }
+    c._billing = data || null;
+  }catch(e){ console.warn('cargarBillingCliente exception:', e); }
+  renderClientPanel();
+}
+
+// Etiqueta legible del intervalo de pago
+function billingIntervalLabel(iv){
+  iv = parseInt(iv);
+  if(iv===0) return 'pago único';
+  if(iv===1) return 'uno cada mes';
+  return 'uno cada '+iv+' meses';
+}
+// Selección temporal del intervalo en el formulario de cuota
+function setCuotaIv(v){ if(currentClient){ currentClient._cuotaIv = v; renderClientPanel(); } }
+function toggleCuotaEdit(on){ if(currentClient){ currentClient._cuotaEdit = on; currentClient._cuotaIv = null; renderClientPanel(); } }
+// Previsualización en vivo del resumen del plan mientras se rellena el formulario
+function updateCuotaPreview(){
+  const c = currentClient; if(!c) return;
+  const amount = parseFloat((document.getElementById('cuota-amount')||{}).value)||0;
+  const num = parseInt((document.getElementById('cuota-num')||{}).value)||1;
+  const iv = (c._cuotaIv!=null)?c._cuotaIv:(c._billing?c._billing.interval_months:1);
+  const el = document.getElementById('cuota-preview'); if(!el) return;
+  if(!amount){ el.innerHTML = 'Rellena el importe para ver el resumen.'; return; }
+  const total = amount*num;
+  const each = num>1 ? (' · '+billingIntervalLabel(iv)) : '';
+  el.innerHTML = (num>1?('<b>'+num+' pagos de '+amount.toLocaleString('es-ES')+' €</b>'+each):('<b>1 pago de '+amount.toLocaleString('es-ES')+' €</b> (pago único)'))+
+    '<br>Total del plan: <b>'+total.toLocaleString('es-ES')+' €</b>';
+}
+async function guardarCuotaCliente(){
+  const c = currentClient; if(!c) return;
+  const amount = parseFloat((document.getElementById('cuota-amount')||{}).value);
+  const num = parseInt((document.getElementById('cuota-num')||{}).value)||1;
+  const iv = (c._cuotaIv!=null)?c._cuotaIv:(c._billing?c._billing.interval_months:1);
+  const first = (document.getElementById('cuota-first')||{}).value;
+  const link = ((document.getElementById('cuota-link')||{}).value||'').trim();
+  if(!amount || amount<=0){ showToast('Pon un importe válido'); return; }
+  if(!first){ showToast('Pon la fecha del primer cobro'); return; }
+  const row = {client_id:c.id, coach_id:coachData.id, amount:amount, num_payments:num, interval_months:iv, first_charge:first, pay_link:link||null, pay_label:'Stripe', currency:'EUR', active:true, updated_at:new Date().toISOString()};
+  if(c._billing && Array.isArray(c._billing.paid_numbers)) row.paid_numbers = c._billing.paid_numbers.filter(n=>n<=num);
+  try{
+    const {data,error} = await sb.from('client_billing').upsert(row,{onConflict:'client_id'}).select('*').single();
+    if(error){ console.error('guardarCuotaCliente:', error); showToast('✕ No se pudo guardar la cuota'); return; }
+    c._billing = data; c._cuotaEdit = false; c._cuotaIv = null;
+    renderClientPanel(); showToast('✓ Cuota guardada');
+  }catch(e){ console.error(e); showToast('✕ Error al guardar'); }
+}
+async function togglePagoCobrado(n){
+  const c = currentClient; if(!c || !c._billing) return;
+  let paid = Array.isArray(c._billing.paid_numbers)?c._billing.paid_numbers.slice():[];
+  const i = paid.indexOf(n);
+  if(i>=0) paid.splice(i,1); else paid.push(n);
+  paid.sort((a,b)=>a-b);
+  c._billing.paid_numbers = paid;
+  renderClientPanel();
+  try{
+    const {error} = await sb.from('client_billing').update({paid_numbers:paid, updated_at:new Date().toISOString()}).eq('client_id',c.id);
+    if(error){ console.error('togglePagoCobrado:', error); showToast('✕ No se pudo actualizar el pago'); }
+  }catch(e){ console.error(e); }
+}
+async function eliminarCuotaCliente(){
+  const c = currentClient; if(!c || !c._billing) return;
+  if(!confirm('¿Eliminar la cuota de este cliente? Se borrará su configuración de pagos.')) return;
+  try{
+    const {error} = await sb.from('client_billing').delete().eq('client_id',c.id);
+    if(error){ console.error('eliminarCuotaCliente:', error); showToast('✕ No se pudo eliminar'); return; }
+    c._billing = null; c._cuotaEdit = false; c._cuotaIv = null;
+    renderClientPanel(); showToast('✓ Cuota eliminada');
+  }catch(e){ console.error(e); showToast('✕ Error al eliminar'); }
 }
 
 // Revisa si han llegado check-ins nuevos sin recargar toda la lista,
@@ -7476,8 +7600,100 @@ function renderPerfil() {
       </div>
     </div>`;
   }
+  // ── TARJETA: Cuota / Pagos (Fase 1) ──
+  const b = c._billing;
+  const editing = (!b) || c._cuotaEdit;
+  let cardCuota;
+  if (editing){
+    const ivSel = (c._cuotaIv!=null)?c._cuotaIv:(b?b.interval_months:1);
+    const segOpts = [[0,'Pago único'],[1,'Cada mes'],[2,'Cada 2 meses'],[3,'Cada 3 meses']];
+    const seg = segOpts.map(o=>{
+      const on = ivSel===o[0];
+      return `<div onclick="setCuotaIv(${o[0]})" style="flex:1;text-align:center;font-size:11.5px;font-weight:600;padding:9px 4px;border-radius:9px;cursor:pointer;${on?'background:var(--accent);color:#fff':'background:var(--bg);color:var(--text2);border:1.5px solid var(--border)'}">${o[1]}</div>`;
+    }).join('');
+    const inp = 'border:1.5px solid var(--border);border-radius:9px;padding:10px;background:var(--bg);font-size:14px;color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;outline:none';
+    cardCuota = `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="${secTitle}">Cuota del cliente</div>
+        ${b?`<button onclick="toggleCuotaEdit(false)" style="height:26px;padding:0 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">Cancelar</button>`:''}
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div style="flex:1">
+          <div style="${lblStyle}">Importe por pago</div>
+          <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;padding:0 10px;background:var(--bg)">
+            <input id="cuota-amount" type="number" inputmode="decimal" step="0.01" value="${b?b.amount:''}" oninput="updateCuotaPreview()" placeholder="120" style="border:none;background:none;font-size:14px;padding:10px 0;width:100%;color:var(--text);outline:none;font-family:inherit">
+            <span style="font-size:13px;color:var(--text3)">€</span>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="${lblStyle}">Nº de pagos</div>
+          <input id="cuota-num" type="number" inputmode="numeric" min="1" value="${b?b.num_payments:1}" oninput="updateCuotaPreview()" style="${inp}">
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="${lblStyle}">Cada cuánto se paga</div>
+        <div style="display:flex;gap:6px">${seg}</div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="${lblStyle}">Primer cobro</div>
+        <input id="cuota-first" type="date" value="${b?String(b.first_charge).slice(0,10):''}" style="${inp}">
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="${lblStyle}">Enlace de pago (Stripe Payment Link)</div>
+        <input id="cuota-link" type="url" value="${b&&b.pay_link?escHtml(b.pay_link):''}" placeholder="https://buy.stripe.com/..." style="${inp}">
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:11px 13px;margin-bottom:14px">
+        <div style="${lblStyle};margin-bottom:5px">Resumen del plan</div>
+        <div id="cuota-preview" style="font-size:13px;color:var(--text);line-height:1.6">Rellena el importe para ver el resumen.</div>
+      </div>
+      <button onclick="guardarCuotaCliente()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:11px;cursor:pointer;font-family:inherit">Guardar cuota</button>
+      ${b?`<button onclick="eliminarCuotaCliente()" style="width:100%;margin-top:8px;padding:10px;font-size:12.5px;font-weight:600;background:none;color:var(--red,#dc2626);border:1.5px solid var(--border);border-radius:11px;cursor:pointer;font-family:inherit">Eliminar cuota</button>`:''}
+    </div>`;
+  } else {
+    const st = billingStatus(b);
+    const stMap = {al_dia:['Al día','var(--green)','rgba(22,163,74,.12)'], pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2'], saldado:['Saldado','var(--green)','rgba(22,163,74,.12)']};
+    const stInfo = stMap[st.state]||['—','var(--text3)','var(--bg)'];
+    const total = (b.amount*b.num_payments);
+    const resumen = b.num_payments>1
+      ? `${b.num_payments} pagos de ${Number(b.amount).toLocaleString('es-ES')} € · ${billingIntervalLabel(b.interval_months)}`
+      : `1 pago de ${Number(b.amount).toLocaleString('es-ES')} € (pago único)`;
+    const rows = st.sch.map(p=>{
+      const right = p.paid
+        ? `<button onclick="togglePagoCobrado(${p.n})" title="Marcar como no cobrado" style="font-size:11.5px;font-weight:700;color:var(--green);background:rgba(22,163,74,.12);border:none;padding:5px 11px;border-radius:8px;cursor:pointer;font-family:inherit">✓ Cobrado</button>`
+        : (st.next && st.next.n===p.n
+            ? `<button onclick="togglePagoCobrado(${p.n})" style="font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;font-family:inherit">Marcar cobrado</button>`
+            : `<button onclick="togglePagoCobrado(${p.n})" style="font-size:11.5px;font-weight:600;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit">Pendiente</button>`);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;${p.n<st.sch.length?'border-bottom:1px solid var(--border)':''}">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Pago ${p.n} · ${Number(p.amount).toLocaleString('es-ES')} €</div>
+          <div style="font-size:11px;color:var(--text3)">${fmtFecha(p.due)}</div></div>
+        ${right}
+      </div>`;
+    }).join('');
+    cardCuota = `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="${secTitle}">Cuota del cliente</div>
+        <button onclick="toggleCuotaEdit(true)" style="height:26px;padding:0 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Editar</button>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px">
+        <div>
+          <div style="font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);line-height:1">${Number(total).toLocaleString('es-ES')} €</div>
+          <div style="font-size:12px;color:var(--text2);font-weight:600;margin-top:3px">${resumen}</div>
+        </div>
+        <span style="font-size:12px;font-weight:700;color:${stInfo[1]};background:${stInfo[2]};padding:5px 11px;border-radius:8px;flex-shrink:0">${stInfo[0]}</span>
+      </div>
+      ${st.next?`<div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:10px">Próximo: pago ${st.next.n} de ${st.total} · ${fmtFecha(st.next.due)}</div>`:`<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">Plan saldado · ${st.total} de ${st.total} pagos</div>`}
+      ${b.pay_link?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;word-break:break-all"><b style="color:var(--text2)">Enlace:</b> ${escHtml(b.pay_link)}</div>`:'<div style="font-size:11px;color:#b45309;margin-bottom:6px">⚠ Sin enlace de pago. El cliente no verá botón para pagar.</div>'}
+      <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:4px">
+        <div style="${lblStyle};margin:8px 0 2px">Pagos del plan</div>
+        ${rows}
+      </div>
+    </div>`;
+  }
+
   return `<div style="display:flex;flex-direction:column;gap:14px">
     ${gridHtml}
+    ${cardCuota}
     ${cardFotosProgreso(c)}
     ${cardCuenta}
   </div>`;

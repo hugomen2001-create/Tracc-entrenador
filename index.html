@@ -4569,30 +4569,32 @@ function businessSummaryHtml(){
   const altas = activos.filter(c=>{ const ms=(c._raw&&(c._raw.member_since||c._raw.created_at))||''; return String(ms).slice(0,7)===ym; }).length;
   const bajas = CLIENTS.filter(c=> c._raw && c._raw.active===false && String(c._raw.deactivated_at||'').slice(0,7)===ym).length;
 
-  // Lista por cliente (solo con cuota), vencidos primero
-  const order = {vencido:0, pendiente:1, al_dia:2, saldado:3, none:4};
+  // Lista: SOLO pendientes de cobro (pendiente o vencido), vencidos primero
+  const order = {vencido:0, pendiente:1};
   const rows = withB.map(c=>({c, st:billingStatus(c._billing)}))
+    .filter(x=> x.st.state==='pendiente' || x.st.state==='vencido')
     .sort((a,b)=> (order[a.st.state]-order[b.st.state]))
     .map(({c,st})=>{
-      const stMap={al_dia:['Al día','var(--green)','rgba(22,163,74,.12)'], pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2'], saldado:['Saldado','var(--text3)','var(--bg3)'], none:['—','var(--text3)','var(--bg3)']};
-      const si=stMap[st.state]||stMap.none;
+      const stMap={pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2']};
+      const si=stMap[st.state]||['—','var(--text3)','var(--bg3)'];
       const mensual = billingMonthly(c._billing);
       const mensualTxt = mensual>0 ? _eur(mensual)+'/mes' : (c._billing.num_payments>1?'fraccionado':'pago único');
       const prox = st.next ? fmtFecha(st.next.due) : '—';
+      const importe = st.next ? _eur(st.next.amount) : '';
       return `<div onclick="selectClientById('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer">
         <div class="alert-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'};border:none">${c.initials||'?'}</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:var(--text)">${c.name}</div>
-          <div style="font-size:11px;color:var(--text3)">${mensualTxt} · próximo ${prox}</div>
+          <div style="font-size:11px;color:var(--text3)">${importe} · vence ${prox}</div>
         </div>
         <span style="font-size:11px;font-weight:700;color:${si[1]};background:${si[2]};padding:4px 10px;border-radius:7px;flex-shrink:0">${si[0]}</span>
       </div>`;
     }).join('');
 
   const sinCuota = activos.length - withB.length;
-  const listHtml = withB.length
+  const listHtml = rows
     ? `<div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2)">${rows}</div>`
-    : `<div style="font-size:12.5px;color:var(--text3);padding:14px;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:14px">Aún no has configurado cuotas. Ponlas en la pestaña Perfil de cada cliente.</div>`;
+    : `<div style="font-size:12.5px;color:var(--text3);padding:16px;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:14px">✓ Nadie tiene pagos pendientes ahora mismo.</div>`;
 
   return `<div class="sec-hd" style="margin:18px 0 10px"><div class="sec-t">Negocio</div></div>
     <div class="kpi-strip">
@@ -4604,7 +4606,7 @@ function businessSummaryHtml(){
       <div class="kpi"><div class="kpi-lbl">Altas este mes</div><div class="kpi-val g">${altas}</div><div class="kpi-sub">clientes nuevos</div></div>
       <div class="kpi"><div class="kpi-lbl">Bajas este mes</div><div class="kpi-val ${bajas>0?'':''}" style="${bajas>0?'color:#dc2626':''}">${bajas}</div><div class="kpi-sub">${bajas>0?'clientes de baja':'ninguna'}</div></div>
     </div>
-    <div class="sec-hd" style="margin:14px 0 8px"><div class="sec-t">Cuotas por cliente</div></div>
+    <div class="sec-hd" style="margin:14px 0 8px"><div class="sec-t">Pendientes de cobro</div></div>
     ${listHtml}`;
 }
 

@@ -4503,6 +4503,104 @@ async function eliminarCuotaCliente(){
   }catch(e){ console.error(e); showToast('✕ Error al eliminar'); }
 }
 
+// Dar de baja / reactivar a un cliente (afecta al resumen de negocio)
+async function toggleClienteBaja(){
+  const c = currentClient; if(!c) return;
+  const raw = c._raw || (c._raw = {});
+  const baja = raw.active === false;          // si ya está de baja → reactivar
+  const msg = baja ? '¿Reactivar a este cliente?' : '¿Dar de baja a este cliente? Dejará de contar en ingresos y cuotas (sus datos se conservan).';
+  if(!confirm(msg)) return;
+  const upd = baja ? {active:true, deactivated_at:null} : {active:false, deactivated_at:new Date().toISOString()};
+  try{
+    const {error} = await sb.from('clients').update(upd).eq('id', c.id);
+    if(error){ console.error('toggleClienteBaja:', error); showToast('✕ No se pudo actualizar'); return; }
+    raw.active = upd.active; raw.deactivated_at = upd.deactivated_at;
+    renderClientPanel();
+    showToast(baja ? '✓ Cliente reactivado' : '✓ Cliente dado de baja');
+  }catch(e){ console.error(e); showToast('✕ Error'); }
+}
+
+/* ── FASE 2: resumen de negocio (Vista general) ── */
+// Carga las cuotas de TODOS los clientes en una sola consulta (para la Vista general)
+async function cargarBillingTodos(){
+  if(!CLIENTS.length) return;
+  try{
+    const ids = CLIENTS.map(c=>c.id);
+    const {data,error} = await sb.from('client_billing').select('*').in('client_id', ids);
+    if(error){ console.warn('cargarBillingTodos:', error); return; }
+    const byId={}; (data||[]).forEach(r=>{ byId[r.client_id]=r; });
+    CLIENTS.forEach(c=>{ c._billing = byId[c.id]||null; });
+  }catch(e){ console.warn('cargarBillingTodos exception:', e); }
+}
+// Ingreso mensual equivalente de una cuota (0 si es pago único / inactiva)
+function billingMonthly(b){
+  if(!b || b.active===false || !b.amount) return 0;
+  const iv = parseInt(b.interval_months);
+  if(isNaN(iv) || iv<=0) return 0;
+  return Number(b.amount)/iv;
+}
+function _eur(n){ return Math.round(n).toLocaleString('es-ES')+' €'; }
+// Bloque "Negocio" para la Vista general
+function businessSummaryHtml(){
+  const esActivo = (c)=> !(c._raw && c._raw.active === false);
+  const activos = CLIENTS.filter(esActivo);
+  const withB = activos.filter(c=>c._billing);
+  const now = new Date();
+  const ym = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const finMes = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  let mrr=0, recurringCount=0, cobradoMes=0, pendienteMes=0, pendienteCount=0;
+  withB.forEach(c=>{
+    const m = billingMonthly(c._billing);
+    if(m>0){ mrr+=m; recurringCount++; }
+    billingSchedule(c._billing).forEach(p=>{
+      if(p.paid && String(p.due).slice(0,7)===ym) cobradoMes+=p.amount;
+      if(!p.paid){ const dd=new Date(String(p.due).slice(0,10)+'T00:00:00'); if(dd<=finMes){ pendienteMes+=p.amount; pendienteCount++; } }
+    });
+  });
+  const precioMedio = recurringCount? mrr/recurringCount : 0;
+  const altas = activos.filter(c=>{ const ms=(c._raw&&(c._raw.member_since||c._raw.created_at))||''; return String(ms).slice(0,7)===ym; }).length;
+  const bajas = CLIENTS.filter(c=> c._raw && c._raw.active===false && String(c._raw.deactivated_at||'').slice(0,7)===ym).length;
+
+  // Lista por cliente (solo con cuota), vencidos primero
+  const order = {vencido:0, pendiente:1, al_dia:2, saldado:3, none:4};
+  const rows = withB.map(c=>({c, st:billingStatus(c._billing)}))
+    .sort((a,b)=> (order[a.st.state]-order[b.st.state]))
+    .map(({c,st})=>{
+      const stMap={al_dia:['Al día','var(--green)','rgba(22,163,74,.12)'], pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2'], saldado:['Saldado','var(--text3)','var(--bg3)'], none:['—','var(--text3)','var(--bg3)']};
+      const si=stMap[st.state]||stMap.none;
+      const mensual = billingMonthly(c._billing);
+      const mensualTxt = mensual>0 ? _eur(mensual)+'/mes' : (c._billing.num_payments>1?'fraccionado':'pago único');
+      const prox = st.next ? fmtFecha(st.next.due) : '—';
+      return `<div onclick="selectClientById('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer">
+        <div class="alert-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'};border:none">${c.initials||'?'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${c.name}</div>
+          <div style="font-size:11px;color:var(--text3)">${mensualTxt} · próximo ${prox}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${si[1]};background:${si[2]};padding:4px 10px;border-radius:7px;flex-shrink:0">${si[0]}</span>
+      </div>`;
+    }).join('');
+
+  const sinCuota = activos.length - withB.length;
+  const listHtml = withB.length
+    ? `<div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2)">${rows}</div>`
+    : `<div style="font-size:12.5px;color:var(--text3);padding:14px;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:14px">Aún no has configurado cuotas. Ponlas en la pestaña Perfil de cada cliente.</div>`;
+
+  return `<div class="sec-hd" style="margin:18px 0 10px"><div class="sec-t">Negocio</div></div>
+    <div class="kpi-strip">
+      <div class="kpi"><div class="kpi-lbl">Ingresos recurrentes</div><div class="kpi-val g">${_eur(mrr)}</div><div class="kpi-sub">al mes (MRR)</div></div>
+      <div class="kpi"><div class="kpi-lbl">Cobrado este mes</div><div class="kpi-val">${_eur(cobradoMes)}</div><div class="kpi-sub">pagos marcados</div></div>
+      <div class="kpi"><div class="kpi-lbl">Pendiente de cobro</div><div class="kpi-val ${pendienteMes>0?'am':''}">${_eur(pendienteMes)}</div><div class="kpi-sub ${pendienteMes>0?'am':''}">${pendienteCount} pago${pendienteCount===1?'':'s'} este mes</div></div>
+      <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val">${_eur(precioMedio)}</div><div class="kpi-sub">por cliente/mes</div></div>
+      <div class="kpi"><div class="kpi-lbl">Clientes con cuota</div><div class="kpi-val">${withB.length}</div><div class="kpi-sub">${sinCuota>0?sinCuota+' sin configurar':'todos configurados'}</div></div>
+      <div class="kpi"><div class="kpi-lbl">Altas este mes</div><div class="kpi-val g">${altas}</div><div class="kpi-sub">clientes nuevos</div></div>
+      <div class="kpi"><div class="kpi-lbl">Bajas este mes</div><div class="kpi-val ${bajas>0?'':''}" style="${bajas>0?'color:#dc2626':''}">${bajas}</div><div class="kpi-sub">${bajas>0?'clientes de baja':'ninguna'}</div></div>
+    </div>
+    <div class="sec-hd" style="margin:14px 0 8px"><div class="sec-t">Cuotas por cliente</div></div>
+    ${listHtml}`;
+}
+
+
 // Revisa si han llegado check-ins nuevos sin recargar toda la lista,
 // y actualiza los puntitos de la barra lateral. Ligero: una sola query.
 async function refreshCheckinDots(){
@@ -7549,9 +7647,11 @@ function renderPerfil() {
   }
 
   // ── TARJETA: Cuenta ──
+  const esBaja = raw.active === false;
   const cardCuenta = `<div style="${cardStyle};flex-shrink:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div style="${secTitle}">Cuenta</div>
+      <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:7px;${esBaja?'color:#dc2626;background:#fee2e2':'color:var(--green);background:rgba(22,163,74,.12)'}">${esBaja?'De baja':'Activo'}</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div style="${datoStyle}"><div style="${lblStyle}">Email</div><div style="${valStyle};font-size:13px">${
@@ -7563,6 +7663,10 @@ function renderPerfil() {
       <div style="${datoStyle}"><div style="${lblStyle}">Revisiones cada</div><div style="margin-top:6px">${
         ansChip(c.revisionCadaSemanas + (c.revisionCadaSemanas===1?' semana':' semanas'), true)
       }</div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:11.5px;color:var(--text3);line-height:1.4">${esBaja?('De baja desde '+(raw.deactivated_at?fmtFecha(raw.deactivated_at):'—')+'. No cuenta en el resumen de negocio.'):'Marca al cliente de baja si deja de entrenar contigo. Dejará de contar en ingresos y cuotas.'}</div>
+      <button onclick="toggleClienteBaja()" style="flex-shrink:0;height:32px;padding:0 14px;border-radius:9px;border:1.5px solid var(--border);background:${esBaja?'var(--green)':'var(--bg)'};color:${esBaja?'#fff':'#dc2626'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">${esBaja?'Reactivar':'Dar de baja'}</button>
     </div>
   </div>`;
 
@@ -8153,13 +8257,13 @@ function toggleOverview() {
     if (btn) { btn.style.background = '#1a1a18'; btn.style.color = '#fff'; }
     document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
     // Asegurar que todos los clientes tienen datos cargados
-    Promise.all(CLIENTS.map(c => cargarAjustesCliente(c))).then(() => renderOverview());
+    Promise.all([cargarBillingTodos()].concat(CLIENTS.map(c => cargarAjustesCliente(c)))).then(() => renderOverview());
     renderOverview(); // primer pintado optimista
   }
 }
 
 function renderOverview() {
-  const clientes = CLIENTS.slice();
+  const clientes = CLIENTS.filter(c => !(c._raw && c._raw.active === false));
   const stats = clientes.map(c => ({ c, s: _vgStatsCliente(c) }));
 
   // KPIs agregados
@@ -8257,6 +8361,7 @@ function renderOverview() {
         </div>
       </div>
       ${alertasHtml ? `<div class="alerts-section"><div class="sec-hd"><div class="sec-t">Alertas</div></div>${alertasHtml}</div>` : ''}
+      ${businessSummaryHtml()}
       <div class="sec-hd" style="margin-bottom:10px"><div class="sec-t">Todos los clientes</div></div>
       <div class="clients-grid">${grid}</div>
     </div>`;

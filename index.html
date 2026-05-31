@@ -1051,7 +1051,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       <div style="font-size:9px;font-weight:700;color:var(--text2);letter-spacing:.05em">Tracc</div>
     </div>
     <!-- 2. Coach avatar -->
-    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">PB</div>
+    <div id="mini-coach-av" style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0">PB</div>
     <!-- 3. Expand button -->
     <button class="toggle-btn" onclick="toggleSidebar()" title="Mostrar sidebar">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 0 1 0 1.06l-7.5 7.5a.75.75 0 0 1-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 0 1 1.06-1.06l7.5 7.5Z" clip-rule="evenodd"></path></svg>
@@ -4105,6 +4105,17 @@ function renderMiniSidebar() {
   if (logoImg && miniLogo) miniLogo.src = logoImg.src;
   const miniList = document.getElementById('mini-client-list');
   if (!miniList) return;
+  // Modo admin: la mini-barra muestra los ENTRENADORES, no clientes de demo
+  if (coachData && coachData.is_admin){
+    miniList.innerHTML = ADMIN_COACHES.map(co => {
+      const st = billingStatus(co._billing);
+      const dot = st.state==='vencido'?'var(--red)':st.state==='pendiente'?'var(--amber)':(st.state==='al_dia'||st.state==='saldado')?'var(--green)':'#ccc';
+      const ini = (co.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+      const isActive = _adminMode!=='overview' && _adminCoachId===co.id;
+      return `<div class="mini-av${isActive?' active-mini':''}" style="background:var(--bg3);color:var(--text2)" onclick="adminOpenCoach('${co.id}')" title="${escHtml(co.name||'')}">${ini}<div class="mini-dot" style="background:${dot}"></div></div>`;
+    }).join('');
+    return;
+  }
   const dotColor = {green:'var(--green)', amber:'var(--amber)', red:'var(--red)'};
   miniList.innerHTML = CLIENTS.map(c => {
     const dot = getDotClass(c);
@@ -4569,6 +4580,7 @@ function initAdmin(){
   const nameEl = document.querySelector('.coach-name'); if(nameEl) nameEl.textContent=(coachData.name||'Admin').split(' ')[0];
   const roleEl = document.querySelector('.coach-role'); if(roleEl) roleEl.textContent='Administrador';
   const av = document.querySelector('.coach-card .avatar'); if(av) av.textContent=(coachData.name||'A').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const miniAv = document.getElementById('mini-coach-av'); if(miniAv) miniAv.textContent=(coachData.name||'A').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   // Ocultar botones que no aplican al admin
   ['pagos-btn','plan-btn','pending-btn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display='none'; });
   const ov = document.getElementById('overview-btn'); if(ov){ ov.setAttribute('onclick','adminGoOverview()'); }
@@ -4576,7 +4588,7 @@ function initAdmin(){
   const lbl = document.querySelector('.sb-label'); if(lbl) lbl.textContent='Entrenadores';
   const fb = document.querySelector('.sb-filter-bar'); if(fb) fb.style.display='none';
   // Cargar y pintar
-  loadAdminData().then(()=>{ renderAdminSidebar(); adminGoOverview(); });
+  loadAdminData().then(()=>{ renderAdminSidebar(); renderMiniSidebar(); adminGoOverview(); });
 }
 
 function renderAdminSidebar(){
@@ -4611,6 +4623,7 @@ function adminGoOverview(){
   _adminMode='overview'; _adminCoachId=null;
   const ov=document.getElementById('overview-btn'); if(ov){ ov.style.background='#1a1a18'; ov.style.color='#fff'; }
   renderAdminSidebar();
+  renderMiniSidebar();
   renderAdminOverview();
 }
 
@@ -4675,6 +4688,7 @@ function adminOpenCoach(id){
   _adminMode='coach'; _adminCoachId=id; _adminCfgIv=null;
   const ov=document.getElementById('overview-btn'); if(ov){ ov.style.background='var(--bg2)'; ov.style.color='var(--text2)'; }
   renderAdminSidebar();
+  renderMiniSidebar();
   renderAdminCoach();
 }
 

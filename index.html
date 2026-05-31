@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- saved from url=(0070)file:///C:/Users/HugoMengual/Downloads/Tracc___Panel_Entrenador_1.html -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -761,7 +760,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
           <div class="lg-field">
             <div class="lg-field-lbl">Email</div>
             <div class="lg-inp-wrap">
-              <input class="lg-inp" type="email" id="lg-email" placeholder="pol@tracc.app" autocomplete="email" oninput="lgValidateLogin()">
+              <input class="lg-inp" type="email" id="lg-email" placeholder="tucorreo@email.com" autocomplete="email" oninput="lgValidateLogin()">
               <span class="lg-inp-icon ok" id="lg-email-ok" style="display:none;color:#16a34a">✓</span>
             </div>
           </div>
@@ -829,7 +828,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
           <div class="lg-field">
             <div class="lg-field-lbl">Email de tu cuenta Tracc</div>
             <div class="lg-inp-wrap">
-              <input class="lg-inp" type="email" id="lg-recover-email" placeholder="pol@tracc.app" autocomplete="email">
+              <input class="lg-inp" type="email" id="lg-recover-email" placeholder="tucorreo@email.com" autocomplete="email">
             </div>
           </div>
           <div style="height:8px"></div>
@@ -1754,30 +1753,22 @@ function lgApplyCoachToDashboard(){
   const nameEl = document.querySelector('.coach-name');
   const avEl = document.querySelector('.coach-card .avatar');
   if (nameEl) nameEl.textContent = coachData.name || 'Entrenador';
-  if (avEl){
-    const initials = (coachData.name || 'E').split(' ')
-      .map(w => w[0]).slice(0,2).join('').toUpperCase();
-    avEl.textContent = initials;
-  }
+  const initials = (coachData.name || 'E').split(' ')
+    .map(w => w[0]).slice(0,2).join('').toUpperCase();
+  if (avEl) avEl.textContent = initials;
+  const miniAv = document.getElementById('mini-coach-av');
+  if (miniAv) miniAv.textContent = initials;
 }
 
-// ── Cerrar sesión → vuelve al login ──
+// ── Cerrar sesión → recarga limpia (evita arrastrar datos de la cuenta anterior) ──
 async function lgLogout(){
   try { await sb.auth.signOut(); } catch(e){ console.error('signOut error:', e); }
   coachData = null;
-
-  document.getElementById('lg-email').value = '';
-  document.getElementById('lg-pwd').value = '';
-  document.getElementById('lg-email').classList.remove('ok','error');
-  document.getElementById('lg-pwd').classList.remove('ok','error');
-  document.getElementById('lg-email-ok').style.display = 'none';
-  lgClearLoginError();
-  document.getElementById('lg-login-btn').classList.remove('ready');
-  document.getElementById('lg-login-btn-label').textContent = 'Entrar al panel';
-  document.getElementById('lg-progress').style.width = '0%';
-  document.getElementById('lg-progress-pct').textContent = '0%';
-  lgGoto('login');
-  document.getElementById('login-layer').classList.remove('hidden');
+  // Parar sondeos en marcha antes de recargar
+  if (window._checkinPoll){ clearInterval(window._checkinPoll); window._checkinPoll = null; }
+  // Recargar la página: limpia por completo el estado (clientes, modo admin,
+  // DOM ya renderizado, etc.) para que el siguiente login arranque de cero.
+  location.reload();
 }
 
 // ── Recuperar contraseña — paso 1 (REAL) ──
@@ -12002,7 +11993,7 @@ Genera entre 4 y 7 ejercicios apropiados para el tipo de sesión indicado.`;
 
   const usr = `Cliente: ${c.name}, ${c.peso}kg, objetivo: ${c.goal}.
 Tipo de sesión: ${d.type}.
-${db.length>0?'Ejercicios disponibles en el listado de Pol (usa preferentemente estos): '+db.join(', ')+'.\n':''}Genera un entrenamiento completo y equilibrado.`;
+${db.length>0?'Ejercicios disponibles en el listado de '+((coachData&&coachData.name)?coachData.name.split(' ')[0]:'tu entrenador')+' (usa preferentemente estos): '+db.join(', ')+'.\n':''}Genera un entrenamiento completo y equilibrado.`;
 
   try {
     const res = await fetch(GROQ_URL, {

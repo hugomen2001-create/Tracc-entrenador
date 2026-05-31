@@ -4372,6 +4372,32 @@ async function cargarCheckinsCliente(){
   renderClientPanel();
 }
 
+// Revisa si han llegado check-ins nuevos sin recargar toda la lista,
+// y actualiza los puntitos de la barra lateral. Ligero: una sola query.
+async function refreshCheckinDots(){
+  if (!coachData || !CLIENTS.length) return;
+  try{
+    const ids = CLIENTS.map(c => c.id);
+    const { data, error } = await sb
+      .from('weekly_checkins')
+      .select('client_id')
+      .in('client_id', ids)
+      .eq('seen_by_coach', false)
+      .not('submitted_at','is',null);
+    if (error) return;
+    const unseen = {};
+    (data || []).forEach(k => { unseen[k.client_id] = true; });
+    let changed = false;
+    CLIENTS.forEach(c => {
+      // No marcamos al cliente abierto (al abrirlo ya se da por visto)
+      const isOpen = currentClient && currentClient.id === c.id;
+      const val = isOpen ? false : !!unseen[c.id];
+      if (c._unseenCheckin !== val){ c._unseenCheckin = val; changed = true; }
+    });
+    if (changed && typeof renderClientList === 'function') renderClientList();
+  }catch(e){ /* silencioso: es un refresco en segundo plano */ }
+}
+
 // Tarjeta con el último check-in del cliente (+ historial breve)
 function renderCheckinCard(c){
   const list = (c && c._checkins) || [];
@@ -4382,7 +4408,8 @@ function renderCheckinCard(c){
     return `<div style="margin-bottom:18px">
       <div class="section-title" style="margin-bottom:8px">Check-in semanal</div>
       <div class="panel-card">
-        <div style="padding:18px 14px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6">
+        <div style="padding:22px 16px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6">
+          <div style="font-size:24px;margin-bottom:8px;opacity:.5">📋</div>
           El cliente aún no ha enviado ningún check-in.<br>Aparecen automáticamente cada fin de semana.
         </div>
       </div>
@@ -4390,35 +4417,45 @@ function renderCheckinCard(c){
   }
   const latest = list[0];
   const a = latest.answers || {};
-  const chip = (label,val)=>`<div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center">
-      <div style="font-size:15px;font-weight:700;color:var(--text)">${val!=null?val:'—'}<span style="font-size:10px;color:var(--text3);font-weight:500">/5</span></div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-top:2px">${label}</div>
+  const metric = (label,val,color,emoji)=>{
+    let bars='';
+    for(let n=1;n<=5;n++) bars+=`<div style="flex:1;height:5px;border-radius:3px;background:${n<=(val||0)?color:'var(--border)'}"></div>`;
+    return `<div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:11px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)">${emoji} ${label}</span>
+        <span style="font-size:17px;font-weight:800;color:var(--text);line-height:1">${val!=null?val:'—'}<span style="font-size:9px;color:var(--text3);font-weight:600">/5</span></span>
+      </div>
+      <div style="display:flex;gap:3px">${bars}</div>
     </div>`;
-  const planTag = a.plan?`<span style="font-size:11px;font-weight:700;color:${planColor[a.plan]||'var(--text2)'};background:${(planColor[a.plan]||'var(--text2)')}18;padding:3px 10px;border-radius:6px">Plan: ${planLabel[a.plan]||a.plan}</span>`:'';
-  const notesHtml = (latest.notes&&latest.notes.trim())?`<div style="background:var(--bg2);border-radius:10px;padding:10px 12px;margin-top:10px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:4px">💬 Nota del cliente</div>
-      <div style="font-size:12.5px;color:var(--text);line-height:1.5;white-space:pre-wrap">${escHtml(latest.notes)}</div>
+  };
+  const planPill = a.plan?`<div style="display:inline-flex;align-items:center;gap:6px;background:${(planColor[a.plan]||'var(--text2)')}18;border:1px solid ${(planColor[a.plan]||'var(--text2)')}40;border-radius:8px;padding:6px 11px">
+      <span style="font-size:11px;font-weight:600;color:var(--text3)">Cumplió el plan</span>
+      <span style="font-size:12px;font-weight:800;color:${planColor[a.plan]||'var(--text2)'}">${planLabel[a.plan]||a.plan}</span>
+    </div>`:'';
+  const notesHtml = (latest.notes&&latest.notes.trim())?`<div style="background:var(--bg2);border-left:3px solid var(--green);border-radius:0 10px 10px 0;padding:11px 13px;margin-top:11px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px">💬 Nota del cliente</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap">${escHtml(latest.notes)}</div>
     </div>`:'';
   // Historial breve (semanas anteriores)
   const hist = list.slice(1,5);
-  const histHtml = hist.length?`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Semanas anteriores</div>
-      ${hist.map(k=>{const ka=k.answers||{};return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text2)">
-        <span style="width:54px;color:var(--text3)">${fmtWk(k.week_start)}</span>
-        <span>😴 ${ka.sleep!=null?ka.sleep:'—'}</span>
-        <span>⚡ ${ka.energy!=null?ka.energy:'—'}</span>
-        <span>🍽️ ${ka.hunger!=null?ka.hunger:'—'}</span>
-        <span style="margin-left:auto;color:${planColor[ka.plan]||'var(--text3)'}">${planLabel[ka.plan]||'—'}</span>
+  const histHtml = hist.length?`<div style="margin-top:13px;border-top:1px solid var(--border);padding-top:11px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px">Semanas anteriores</div>
+      ${hist.map(k=>{const ka=k.answers||{};return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12px;color:var(--text2)">
+        <span style="width:50px;color:var(--text3);font-weight:600">${fmtWk(k.week_start)}</span>
+        <span title="Sueño">🌙 ${ka.sleep!=null?ka.sleep:'—'}</span>
+        <span title="Energía">⚡ ${ka.energy!=null?ka.energy:'—'}</span>
+        <span title="Hambre">🍽️ ${ka.hunger!=null?ka.hunger:'—'}</span>
+        <span style="margin-left:auto;font-weight:600;color:${planColor[ka.plan]||'var(--text3)'}">${planLabel[ka.plan]||'—'}</span>
       </div>`;}).join('')}
     </div>`:'';
   return `<div style="margin-bottom:18px">
     <div class="section-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px">Check-in semanal
-      <span style="font-size:10.5px;font-weight:600;color:var(--text3)">· ${fmtWk(latest.week_start)}</span></div>
+      <span style="font-size:10.5px;font-weight:600;color:var(--text3)">· semana del ${fmtWk(latest.week_start)}</span></div>
     <div class="panel-card">
-      <div style="display:flex;gap:7px;margin-bottom:10px">
-        ${chip('Sueño',a.sleep)}${chip('Energía',a.energy)}${chip('Hambre',a.hunger)}
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        ${metric('Sueño',a.sleep,'#7c3aed','🌙')}${metric('Energía',a.energy,'#d97706','⚡')}${metric('Hambre',a.hunger,'#111','🍽️')}
       </div>
-      ${planTag}
+      ${planPill}
       ${notesHtml}
       ${histHtml}
     </div>
@@ -11816,6 +11853,11 @@ async function initDashboard(){
   } else {
     // Sin clientes: dejar el panel principal con un estado vacío
     renderClientPanel();
+  }
+  // Refresco de puntitos de check-in: cada 60s y al volver a la pestaña
+  if (!window._checkinPoll){
+    window._checkinPoll = setInterval(refreshCheckinDots, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCheckinDots(); });
   }
 }
 

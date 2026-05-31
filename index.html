@@ -3616,11 +3616,18 @@ function renderSidebar() {
 
   list.innerHTML = CLIENTS.map(c => {
     const dot = getDotClass(c);
+    const isActive = currentClient && currentClient.id === c.id;
+    const lastLbl = (typeof lastSessionLabel==='function') ? lastSessionLabel(c._lastSessionDate) : '';
+    const lastColor = dot==='green' ? 'var(--green)' : dot==='amber' ? 'var(--amber)' : 'var(--text3)';
+    const ckDot = c._unseenCheckin ? '<div title="Check-in nuevo" style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;margin-left:6px"></div>' : '';
     return `
-    <div class="client-item" id="ci-${c.id}" onclick="selectClient('${c.id}')">
+    <div class="client-item${isActive?' active':''}" id="ci-${c.id}" onclick="selectClient('${c.id}')">
       <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
-      <div class="client-name">${c.name}</div>
+      <div style="flex:1;min-width:0">
+        <div class="client-name" style="display:flex;align-items:center">${c.name}${ckDot}</div>
+        <div style="font-size:10.5px;color:${lastColor};font-weight:600;margin-top:1px">${lastLbl}</div>
+      </div>
       <div class="client-tag">${c.stats.sessions}/${c.stats.sessionGoal}</div>
     </div>`;
   }).join('');

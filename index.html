@@ -1975,14 +1975,34 @@ const TOUR_STEPS = [
 ];
 let _tourIdx = 0;
 function startTour(){ _tourIdx = 0; _tourShow(); }
-function _tourEnd(){ try{ localStorage.setItem('tracc_tour_seen_v1','1'); }catch(e){} const r=document.getElementById('tour-root'); if(r) r.remove(); }
+// Clave por cuenta para el respaldo en el navegador
+function _tourSeenKey(){ try{ return 'tracc_tour_seen_' + ((coachData && (coachData.user_id||coachData.id)) || 'x'); }catch(e){ return 'tracc_tour_seen_x'; } }
+// Marca el tour como visto: en la cuenta (Supabase) y en el navegador (respaldo)
+function _markTourSeen(){
+  try{ localStorage.setItem(_tourSeenKey(),'1'); }catch(e){}
+  try{
+    if(coachData){
+      coachData.tour_seen = true;
+      sb.from('coaches').update({tour_seen:true}).eq('id', coachData.id).then(()=>{}, ()=>{});
+    }
+  }catch(e){}
+}
+function _tourEnd(){ const r=document.getElementById('tour-root'); if(r) r.remove(); }
 function tourSkip(){ _tourEnd(); }
 function tourPrev(){ if(_tourIdx>0){ _tourIdx--; _tourShow(); } }
 function tourNext(){
   if(_tourIdx>=TOUR_STEPS.length-1){ _tourEnd(); try{ if(typeof openVgMode==='function') openVgMode('plan'); }catch(e){} return; }
   _tourIdx++; _tourShow();
 }
-function maybeStartTour(){ try{ if(localStorage.getItem('tracc_tour_seen_v1')) return; }catch(e){} startTour(); }
+// Solo arranca automáticamente si esta cuenta no lo ha visto nunca.
+// Lo marca como visto en cuanto arranca (aunque no lo termine), para que
+// no vuelva a salir solo. El botón "?" lo lanza siempre con startTour().
+function maybeStartTour(){
+  try{ if(coachData && coachData.tour_seen === true) return; }catch(e){}
+  try{ if(localStorage.getItem(_tourSeenKey())) return; }catch(e){}
+  _markTourSeen();
+  startTour();
+}
 function _tourShow(){
   const step = TOUR_STEPS[_tourIdx];
   try{ if(step.nav) step.nav(); }catch(e){ console.warn('tour nav:', e); }

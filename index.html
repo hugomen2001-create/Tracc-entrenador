@@ -4547,6 +4547,8 @@ async function eliminarCliente(){
     // Entreno (plan)
     await intentar(()=> sb.from('client_plans').delete().eq('client_id', cid));
     await intentar(()=> sb.from('training_plans').delete().eq('client_id', cid));
+    // Notas de ejercicio (pueden referenciar sesiones) → borrar antes que los entrenos
+    await intentar(()=> sb.from('exercise_notes').delete().eq('client_id', cid));
     // Entrenos: series (por sesión) → sesiones
     try{
       const { data:ws } = await sb.from('workout_sessions').select('id').eq('client_id', cid);
@@ -4554,10 +4556,19 @@ async function eliminarCliente(){
       if(wsIds.length) await sb.from('workout_sets').delete().in('session_id', wsIds);
     }catch(e){ console.warn(e); }
     await intentar(()=> sb.from('workout_sessions').delete().eq('client_id', cid));
+    // Resto de tablas asociadas al cliente (mesociclo, agenda, check-ins, etc.)
+    await intentar(()=> sb.from('split_adjustments').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('week_reorders').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('weekly_checkins').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('weekly_nutrition').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('cheats').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('appointments').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('mesocycles').delete().eq('client_id', cid));
     // Métricas, cuestionario, cuota y fotos
     await intentar(()=> sb.from('daily_metrics').delete().eq('client_id', cid));
     await intentar(()=> sb.from('client_questionnaire').delete().eq('client_id', cid));
     await intentar(()=> sb.from('client_billing').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('revision_notes').delete().eq('client_id', cid));
     await intentar(()=> sb.from('revision_photos').delete().eq('client_id', cid));
     await intentar(()=> sb.from('progress_photos').delete().eq('client_id', cid));
     // Finalmente, el cliente

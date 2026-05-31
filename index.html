@@ -1006,6 +1006,11 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd"></path></svg>
         Mi plan
       </button>
+      <button onclick="openVgMode('agenda')" id="agenda-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px;position:relative">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clip-rule="evenodd"></path></svg>
+        Agenda
+        <span id="agenda-badge" style="display:none;position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center">0</span>
+      </button>
     </div>
   </div>
   <div id="sb-clientes-header2" style="display:flex;align-items:center;justify-content:space-between;padding:4px 16px 7px">
@@ -5605,6 +5610,9 @@ function renderResumen() {
       ${weekOffset<0?`<button onclick="resetWeek()" style="font-size:11.5px;padding:4px 12px;border-radius:7px;border:1px solid var(--accent);background:var(--bg2);cursor:pointer;color:var(--accent);font-family:'DM Sans',sans-serif;font-weight:500">Hoy</button>`:''}
     </div>
 
+    <!-- PRÓXIMAS CITAS -->
+    ${citasClienteCardHtml(c)}
+
     <!-- STAT CARDS -->
     <div class="stat-grid">
       <div class="stat-card" onclick="openChartModal('sessions')">
@@ -8705,7 +8713,7 @@ function _vgSaludo(){
 
 let _vgMode = null; // null | 'overview' | 'pagos' | 'plan'
 function _setVgButtons(){
-  [['overview-btn','overview'],['pagos-btn','pagos'],['plan-btn','plan']].forEach(([id,m])=>{
+  [['overview-btn','overview'],['pagos-btn','pagos'],['plan-btn','plan'],['agenda-btn','agenda']].forEach(([id,m])=>{
     const b=document.getElementById(id); if(!b)return;
     const on=_vgMode===m;
     b.style.background = on?'#1a1a18':'var(--bg2)';
@@ -8732,6 +8740,9 @@ function openVgMode(mode){
     renderPagosPanel();
   } else if(mode==='plan'){
     renderPlanPanel();
+  } else if(mode==='agenda'){
+    renderAgendaPanel();
+    cargarAppointments().then(()=>{ if(_vgMode==='agenda'){ marcarAgendaVista(); renderAgendaPanel(); } });
   }
 }
 // Compatibilidad: por si algo llama todavía a toggleOverview
@@ -12720,6 +12731,212 @@ setTimeout(()=>{
 // initDashboard() lo llama el login (lgEnterApp / autologin) una vez que
 // hay un coach verificado. Carga los clientes reales y renderiza el sidebar.
 // ══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════
+// AGENDA / CITAS (tabla appointments)
+// Pol crea citas para sus clientes; el cliente las acepta/rechaza/propone otra
+// hora desde MyTracc. Vista de calendario global + tarjeta por cliente.
+// ══════════════════════════════════════════════════════════════════════════
+let APPOINTMENTS = [];
+let _agCal = new Date(); _agCal.setDate(1);
+const APPT_TYPES = {
+  revision:{label:'Revisión',color:'#16a34a',bg:'#dcfce7',icon:'📋'},
+  llamada:{label:'Llamada',color:'#a16207',bg:'#fef9c3',icon:'📞'},
+  sesion:{label:'Sesión',color:'#1d4ed8',bg:'#dbeafe',icon:'🏋'},
+  otro:{label:'Otro',color:'#6b6b66',bg:'#ececec',icon:'📌'}
+};
+function _apptType(t){ return APPT_TYPES[t]||APPT_TYPES.otro; }
+function apptClientName(id){ const c=CLIENTS.find(x=>String(x.id)===String(id)); return c?c.name:'Cliente'; }
+function apptDateObj(a){ return new Date(a.status==='contrapropuesta'&&a.client_proposed_at?a.client_proposed_at:a.starts_at); }
+function apptFmtFecha(d){ return d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }
+function apptFmtHora(d){ return d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}); }
+
+async function cargarAppointments(){
+  if(!coachData||!coachData.id){ APPOINTMENTS=[]; return; }
+  try{
+    const {data,error}=await sb.from('appointments').select('*').eq('coach_id',coachData.id).order('starts_at',{ascending:true});
+    if(error){ console.warn('cargarAppointments:',error); APPOINTMENTS=[]; }
+    else APPOINTMENTS=data||[];
+  }catch(e){ console.warn('cargarAppointments ex:',e); APPOINTMENTS=[]; }
+  actualizarAgendaBadge();
+}
+function apptCoachUnseen(){ return APPOINTMENTS.filter(a=>a.seen_by_coach===false).length; }
+function actualizarAgendaBadge(){
+  const b=document.getElementById('agenda-badge'); if(!b)return;
+  const n=apptCoachUnseen();
+  b.style.display=n>0?'flex':'none'; b.textContent=n>9?'9+':String(n);
+}
+async function marcarAgendaVista(){
+  const unseen=APPOINTMENTS.filter(a=>a.seen_by_coach===false).map(a=>a.id);
+  if(!unseen.length) return;
+  APPOINTMENTS.forEach(a=>{ if(a.seen_by_coach===false) a.seen_by_coach=true; });
+  actualizarAgendaBadge();
+  try{ await sb.from('appointments').update({seen_by_coach:true}).in('id',unseen); }catch(e){}
+}
+function _agRerender(){
+  if(_vgMode==='agenda') renderAgendaPanel();
+  else if(currentClient) renderClientPanel();
+}
+
+// ── Tarjeta "Próximas citas" por cliente (en Resumen) ──
+function citasClienteCardHtml(c){
+  if(!c) return '';
+  const ahora=Date.now()-3600000;
+  const list=APPOINTMENTS.filter(a=>String(a.client_id)===String(c.id)&&a.status!=='rechazada'&&a.status!=='cancelada'&&apptDateObj(a).getTime()>ahora)
+    .sort((a,b)=>apptDateObj(a)-apptDateObj(b)).slice(0,4);
+  const row=(a)=>{
+    const T=_apptType(a.type), d=apptDateObj(a);
+    const estado = a.status==='aceptada'?'<span style="font-size:10px;font-weight:600;color:#16a34a;background:#dcfce7;padding:2px 8px;border-radius:6px">Aceptada</span>'
+      : a.status==='contrapropuesta'?'<span style="font-size:10px;font-weight:600;color:#a16207;background:#fef9c3;padding:2px 8px;border-radius:6px">Propone otra hora</span>'
+      : '<span style="font-size:10px;font-weight:600;color:#a16207;background:#fef9c3;padding:2px 8px;border-radius:6px">Pendiente</span>';
+    const accion = a.status==='contrapropuesta'
+      ? `<button onclick="aceptarContrapropuesta('${a.id}')" style="font-size:10px;font-weight:600;color:#fff;background:#16a34a;border:none;border-radius:6px;padding:4px 9px;cursor:pointer;margin-left:6px">Aceptar su hora</button>` : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="width:30px;height:30px;border-radius:8px;background:${T.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px">${T.icon}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600;color:var(--text)">${T.label}${a.title?' · '+escHtml(a.title):''}</div>
+        <div style="font-size:11px;color:var(--text3)">${apptFmtFecha(d)} · ${apptFmtHora(d)}${a.location?' · '+escHtml(a.location):''}</div></div>
+      ${estado}${accion}
+      <button onclick="cancelarCita('${a.id}')" title="Cancelar cita" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+    </div>`;
+  };
+  return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Próximas citas</div>
+      <button onclick="abrirNuevaCita('${c.id}')" style="height:28px;padding:0 12px;border-radius:8px;background:var(--green);border:none;font-size:11.5px;font-weight:600;color:#fff;cursor:pointer">+ Nueva cita</button>
+    </div>
+    ${list.length?list.map(row).join(''):'<div style="font-size:11.5px;color:var(--text3);padding:6px 0">Sin citas próximas. Pulsa “Nueva cita”.</div>'}
+  </div>`;
+}
+
+// ── Vista calendario global (modo 'agenda') ──
+function renderAgendaPanel(){
+  const panel=document.getElementById('main-panel'); if(!panel) return;
+  const y=_agCal.getFullYear(), m=_agCal.getMonth();
+  const monthName=_agCal.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  let lead=new Date(y,m,1).getDay(); lead=(lead===0?6:lead-1);
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+  const byDay={};
+  APPOINTMENTS.forEach(a=>{
+    if(a.status==='rechazada'||a.status==='cancelada') return;
+    const d=apptDateObj(a);
+    if(d.getFullYear()===y&&d.getMonth()===m){ (byDay[d.getDate()]=byDay[d.getDate()]||[]).push(a); }
+  });
+  const DOW=['L','M','X','J','V','S','D'];
+  let cells='';
+  for(let i=0;i<lead;i++) cells+='<div></div>';
+  for(let dn=1;dn<=daysInMonth;dn++){
+    const isToday=(y===today.getFullYear()&&m===today.getMonth()&&dn===today.getDate());
+    const items=(byDay[dn]||[]).sort((a,b)=>apptDateObj(a)-apptDateObj(b));
+    const pills=items.slice(0,3).map(a=>{const T=_apptType(a.type),d=apptDateObj(a);return `<div style="font-size:9px;font-weight:600;background:${T.bg};color:${T.color};border-radius:4px;padding:1px 4px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${apptFmtHora(d)} ${escHtml(apptClientName(a.client_id).split(' ')[0])}</div>`;}).join('');
+    const more=items.length>3?`<div style="font-size:9px;color:var(--text3);margin-top:1px">+${items.length-3} más</div>`:'';
+    cells+=`<div onclick="abrirDiaAgenda(${y},${m},${dn})" style="min-height:74px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};border-radius:9px;padding:5px 6px;background:var(--bg2);cursor:pointer">
+      <div style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--green)':'var(--text2)'}">${dn}</div>${pills}${more}</div>`;
+  }
+  const legend=Object.keys(APPT_TYPES).map(k=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)"><span style="width:7px;height:7px;border-radius:50%;background:${APPT_TYPES[k].color}"></span>${APPT_TYPES[k].label}</span>`).join('');
+  panel.innerHTML=`
+    <div class="vg-header"><div><div class="vg-title">Agenda</div><div class="vg-date">Todas tus citas</div></div>
+      <button onclick="abrirNuevaCita()" style="height:36px;padding:0 15px;border-radius:9px;background:var(--green);border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer">+ Nueva cita</button></div>
+    <div class="vg-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="agMes(-1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">‹</button>
+          <div style="font-size:16px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">${monthName}</div>
+          <button onclick="agMes(1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">›</button>
+          <button onclick="agHoy()" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;height:30px;padding:0 12px;cursor:pointer;color:var(--text2);font-size:12px">Hoy</button>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">${legend}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">${d}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
+    </div>`;
+}
+function agMes(delta){ _agCal.setMonth(_agCal.getMonth()+delta); renderAgendaPanel(); }
+function agHoy(){ _agCal=new Date(); _agCal.setDate(1); renderAgendaPanel(); }
+function abrirDiaAgenda(y,m,dn){
+  const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');
+  abrirNuevaCita(null, ds);
+}
+
+// ── Modal: nueva cita ──
+function abrirNuevaCita(clientId, dateStr){
+  let ov=document.getElementById('cita-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='cita-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:260;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.onclick=(e)=>{ if(e.target===ov) cerrarCitaModal(); };
+    document.body.appendChild(ov);
+  }
+  const clientes=CLIENTS.filter(c=>c.active!==false);
+  const cliOpts=clientes.map(c=>`<option value="${c.id}" ${String(c.id)===String(clientId)?'selected':''}>${escHtml(c.name)}</option>`).join('');
+  const hoy=new Date(); const fecha=dateStr||(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0'));
+  const tipoBtn=(k)=>`<button type="button" onclick="citaSetTipo('${k}')" data-tipo="${k}" class="cita-tipo" style="font-size:12px;font-weight:600;padding:7px 13px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer">${APPT_TYPES[k].label}</button>`;
+  const inp='border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;background:var(--bg);font-size:13px;color:var(--text);font-family:inherit;box-sizing:border-box;width:100%';
+  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:460px;padding:20px 22px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--text)">Nueva cita</div>
+      <button onclick="cerrarCitaModal()" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer">✕</button>
+    </div>
+    <div style="margin-bottom:12px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Cliente</div>
+      <select id="cita-cli" style="${inp}">${cliOpts}</select></div>
+    <div style="margin-bottom:12px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Tipo</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">${Object.keys(APPT_TYPES).map(tipoBtn).join('')}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Fecha</div><input type="date" id="cita-fecha" value="${fecha}" style="${inp}"></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Hora</div><input type="time" id="cita-hora" value="18:00" style="${inp}"></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Duración</div><input type="text" id="cita-dur" placeholder="45 min" style="${inp}"></div>
+    </div>
+    <div style="margin-bottom:12px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Lugar / enlace</div>
+      <input type="text" id="cita-lugar" placeholder="Gimnasio, dirección o enlace de videollamada" style="${inp}"></div>
+    <div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Nota (opcional)</div>
+      <input type="text" id="cita-nota" placeholder="Trae ropa cómoda, medimos pliegues…" style="${inp}"></div>
+    <button onclick="guardarNuevaCita()" style="width:100%;height:42px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Proponer cita al cliente</button>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">El cliente recibirá un aviso y podrá aceptarla, rechazarla o proponer otra hora</div>
+  </div>`;
+  ov.style.display='flex';
+  _citaTipo='revision'; citaSetTipo('revision');
+}
+let _citaTipo='revision';
+function citaSetTipo(k){ _citaTipo=k;
+  document.querySelectorAll('#cita-overlay .cita-tipo').forEach(b=>{
+    const on=b.getAttribute('data-tipo')===k;
+    b.style.background=on?'#1a1a18':'var(--bg)'; b.style.color=on?'#fff':'var(--text2)'; b.style.borderColor=on?'#1a1a18':'var(--border)';
+  });
+}
+function cerrarCitaModal(){ const ov=document.getElementById('cita-overlay'); if(ov) ov.style.display='none'; }
+
+async function guardarNuevaCita(){
+  const cli=document.getElementById('cita-cli').value;
+  const fecha=document.getElementById('cita-fecha').value;
+  const hora=document.getElementById('cita-hora').value;
+  const dur=document.getElementById('cita-dur').value.trim();
+  const lugar=document.getElementById('cita-lugar').value.trim();
+  const nota=document.getElementById('cita-nota').value.trim();
+  if(!cli||!fecha||!hora){ showToast('Completa cliente, fecha y hora'); return; }
+  const starts=new Date(fecha+'T'+hora);
+  const durNum=parseInt((dur.match(/\d+/)||[])[0])||null;
+  const fila={ coach_id:coachData.id, client_id:cli, type:_citaTipo, starts_at:starts.toISOString(),
+    duration_minutes:durNum, location:lugar||null, notes:nota||null,
+    status:'pendiente', proposed_by:'coach', seen_by_client:false, seen_by_coach:true };
+  try{
+    const {error}=await sb.from('appointments').insert(fila);
+    if(error){ console.error('guardarNuevaCita:',error); showToast('Error al guardar la cita'); return; }
+  }catch(e){ console.error(e); showToast('Error al guardar la cita'); return; }
+  cerrarCitaModal();
+  await cargarAppointments();
+  _agRerender();
+  showToast('✓ Cita propuesta al cliente');
+}
+
+async function cancelarCita(id){
+  if(!confirm('¿Cancelar esta cita?')) return;
+  try{ await sb.from('appointments').update({status:'cancelada',seen_by_client:false}).eq('id',id); }catch(e){}
+  await cargarAppointments(); _agRerender(); showToast('Cita cancelada');
+}
+async function aceptarContrapropuesta(id){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  try{ await sb.from('appointments').update({starts_at:a.client_proposed_at||a.starts_at,status:'aceptada',proposed_by:'coach',seen_by_client:false}).eq('id',id); }catch(e){}
+  await cargarAppointments(); _agRerender(); showToast('✓ Hora confirmada');
+}
+
 let _dashboardInited = false;
 async function initDashboard(){
   if (_dashboardInited) return;
@@ -12731,6 +12948,7 @@ async function initDashboard(){
   }
   await loadRealClients();
   renderSidebar();
+  cargarAppointments();
   if (CLIENTS.length){
     selectClient(CLIENTS[0].id);
   } else {

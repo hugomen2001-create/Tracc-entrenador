@@ -12827,7 +12827,7 @@ function renderAgendaPanel(){
   for(let dn=1;dn<=daysInMonth;dn++){
     const isToday=(y===today.getFullYear()&&m===today.getMonth()&&dn===today.getDate());
     const items=(byDay[dn]||[]).sort((a,b)=>apptDateObj(a)-apptDateObj(b));
-    const pills=items.slice(0,3).map(a=>{const T=_apptType(a.type),d=apptDateObj(a);return `<div style="font-size:9px;font-weight:600;background:${T.bg};color:${T.color};border-radius:4px;padding:1px 4px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${apptFmtHora(d)} ${escHtml(apptClientName(a.client_id).split(' ')[0])}</div>`;}).join('');
+    const pills=items.slice(0,3).map(a=>{const T=_apptType(a.type),d=apptDateObj(a);return `<div onclick="event.stopPropagation();abrirDetalleCita('${a.id}')" style="font-size:9px;font-weight:600;background:${T.bg};color:${T.color};border-radius:4px;padding:1px 4px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer">${apptFmtHora(d)} ${escHtml(apptClientName(a.client_id).split(' ')[0])}</div>`;}).join('');
     const more=items.length>3?`<div style="font-size:9px;color:var(--text3);margin-top:1px">+${items.length-3} más</div>`:'';
     cells+=`<div onclick="abrirDiaAgenda(${y},${m},${dn})" style="min-height:74px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};border-radius:9px;padding:5px 6px;background:var(--bg2);cursor:pointer">
       <div style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--green)':'var(--text2)'}">${dn}</div>${pills}${more}</div>`;
@@ -12855,6 +12855,118 @@ function agHoy(){ _agCal=new Date(); _agCal.setDate(1); renderAgendaPanel(); }
 function abrirDiaAgenda(y,m,dn){
   const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');
   abrirNuevaCita(null, ds);
+}
+
+// Detalle de una cita (click en el calendario) + acceso al perfil del cliente
+function abrirDetalleCita(id){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  const T=_apptType(a.type), d=apptDateObj(a);
+  const cli=CLIENTS.find(c=>String(c.id)===String(a.client_id));
+  const estado={pendiente:['Pendiente de respuesta','#a16207','#fef9c3'],aceptada:['Aceptada','#16a34a','#dcfce7'],contrapropuesta:['El cliente propone otra hora','#a16207','#fef9c3'],rechazada:['Rechazada','#dc2626','#fee2e2'],cancelada:['Cancelada','#6b6b66','#ececec']}[a.status]||[a.status,'#6b6b66','#ececec'];
+  let ov=document.getElementById('cita-det-ov');
+  if(!ov){ov=document.createElement('div');ov.id='cita-det-ov';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:265;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';ov.onclick=(e)=>{if(e.target===ov)cerrarDetalleCita();};document.body.appendChild(ov);}
+  const row=(lbl,val)=>val?`<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text3)">${lbl}</span><span style="font-size:12.5px;color:var(--text);font-weight:600;text-align:right">${val}</span></div>`:'';
+  const cp=a.status==='contrapropuesta'?`<button onclick="aceptarContrapropuesta('${a.id}');cerrarDetalleCita()" style="flex:1;height:40px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Aceptar su hora</button>`:'';
+  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:400px;padding:20px 22px">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+      <div style="width:42px;height:42px;border-radius:11px;background:${T.bg};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${T.icon}</div>
+      <div style="flex:1;min-width:0"><div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text);line-height:1">${T.label}</div>
+        <span style="display:inline-block;margin-top:5px;font-size:10.5px;font-weight:600;color:${estado[1]};background:${estado[2]};padding:2px 9px;border-radius:6px">${estado[0]}</span></div>
+      <button onclick="cerrarDetalleCita()" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;flex-shrink:0">✕</button>
+    </div>
+    ${row('Cliente', cli?escHtml(cli.name):'—')}
+    ${row('Fecha', apptFmtFecha(d))}
+    ${row('Hora', apptFmtHora(d))}
+    ${row('Duración', a.duration_minutes?a.duration_minutes+' min':'')}
+    ${row('Lugar', a.location?escHtml(a.location):'')}
+    ${a.notes?`<div style="margin-top:10px;background:var(--bg);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:9px 11px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Nota</div><div style="font-size:12.5px;color:var(--text);line-height:1.5">${escHtml(a.notes)}</div></div>`:''}
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button onclick="irAClientePerfil('${a.client_id}')" style="flex:1;height:40px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Ver perfil del cliente</button>
+      ${cp}
+    </div>
+    <button onclick="cancelarCita('${a.id}');cerrarDetalleCita()" style="width:100%;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer;margin-top:8px">Cancelar cita</button>
+  </div>`;
+  ov.style.display='flex';
+}
+function cerrarDetalleCita(){const ov=document.getElementById('cita-det-ov');if(ov)ov.style.display='none';}
+function irAClientePerfil(id){
+  cerrarDetalleCita();
+  if(_vgMode){ _vgMode=null; _overviewOpen=false; _setVgButtons(); }
+  selectClient(id);
+}
+
+// Realtime: refresca la agenda cuando un cliente acepta/rechaza/propone
+function subscribeAppointmentsCoach(){
+  if(!coachData||!coachData.id||window._apptChan) return;
+  window._apptChan=sb.channel('appts_coach_'+coachData.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'appointments',filter:'coach_id=eq.'+coachData.id},()=>{
+      cargarAppointments().then(()=>_agRerender());
+    }).subscribe();
+}
+
+// Realtime AMPLIO: cualquier cambio de los clientes (métricas, sesiones, dieta,
+// cheats, revisiones, checkins, billing…) recarga y re-renderiza en vivo.
+let _lrTC=null;
+function scheduleLiveRefreshCoach(){ clearTimeout(_lrTC); _lrTC=setTimeout(liveRefreshCoach,600); }
+async function liveRefreshCoach(){
+  if(!coachData) return;
+  // No pisar ediciones en curso: si está en "Editar plan", solo refresca datos+sidebar
+  const editing = (typeof currentTab!=='undefined' && currentTab==='editar');
+  const sel = currentClient ? currentClient.id : null;
+  try{ await loadRealClients(); }catch(e){ console.warn('liveRefreshCoach:',e); return; }
+  if(sel){ const still=CLIENTS.find(c=>String(c.id)===String(sel)); if(still) currentClient=still; }
+  renderSidebar();
+  if(_vgMode==='overview'){ if(typeof renderOverview==='function') renderOverview(); }
+  else if(_vgMode==='pagos'){ if(typeof renderPagosPanel==='function') renderPagosPanel(); }
+  else if(_vgMode==='agenda'){ renderAgendaPanel(); }
+  else if(_vgMode==='plan'){ /* el plan del coach no depende de clientes */ }
+  else if(!editing && currentClient){ renderClientPanel(); }
+}
+function setupRealtimeCoach(){
+  if(window._rtChanCoach) return;
+  let ch=sb.channel('tracc_all_'+((coachData&&coachData.id)||'x'));
+  ['daily_metrics','workout_sessions','workout_sets','cheats','weekly_checkins','exercise_notes','split_adjustments','week_reorders','progress_photos','revision_photos','revision_notes','client_billing','clients','client_plans','training_plans','nutrition_plans','nutrition_options','weekly_nutrition','mesocycles','coach_applications','client_questionnaire'].forEach(t=>{
+    ch=ch.on('postgres_changes',{event:'*',schema:'public',table:t},scheduleLiveRefreshCoach);
+  });
+  ch.subscribe();
+  window._rtChanCoach=ch;
+}
+
+// Realtime GLOBAL: cualquier cambio de cualquier cliente refresca el panel en vivo
+function _traccBusy(){
+  // No refrescar si Pol está editando (perdería cambios) o con un modal abierto
+  if(typeof editPlan!=='undefined'&&editPlan) return true;
+  if(typeof editandoBorradorPlan!=='undefined'&&editandoBorradorPlan) return true;
+  if(typeof editandoObjetivos!=='undefined'&&editandoObjetivos) return true;
+  if(typeof editandoEjercicioId!=='undefined'&&editandoEjercicioId) return true;
+  for(const id of ['cita-overlay','cita-det-ov','cmp-overlay']){
+    const el=document.getElementById(id);
+    if(el&&el.style.display&&el.style.display!=='none') return true;
+  }
+  return false;
+}
+function traccScheduleRefresh(){ clearTimeout(window._trT); window._trT=setTimeout(traccLiveRefresh,700); }
+async function traccLiveRefresh(){
+  if(_traccBusy()){ traccScheduleRefresh(); return; }   // reintenta cuando deje de editar
+  try{
+    const curId=currentClient&&currentClient.id;
+    await loadRealClients();
+    if(curId!=null){ const c=CLIENTS.find(x=>x.id===curId); if(c) currentClient=c; }
+    await cargarAppointments();
+    renderSidebar();
+    if(_vgMode==='agenda') renderAgendaPanel();
+    else if(_vgMode==='overview' && typeof renderOverview==='function') renderOverview();
+    else if(_vgMode==='pagos' && typeof renderPagosPanel==='function') renderPagosPanel();
+    else if(currentClient) renderClientPanel();
+  }catch(e){ console.warn('traccLiveRefresh:',e); }
+}
+function subscribeTraccLive(){
+  if(!coachData||!coachData.id||window._traccLiveChan) return;
+  let ch=sb.channel('tracc_live_'+coachData.id);
+  ['clients','daily_metrics','workout_sessions','workout_sets','cheats','weekly_checkins','exercise_notes','progress_photos','revision_photos','revision_notes','client_plans','training_plans','nutrition_plans','nutrition_options','weekly_nutrition','mesocycles','split_adjustments','week_reorders','client_billing'].forEach(t=>{
+    ch=ch.on('postgres_changes',{event:'*',schema:'public',table:t},()=>traccScheduleRefresh());
+  });
+  window._traccLiveChan=ch.subscribe();
 }
 
 // ── Modal: nueva cita ──
@@ -12948,7 +13060,9 @@ async function initDashboard(){
   }
   await loadRealClients();
   renderSidebar();
-  cargarAppointments();
+  cargarAppointments().then(subscribeAppointmentsCoach);
+  setupRealtimeCoach();
+  subscribeTraccLive();
   if (CLIENTS.length){
     selectClient(CLIENTS[0].id);
   } else {

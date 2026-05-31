@@ -1011,6 +1011,10 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
         Agenda
         <span id="agenda-badge" style="display:none;position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center">0</span>
       </button>
+      <button onclick="openVgMode('import')" id="import-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1"/></svg>
+        Importar
+      </button>
     </div>
   </div>
   <div id="sb-clientes-header2" style="display:flex;align-items:center;justify-content:space-between;padding:4px 16px 7px">
@@ -1440,6 +1444,8 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- xlsx-js-style: superset compatible que SÍ permite estilos (colores, negrita) en las plantillas -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
@@ -4578,7 +4584,7 @@ function initAdmin(){
   const av = document.querySelector('.coach-card .avatar'); if(av) av.textContent=(coachData.name||'A').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const miniAv = document.getElementById('mini-coach-av'); if(miniAv) miniAv.textContent=(coachData.name||'A').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   // Ocultar botones que no aplican al admin
-  ['pagos-btn','plan-btn','pending-btn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display='none'; });
+  ['pagos-btn','plan-btn','pending-btn','import-btn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display='none'; });
   const ov = document.getElementById('overview-btn'); if(ov){ ov.setAttribute('onclick','adminGoOverview()'); }
   // Etiqueta de la sección y barra de filtros
   const lbl = document.querySelector('.sb-label'); if(lbl) lbl.textContent='Entrenadores';
@@ -8713,7 +8719,7 @@ function _vgSaludo(){
 
 let _vgMode = null; // null | 'overview' | 'pagos' | 'plan'
 function _setVgButtons(){
-  [['overview-btn','overview'],['pagos-btn','pagos'],['plan-btn','plan'],['agenda-btn','agenda']].forEach(([id,m])=>{
+  [['overview-btn','overview'],['pagos-btn','pagos'],['plan-btn','plan'],['agenda-btn','agenda'],['import-btn','import']].forEach(([id,m])=>{
     const b=document.getElementById(id); if(!b)return;
     const on=_vgMode===m;
     b.style.background = on?'#1a1a18':'var(--bg2)';
@@ -8743,6 +8749,8 @@ function openVgMode(mode){
   } else if(mode==='agenda'){
     renderAgendaPanel();
     cargarAppointments().then(()=>{ if(_vgMode==='agenda'){ marcarAgendaVista(); renderAgendaPanel(); } });
+  } else if(mode==='import'){
+    renderImportPanel();
   }
 }
 // Compatibilidad: por si algo llama todavía a toggleOverview
@@ -13047,6 +13055,502 @@ async function aceptarContrapropuesta(id){
   const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
   try{ await sb.from('appointments').update({starts_at:a.client_proposed_at||a.starts_at,status:'aceptada',proposed_by:'coach',seen_by_client:false}).eq('id',id); }catch(e){}
   await cargarAppointments(); _agRerender(); showToast('✓ Hora confirmada');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// IMPORTAR CLIENTES (Fase 1) — plantilla Excel + previsualización + alta
+// Crea fichas en `clients` (sin user_id). El cliente las reclama al registrarse
+// en MyTracc con su email (enlace por email en el onboarding).
+// ══════════════════════════════════════════════════════════════════════════
+let _importRows = null;
+let _importMetrics = null;   // [{email,name,date,steps,weight,sleep}]
+let _importWorkouts = null;  // [{email,name,date,type,exercise,set,reps,kg}]
+let _importRoutine = null;   // [{email,name,sesion,orden,exercise,series,reps}]
+let _importNutrition = null; // [{email,name,opcion,comida,alimento,grams,kcal,protein,carbs,fat}]
+
+// Normaliza una celda de fecha (texto AAAA-MM-DD, Date, o serial de Excel) → 'AAAA-MM-DD'
+function _xlDate(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number'){ const dt=new Date(Date.UTC(1899,11,30)+v*86400000); return dt.toISOString().slice(0,10); }
+  const s=String(v).trim();
+  const m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  const d=new Date(s); if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return s;
+}
+// Lee una pestaña por nombre (regex) como matriz de filas. null si no existe.
+function _sheetRows(wb,rx){ const n=wb.SheetNames.find(s=>rx.test(s)); if(!n) return null; return XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:''}).filter(r=>r&&r.some(c=>String(c).trim())); }
+// Conjunto de clientes "conocidos" (ya existentes + los que se van a crear en este Excel)
+function _clientesConocidos(){
+  const emails=new Set(), names=new Set();
+  (CLIENTS||[]).forEach(c=>{ if(c.email)emails.add(c.email.toLowerCase()); if(c.name)names.add(c.name.trim().toLowerCase()); });
+  (_importRows||[]).forEach(r=>{ if(r._status!=='dup'&&r.name){ if(r.email)emails.add(r.email.toLowerCase()); names.add(r.name.trim().toLowerCase()); } });
+  return {emails,names};
+}
+function _filaCasaCliente(row,known){
+  const e=(row.email||'').toLowerCase(), n=(row.name||'').trim().toLowerCase();
+  return (e&&known.emails.has(e))||(n&&known.names.has(n));
+}
+
+function descargarPlantillaClientes(){
+  const wb=XLSX.utils.book_new();
+  const GREEN='16A34A', DARK='1A1A18', SOFT='F0FDF4', LINE='D9E5DC';
+  // Estilo de cabecera de marca Tracc (fondo verde, texto blanco en negrita)
+  const styleHeader=(ws,n)=>{
+    for(let c=0;c<n;c++){ const ref=XLSX.utils.encode_cell({r:0,c}); if(!ws[ref])ws[ref]={t:'s',v:''};
+      ws[ref].s={fill:{patternType:'solid',fgColor:{rgb:GREEN}},font:{name:'Calibri',sz:11,bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'left',vertical:'center'},border:{bottom:{style:'medium',color:{rgb:'0F7A38'}}}}; }
+    ws['!rows']=[{hpt:26}];
+  };
+  const mk=(headers,ejemplos,widths)=>{ const ws=XLSX.utils.aoa_to_sheet([headers,...ejemplos]); ws['!cols']=widths.map(w=>({wch:w})); styleHeader(ws,headers.length); return ws; };
+
+  const wsC=mk(['Nombre*','Email','Peso (kg)','Altura (cm)','Objetivo','Sexo (H/M)','Fecha nacimiento (AAAA-MM-DD)','Teléfono','Objetivo pasos','Revisión cada (semanas)'],
+    [['Hugo Mengual','hugo@email.com',69.4,170,'Ganar masa muscular','H','2001-05-12','600111222',9000,2],
+     ['Ana López','ana@email.com',61,165,'Perder grasa','M','1995-03-08','600333444',8000,2]],
+    [20,24,10,11,22,11,28,14,14,20]);
+  const wsM=mk(['Email cliente','Fecha (AAAA-MM-DD)','Pasos','Peso (kg)','Sueño (h)'],
+    [['hugo@email.com','2026-05-18',8800,69.6,7],
+     ['hugo@email.com','2026-05-19',10200,69.5,8],
+     ['hugo@email.com','2026-05-20',9120,69.4,7.5],
+     ['hugo@email.com','2026-05-21',8430,69.2,8],
+     ['hugo@email.com','2026-05-22',11500,69.1,6.5],
+     ['hugo@email.com','2026-05-23',7600,69.0,9],
+     ['hugo@email.com','2026-05-24',9800,68.9,7.5],
+     ['ana@email.com','2026-05-18',7200,61.2,7],
+     ['ana@email.com','2026-05-19',8400,61.1,7.5],
+     ['ana@email.com','2026-05-20',7600,61.0,7],
+     ['ana@email.com','2026-05-21',8100,60.8,7.5],
+     ['ana@email.com','2026-05-22',9000,60.7,8],
+     ['ana@email.com','2026-05-23',6800,60.7,6.5],
+     ['ana@email.com','2026-05-24',7900,60.5,7]],
+    [24,20,10,10,10]);
+  const wsE=mk(['Email cliente','Fecha (AAAA-MM-DD)','Tipo (Push/Pull/Pierna...)','Ejercicio','Serie','Reps','Peso (kg)'],
+    [['hugo@email.com','2026-05-20','Push','Press banca',1,10,60],
+     ['hugo@email.com','2026-05-20','Push','Press banca',2,8,65],
+     ['hugo@email.com','2026-05-20','Push','Press banca',3,8,65],
+     ['hugo@email.com','2026-05-20','Push','Press militar',1,10,30],
+     ['hugo@email.com','2026-05-20','Push','Press militar',2,10,30],
+     ['hugo@email.com','2026-05-20','Push','Elevaciones laterales',1,15,8],
+     ['hugo@email.com','2026-05-22','Pull','Dominadas',1,8,0],
+     ['hugo@email.com','2026-05-22','Pull','Dominadas',2,7,0],
+     ['hugo@email.com','2026-05-22','Pull','Remo con barra',1,10,50],
+     ['hugo@email.com','2026-05-22','Pull','Remo con barra',2,10,50],
+     ['ana@email.com','2026-05-20','Full body','Sentadilla',1,10,40],
+     ['ana@email.com','2026-05-20','Full body','Sentadilla',2,10,40],
+     ['ana@email.com','2026-05-20','Full body','Press banca',1,10,30],
+     ['ana@email.com','2026-05-20','Full body','Remo con barra',1,10,30],
+     ['ana@email.com','2026-05-23','Full body','Sentadilla',1,12,42],
+     ['ana@email.com','2026-05-23','Full body','Press banca',1,10,32]],
+    [24,20,24,22,8,8,10]);
+  // FASE 3 · Rutina (plan de entreno por sesión)
+  const wsR=mk(['Email cliente','Sesión (Push/Pull/Pierna/Full...)','Orden','Ejercicio','Series','Reps','Series aprox.','Descanso (s)'],
+    [['hugo@email.com','Push',1,'Press banca',3,'1x8-10 / 2x10-12',2,90],
+     ['hugo@email.com','Push',2,'Press militar',3,'3x10-12',1,75],
+     ['hugo@email.com','Push',3,'Press inclinado mancuerna',3,'3x10-12',1,75],
+     ['hugo@email.com','Push',4,'Fondos en paralelas',3,'3x12',0,60],
+     ['hugo@email.com','Push',5,'Elevaciones laterales',4,'4x15',0,45],
+     ['hugo@email.com','Pull',1,'Dominadas',4,'1x6-8 / 3x8-10',1,90],
+     ['hugo@email.com','Pull',2,'Remo con barra',4,'4x10',1,90],
+     ['hugo@email.com','Pull',3,'Jalón al pecho',3,'3x12',0,75],
+     ['hugo@email.com','Pull',4,'Curl de bíceps con barra',3,'3x12',0,60],
+     ['hugo@email.com','Pull',5,'Face pull',3,'3x15',0,45],
+     ['hugo@email.com','Pierna',1,'Sentadilla',4,'1x8 / 3x8-10',2,120],
+     ['hugo@email.com','Pierna',2,'Prensa',4,'4x12',1,90],
+     ['hugo@email.com','Pierna',3,'Peso muerto rumano',3,'3x10',1,90],
+     ['hugo@email.com','Pierna',4,'Curl femoral',3,'3x12',0,60],
+     ['hugo@email.com','Pierna',5,'Gemelos de pie',4,'4x15',0,45],
+     ['ana@email.com','Full body',1,'Sentadilla',3,'3x10',1,90],
+     ['ana@email.com','Full body',2,'Press banca',3,'3x10',1,75],
+     ['ana@email.com','Full body',3,'Remo con barra',3,'3x10',1,75],
+     ['ana@email.com','Full body',4,'Plancha',3,'3x30 seg',0,45]],
+    [24,30,8,26,8,18,13,13]);
+  // FASE 3 · Nutrición (plan de alimentación por opciones y comidas)
+  const wsN=mk(['Email cliente','Opción','Comida','Alimento','Gramos','Kcal','Proteína (g)','Carbohidratos (g)','Grasas (g)'],
+    [['hugo@email.com',1,'Desayuno','Avena',60,230,8,40,4],
+     ['hugo@email.com',1,'Desayuno','Leche semidesnatada',200,90,7,10,3],
+     ['hugo@email.com',1,'Desayuno','Plátano',120,110,1,28,0],
+     ['hugo@email.com',1,'Comida','Arroz blanco',80,280,6,62,1],
+     ['hugo@email.com',1,'Comida','Pechuga de pollo',150,165,31,0,4],
+     ['hugo@email.com',1,'Comida','Aceite de oliva',10,90,0,0,10],
+     ['hugo@email.com',1,'Cena','Merluza',150,130,26,0,2],
+     ['hugo@email.com',1,'Cena','Patata cocida',200,160,4,36,0],
+     ['hugo@email.com',2,'Desayuno','Tostada integral',60,160,6,30,2],
+     ['hugo@email.com',2,'Desayuno','Huevo',100,140,12,1,10],
+     ['ana@email.com',1,'Desayuno','Yogur 0%',150,60,10,8,0],
+     ['ana@email.com',1,'Desayuno','Frutos rojos',80,40,1,9,0],
+     ['ana@email.com',1,'Comida','Quinoa',70,250,9,45,4],
+     ['ana@email.com',1,'Comida','Salmón',120,200,24,0,12],
+     ['ana@email.com',1,'Cena','Pavo',120,140,26,0,3]],
+    [24,8,14,26,9,8,12,16,10]);
+
+  // Instrucciones con marca Tracc
+  const wsI=XLSX.utils.aoa_to_sheet([
+    ['TRACC'],['Plantilla de importación de clientes'],[''],
+    ['CLIENTES (obligatoria): una fila por cliente. El Nombre es obligatorio; el Email es muy recomendable (vincula su cuenta al registrarse).'],
+    ['MÉTRICAS (opcional): una fila por día y cliente. Mismo Email que en Clientes. Fechas AAAA-MM-DD.'],
+    ['ENTRENOS (opcional): una fila por SERIE realizada. Repite el Ejercicio para cada serie.'],
+    ['RUTINA (opcional): el plan de entreno. Una fila por ejercicio, agrupado por Sesión (Push, Pull, Pierna, Full...). Orden = posición del ejercicio en la sesión. Series = nº total de series. Series aprox. = series de aproximación/calentamiento. Descanso (s) = descanso entre series en segundos.'],
+    ['REPS por serie: escribe las repeticiones de cada serie con el formato  NxR  separando bloques con  /  . Ejemplo: "1x8-10 / 2x10-12" = 1 serie de 8-10 reps y 2 series de 10-12. Si todas las series son iguales, pon "3x12" (3 series de 12). El total de series debe cuadrar con la columna Series.'],
+    ['NUTRICIÓN (opcional): el plan de dieta. Una fila por alimento, agrupado por Opción y Comida. Opción = menú alternativo (1, 2, 3...); el cliente puede elegir entre ellas. Comida = Desayuno, Comida, Merienda, Cena... Pon los gramos, kcal y macros de cada alimento; los totales de cada comida y los objetivos del plan se calculan solos sumando los alimentos.'],
+    ['IMPORTANTE: en TODAS las pestañas, pon una fila por cada dato de CADA cliente, usando su Email para identificarlo. En el ejemplo aparecen hugo@email.com y ana@email.com para que veas cómo conviven varios clientes en la misma hoja.'],
+    ['Borra las filas de ejemplo antes de importar. Guarda y sube el archivo en Tracc → Importar.'],
+  ]);
+  wsI['!cols']=[{wch:110}];
+  wsI['A1'].s={font:{name:'Calibri',sz:28,bold:true,color:{rgb:GREEN}}};
+  wsI['A2'].s={font:{name:'Calibri',sz:13,color:{rgb:'6B6B66'}}};
+  ['A4','A5','A6','A7','A8','A9','A10','A11'].forEach(r=>{ if(wsI[r])wsI[r].s={font:{name:'Calibri',sz:11,color:{rgb:'333333'}},alignment:{wrapText:true,vertical:'top'}}; });
+  wsI['!rows']=[{hpt:40},{hpt:20},{hpt:10},{hpt:28},{hpt:24},{hpt:24},{hpt:52},{hpt:52},{hpt:52},{hpt:44},{hpt:24}];
+
+  XLSX.utils.book_append_sheet(wb,wsC,'Clientes');
+  XLSX.utils.book_append_sheet(wb,wsM,'Metricas');
+  XLSX.utils.book_append_sheet(wb,wsE,'Entrenos');
+  XLSX.utils.book_append_sheet(wb,wsR,'Rutina');
+  XLSX.utils.book_append_sheet(wb,wsN,'Nutricion');
+  XLSX.utils.book_append_sheet(wb,wsI,'Instrucciones');
+  XLSX.writeFile(wb,'plantilla-clientes.xlsx');
+  showToast('Plantilla descargada — rellena al menos la pestaña "Clientes"');
+}
+
+async function importClientesFile(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    const colOf=(hdr)=>(...keys)=>{ for(const k of keys){ const i=hdr.findIndex(h=>h.includes(k)); if(i>=0) return i; } return -1; };
+    const num=(v)=>{const n=parseFloat(String(v).replace(',','.'));return isNaN(n)?null:n;};
+    const int=(v)=>{const n=parseInt(String(v));return isNaN(n)?null:n;};
+
+    // ── Pestaña Clientes ──
+    const rowsC=_sheetRows(wb,/client/i)||_sheetRows(wb,/.*/);
+    _importRows=null;
+    if(rowsC&&rowsC.length>1){
+      const hdr=rowsC[0].map(h=>String(h).toLowerCase()); const col=colOf(hdr);
+      const ci={name:col('nombre','name'),email:col('email','correo'),weight:col('peso','weight'),height:col('altura','height'),goal:col('objetivo','goal','meta'),gender:col('sexo','genero','género','gender'),birth:col('nacimiento','birth','fecha nac'),phone:col('tel','phone','movil','móvil'),steps:col('pasos','steps'),revw:col('revis')};
+      // si esta hoja no parece de clientes (no tiene 'nombre'), no la tratamos como tal
+      if(ci.name>=0){
+        const existing=new Set((CLIENTS||[]).map(c=>(c.email||'').toLowerCase()).filter(Boolean));
+        _importRows=rowsC.slice(1).map(r=>{
+          const g=(i)=>i>=0?String(r[i]||'').trim():'';
+          const name=g(ci.name), email=g(ci.email).toLowerCase();
+          const row={ name, email:email||null, weight:num(g(ci.weight)), height:num(g(ci.height)),
+            goal:g(ci.goal)||null, gender:(g(ci.gender)||'').charAt(0).toUpperCase()||null,
+            birth:_xlDate(g(ci.birth)), phone:g(ci.phone)||null, steps:int(g(ci.steps)), revw:int(g(ci.revw)) };
+          if(!name){ row._status='warn'; row._msg='falta nombre'; }
+          else if(email && existing.has(email)){ row._status='dup'; row._msg='ya existe'; }
+          else if(!email){ row._status='warn'; row._msg='sin email · no podrá acceder'; }
+          else row._status='ok';
+          return row;
+        }).filter(r=>r.name||r.email);
+      }
+    }
+
+    // ── Pestaña Métricas ──
+    const rowsM=_sheetRows(wb,/m[eé]trica|metrica/i);
+    _importMetrics=null;
+    if(rowsM&&rowsM.length>1){
+      const hdr=rowsM[0].map(h=>String(h).toLowerCase()); const col=colOf(hdr);
+      const ci={email:col('email','correo','cliente'),date:col('fecha','date'),steps:col('paso','steps'),weight:col('peso','weight'),sleep:col('sueñ','sueno','sleep')};
+      _importMetrics=rowsM.slice(1).map(r=>{
+        const g=(i)=>i>=0?String(r[i]||'').trim():'';
+        return { email:g(ci.email).toLowerCase()||null, name:g(ci.email).includes('@')?null:g(ci.email)||null,
+          date:_xlDate(g(ci.date)), steps:int(g(ci.steps)), weight:num(g(ci.weight)), sleep:num(g(ci.sleep)) };
+      }).filter(m=>m.date&&(m.email||m.name)&&(m.steps!=null||m.weight!=null||m.sleep!=null));
+    }
+
+    // ── Pestaña Entrenos ──
+    const rowsE=_sheetRows(wb,/entreno|workout|training/i);
+    _importWorkouts=null;
+    if(rowsE&&rowsE.length>1){
+      const hdr=rowsE[0].map(h=>String(h).toLowerCase()); const col=colOf(hdr);
+      const ci={email:col('email','correo','cliente'),date:col('fecha','date'),type:col('tipo','type'),ex:col('ejercicio','exercise'),set:col('serie','set'),reps:col('rep'),kg:col('peso','kg','weight')};
+      _importWorkouts=rowsE.slice(1).map(r=>{
+        const g=(i)=>i>=0?String(r[i]||'').trim():'';
+        return { email:g(ci.email).toLowerCase()||null, name:g(ci.email).includes('@')?null:g(ci.email)||null,
+          date:_xlDate(g(ci.date)), type:g(ci.type)||null, exercise:g(ci.ex)||null,
+          set:int(g(ci.set)), reps:int(g(ci.reps)), kg:num(g(ci.kg)) };
+      }).filter(w=>w.date&&(w.email||w.name)&&w.exercise);
+    }
+
+    // ── Pestaña Rutina (plan de entreno) ──
+    const rowsR=_sheetRows(wb,/rutina|plan|routine/i);
+    _importRoutine=null;
+    if(rowsR&&rowsR.length>1){
+      const hdr=rowsR[0].map(h=>String(h).toLowerCase()); const col=colOf(hdr);
+      const ci={email:col('email','correo','cliente'),sesion:col('sesi','día','dia','session','tipo'),orden:col('orden','order'),ex:col('ejercicio','exercise'),series:col('serie','sets'),reps:col('rep'),approx:col('aprox','aproxim','warmup','calenta'),rest:col('descanso','rest','seg')};
+      _importRoutine=rowsR.slice(1).map(r=>{
+        const g=(i)=>i>=0?String(r[i]||'').trim():'';
+        return { email:g(ci.email).toLowerCase()||null, name:g(ci.email).includes('@')?null:g(ci.email)||null,
+          sesion:g(ci.sesion)||null, orden:int(g(ci.orden)), exercise:g(ci.ex)||null,
+          series:int(g(ci.series)), reps:g(ci.reps)||null, approx:int(g(ci.approx)), rest:int(g(ci.rest)) };
+      }).filter(w=>(w.email||w.name)&&w.sesion&&w.exercise);
+    }
+
+    // ── Pestaña Nutrición (plan de dieta) ──
+    const rowsN=_sheetRows(wb,/nutric|nutrition|dieta|diet/i);
+    _importNutrition=null;
+    if(rowsN&&rowsN.length>1){
+      const hdr=rowsN[0].map(h=>String(h).toLowerCase()); const col=colOf(hdr);
+      const ci={email:col('email','correo','cliente'),opcion:col('opci','option'),comida:col('comida','meal'),alimento:col('aliment','food'),gramos:col('gramo','gram','peso','g)'),kcal:col('kcal','cal'),prot:col('prote','protein'),carb:col('carb','hidrato'),grasa:col('grasa','fat')};
+      _importNutrition=rowsN.slice(1).map(r=>{
+        const g=(i)=>i>=0?String(r[i]||'').trim():'';
+        return { email:g(ci.email).toLowerCase()||null, name:g(ci.email).includes('@')?null:g(ci.email)||null,
+          opcion:int(g(ci.opcion))||1, comida:g(ci.comida)||null, alimento:g(ci.alimento)||null,
+          grams:num(g(ci.gramos)), kcal:num(g(ci.kcal)), protein:num(g(ci.prot)), carbs:num(g(ci.carb)), fat:num(g(ci.grasa)) };
+      }).filter(w=>(w.email||w.name)&&w.comida&&w.alimento);
+    }
+
+    if(!_importRows&&!_importMetrics&&!_importWorkouts&&!_importRoutine&&!_importNutrition){ showToast('No se encontraron pestañas Clientes, Métricas, Entrenos, Rutina ni Nutrición'); return; }
+    renderImportPanel();
+  }catch(e){ console.error('importClientesFile:',e); showToast('No se pudo leer el Excel'); }
+}
+
+async function ejecutarImportClientes(){
+  // 1) Crear clientes nuevos
+  let nClientes=0;
+  if(_importRows){
+    const toInsert=_importRows.filter(r=>r._status!=='dup'&&r.name).map(r=>({
+      coach_id:coachData.id, name:r.name, email:r.email, weight_kg:r.weight, height_cm:r.height,
+      goal:r.goal, gender:r.gender, birth_date:r.birth||null, phone:r.phone, steps_goal:r.steps,
+      revision_every_weeks:r.revw, member_since:new Date().toISOString().slice(0,10), active:true, status:'active'
+    }));
+    if(toInsert.length){
+      try{ const {error}=await sb.from('clients').insert(toInsert);
+        if(error){ console.error('import clients:',error); showToast('Error al importar clientes: '+(error.message||'')); return; }
+        nClientes=toInsert.length;
+      }catch(e){ console.error(e); showToast('Error al importar clientes'); return; }
+    }
+  }
+
+  // Recargar para tener los ids de los recién creados y poder casar métricas/entrenos
+  if(nClientes) await loadRealClients();
+  const byEmail={}, byName={};
+  (CLIENTS||[]).forEach(c=>{ if(c.email)byEmail[c.email.toLowerCase()]=c.id; if(c.name)byName[c.name.trim().toLowerCase()]=c.id; });
+  const idDe=(row)=> (row.email&&byEmail[row.email])||(row.name&&byName[row.name.trim().toLowerCase()])||null;
+
+  // 2) Métricas diarias
+  let nMet=0;
+  if(_importMetrics&&_importMetrics.length){
+    const rows=_importMetrics.map(m=>{ const cid=idDe(m); return cid?{client_id:cid,date:m.date,steps:m.steps,weight_kg:m.weight,sleep_hours:m.sleep}:null; }).filter(Boolean);
+    if(rows.length){
+      try{ const {error}=await sb.from('daily_metrics').insert(rows);
+        if(error) console.error('import metrics:',error); else nMet=rows.length;
+      }catch(e){ console.error(e); }
+    }
+  }
+
+  // 3) Entrenos (agrupados por cliente + fecha + tipo → sesión + sus series)
+  let nEnt=0;
+  if(_importWorkouts&&_importWorkouts.length){
+    const groups={};
+    _importWorkouts.forEach(w=>{ const cid=idDe(w); if(!cid)return; const key=cid+'|'+w.date+'|'+(w.type||''); (groups[key]=groups[key]||{client_id:cid,date:w.date,type:w.type,sets:[]}).sets.push(w); });
+    for(const k in groups){
+      const g=groups[k];
+      try{
+        const {data:sess,error:se}=await sb.from('workout_sessions').insert({client_id:g.client_id,session_date:g.date,session_type:g.type||'Importado',completed:true}).select('id').single();
+        if(se||!sess){ console.error('import session:',se); continue; }
+        const cont={};
+        const setsRows=g.sets.map(s=>{ const ex=s.exercise||'Ejercicio'; cont[ex]=(cont[ex]||0)+1; return {session_id:sess.id,exercise_name:ex,set_number:s.set!=null?s.set:cont[ex],reps_done:s.reps,weight_kg:s.kg}; });
+        if(setsRows.length){ const {error:we}=await sb.from('workout_sets').insert(setsRows); if(we) console.error('import sets:',we); }
+        nEnt++;
+      }catch(e){ console.error('import entreno:',e); }
+    }
+  }
+
+  // 4) Rutina (plan de entreno)
+  let nRut=0;
+  try{ nRut=await _importarRutina(idDe); }catch(e){ console.error('import rutina:',e); }
+
+  // 5) Nutrición (plan de dieta)
+  let nNut=0;
+  try{ nNut=await _importarNutricion(idDe); }catch(e){ console.error('import nutricion:',e); }
+
+  if(!nClientes&&!nMet&&!nEnt&&!nRut&&!nNut){ showToast('No había datos nuevos para importar'); return; }
+  const partes=[]; if(nClientes)partes.push(nClientes+' cliente'+(nClientes!==1?'s':'')); if(nMet)partes.push(nMet+' métrica'+(nMet!==1?'s':'')); if(nEnt)partes.push(nEnt+' entreno'+(nEnt!==1?'s':'')); if(nRut)partes.push(nRut+' rutina'+(nRut!==1?'s':'')); if(nNut)partes.push(nNut+' dieta'+(nNut!==1?'s':''));
+  showToast('✓ Importado: '+partes.join(' · '));
+  _importRows=null; _importMetrics=null; _importWorkouts=null; _importRoutine=null; _importNutrition=null;
+  await loadRealClients(); renderSidebar();
+  renderImportPanel();
+}
+
+// Importa la rutina: por cliente, crea/asegura ejercicios en la biblioteca,
+// crea un training_plan (split derivado de las sesiones) e inserta client_plans.
+// Importa la nutrición: por cliente crea un nutrition_plan (objetivos = suma de
+// la 1ª opción) y una nutrition_options por cada Opción, con sus comidas/alimentos.
+async function _importarNutricion(idDe){
+  if(!_importNutrition||!_importNutrition.length) return 0;
+  const porCliente={};
+  _importNutrition.forEach(r=>{ const cid=idDe(r); if(!cid)return; (porCliente[cid]=porCliente[cid]||[]).push(r); });
+  let hechas=0;
+  for(const cid in porCliente){
+    const filas=porCliente[cid];
+    // Agrupar por opción → comida → items
+    const porOpcion={};
+    filas.forEach(f=>{ (porOpcion[f.opcion]=porOpcion[f.opcion]||[]).push(f); });
+    const numsOpcion=Object.keys(porOpcion).map(Number).sort((a,b)=>a-b);
+    // Objetivos del plan = suma de la primera opción
+    const prim=porOpcion[numsOpcion[0]]||[];
+    const goal=prim.reduce((s,f)=>({kcal:s.kcal+(f.kcal||0),p:s.p+(f.protein||0),c:s.c+(f.carbs||0),g:s.g+(f.fat||0)}),{kcal:0,p:0,c:0,g:0});
+    // Crear plan
+    let plan;
+    try{
+      const {data,error}=await sb.from('nutrition_plans').insert({client_id:cid,coach_id:coachData.id,kcal_goal:Math.round(goal.kcal),protein_g:Math.round(goal.p),carbs_g:Math.round(goal.c),fat_g:Math.round(goal.g),preferences:null,is_active:true,activation_date:new Date().toISOString().slice(0,10)}).select('id').single();
+      if(error||!data){ console.error('import nutrition_plan:',error); continue; }
+      plan=data;
+    }catch(e){ console.error(e); continue; }
+    // Construir y crear cada opción
+    const optRows=numsOpcion.map(n=>{
+      const meals={};
+      porOpcion[n].forEach(f=>{ const c=f.comida; (meals[c]=meals[c]||{items:[]}).items.push({name:f.alimento,grams:f.grams,kcal:f.kcal,protein:f.protein,carbs:f.carbs,fat:f.fat}); });
+      return { nutrition_plan_id:plan.id, option_number:n, name:'Opción '+n, meals };
+    });
+    if(optRows.length){ try{ const {error}=await sb.from('nutrition_options').insert(optRows); if(error)console.error('import nutrition_options:',error); }catch(e){ console.error(e); } }
+    hechas++;
+  }
+  return hechas;
+}
+
+async function _importarRutina(idDe){
+  if(!_importRoutine||!_importRoutine.length) return 0;
+  // Agrupar filas por cliente
+  const porCliente={};
+  _importRoutine.forEach(r=>{ const cid=idDe(r); if(!cid)return; (porCliente[cid]=porCliente[cid]||[]).push(r); });
+  // Biblioteca de ejercicios en memoria (si existe) para casar por nombre
+  let lib = (typeof EXERCISE_LIBRARY!=='undefined'&&Array.isArray(EXERCISE_LIBRARY))?EXERCISE_LIBRARY.slice():[];
+  const libByName={}; lib.forEach(e=>{ if(e&&e.name)libByName[e.name.trim().toLowerCase()]=e.id; });
+  let hechas=0;
+  for(const cid in porCliente){
+    const filas=porCliente[cid];
+    // 1) Asegurar ejercicios en la biblioteca del coach
+    const nombres=[...new Set(filas.map(f=>f.exercise.trim()).filter(Boolean))];
+    const nuevos=nombres.filter(n=>!libByName[n.toLowerCase()]);
+    if(nuevos.length){
+      try{
+        const {data:ins}=await sb.from('exercises').insert(nuevos.map(n=>({coach_id:coachData.id,name:n}))).select('id,name');
+        (ins||[]).forEach(e=>{ libByName[(e.name||'').trim().toLowerCase()]=e.id; if(typeof EXERCISE_LIBRARY!=='undefined'&&Array.isArray(EXERCISE_LIBRARY))EXERCISE_LIBRARY.push(e); });
+      }catch(e){ console.error('import exercises lib:',e); }
+    }
+    // 2) Split (7 días) a partir de las sesiones distintas, en orden de aparición
+    const sesiones=[...new Set(filas.map(f=>f.sesion))];
+    const split=[]; for(let i=0;i<7;i++) split.push(sesiones[i]||'OFF');
+    // 3) Crear training_plan
+    let plan;
+    try{
+      const {data,error}=await sb.from('training_plans').insert({client_id:cid,coach_id:coachData.id,split,split_days:7,is_active:true,activation_date:new Date().toISOString().slice(0,10)}).select('id').single();
+      if(error||!data){ console.error('import training_plan:',error); continue; }
+      plan=data;
+    }catch(e){ console.error(e); continue; }
+    // 4) client_plans (un registro por ejercicio)
+    const cont={};
+    const cpRows=filas.map(f=>{ const exId=libByName[f.exercise.trim().toLowerCase()]||null; const st=f.sesion;
+      cont[st]=(cont[st]||0)+1;
+      return { client_id:cid, training_plan_id:plan.id, is_active:true, exercise_id:exId,
+        session_type:st, exercise_order:f.orden!=null?f.orden:cont[st], sets:f.series, reps:f.reps, approx:f.approx, rest_sec:f.rest }; })
+      .filter(r=>r.exercise_id);
+    if(cpRows.length){ try{ const {error}=await sb.from('client_plans').insert(cpRows); if(error)console.error('import client_plans:',error); }catch(e){ console.error(e); } }
+    hechas++;
+  }
+  return hechas;
+}
+
+function renderImportPanel(){
+  const panel=document.getElementById('main-panel'); if(!panel) return;
+  const code=(coachData&&coachData.code)||'—';
+  const cardOpen='background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px';
+  const numOk='width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0';
+
+  let paso3;
+  const hayDatos = _importRows||_importMetrics||_importWorkouts||_importRoutine||_importNutrition;
+  if(hayDatos){
+    const known=_clientesConocidos();
+    const okN=(_importRows||[]).filter(r=>r._status==='ok').length;
+    const warnN=(_importRows||[]).filter(r=>r._status==='warn').length;
+    const dupN=(_importRows||[]).filter(r=>r._status==='dup').length;
+    const importables=(_importRows||[]).filter(r=>r._status!=='dup'&&r.name).length;
+    const metOk=(_importMetrics||[]).filter(m=>_filaCasaCliente(m,known)).length;
+    const metBad=(_importMetrics||[]).length-metOk;
+    const entFilas=(_importWorkouts||[]).filter(w=>_filaCasaCliente(w,known)).length;
+    const entBad=(_importWorkouts||[]).length-entFilas;
+    const rutOkRows=(_importRoutine||[]).filter(w=>_filaCasaCliente(w,known));
+    const rutClientes=new Set(rutOkRows.map(r=>(r.email||r.name||'').toLowerCase())).size;
+    const rutBad=(_importRoutine||[]).length-rutOkRows.length;
+    const nutOkRows=(_importNutrition||[]).filter(w=>_filaCasaCliente(w,known));
+    const nutClientes=new Set(nutOkRows.map(r=>(r.email||r.name||'').toLowerCase())).size;
+    const nutBad=(_importNutrition||[]).length-nutOkRows.length;
+    const totalAcciones=importables+metOk+entFilas+rutOkRows.length+nutOkRows.length;
+    const chip=(txt,c,bg)=>`<span style="font-size:11px;font-weight:700;color:${c};background:${bg};padding:3px 9px;border-radius:6px">${txt}</span>`;
+
+    const tablaClientes = _importRows ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 6px">Clientes</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          ${chip('✓ '+okN+' listos','#15803d','#dcfce7')}
+          ${warnN?chip('⚠ '+warnN+' a revisar','#a16207','#fef3c7'):''}
+          ${dupN?chip('• '+dupN+' ya existen','#dc2626','#fee2e2'):''}
+        </div>
+        <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">
+          <div style="flex:2">Cliente</div><div style="flex:2">Email</div><div style="flex:1">Peso</div><div style="flex:1">Estado</div></div>
+        <div style="max-height:200px;overflow-y:auto;margin-bottom:14px">${_importRows.map(r=>{
+          const c=r._status==='dup'?'#dc2626':r._status==='warn'?'#a16207':'#16a34a';
+          const est=r._status==='dup'?'Ya existe':r._status==='warn'?'Revisar':'Listo';
+          return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px">
+            <div style="flex:2;color:var(--text);min-width:0">${escHtml(r.name||'—')}</div>
+            <div style="flex:2;color:var(--text3);min-width:0">${escHtml(r.email||'—')}</div>
+            <div style="flex:1;color:var(--text2)">${r.weight!=null?r.weight:'—'}</div>
+            <div style="flex:1;color:${c}">${est}</div></div>`;
+        }).join('')}</div>` : '';
+
+    const extras = (_importMetrics||_importWorkouts||_importRoutine||_importNutrition) ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 6px">Historial y planes</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          ${_importMetrics?chip('✓ '+metOk+' métricas','#15803d','#dcfce7'):''}
+          ${metBad?chip('⚠ '+metBad+' sin cliente','#a16207','#fef3c7'):''}
+          ${_importWorkouts?chip('✓ '+entFilas+' series de entreno','#15803d','#dcfce7'):''}
+          ${entBad?chip('⚠ '+entBad+' sin cliente','#a16207','#fef3c7'):''}
+          ${_importRoutine?chip('✓ rutina para '+rutClientes+' cliente'+(rutClientes!==1?'s':''),'#15803d','#dcfce7'):''}
+          ${rutBad?chip('⚠ '+rutBad+' filas de rutina sin cliente','#a16207','#fef3c7'):''}
+          ${_importNutrition?chip('✓ dieta para '+nutClientes+' cliente'+(nutClientes!==1?'s':''),'#15803d','#dcfce7'):''}
+          ${nutBad?chip('⚠ '+nutBad+' filas de dieta sin cliente','#a16207','#fef3c7'):''}
+        </div>` : '';
+
+    paso3=`<div style="${cardOpen}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="${numOk}">3</div><div style="font-size:14px;font-weight:600;color:var(--text)">Revisa antes de importar</div></div>
+      <div style="margin-left:34px">
+        ${tablaClientes}${extras}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:13px 15px">
+          <div style="font-size:12.5px;color:var(--text2)">${importables?'Se crearán <b style="color:var(--text)">'+importables+'</b> fichas. Cada cliente accede registrándose en MyTracc con su email y tu código <b style="color:var(--green)">'+escHtml(code)+'</b>.':'Se añadirá el historial a los clientes que coincidan por email/nombre.'}</div>
+          <button onclick="ejecutarImportClientes()" ${totalAcciones?'':'disabled'} style="background:${totalAcciones?'var(--green)':'var(--border)'};color:#fff;border:none;border-radius:10px;height:42px;padding:0 18px;font-size:14px;font-weight:600;cursor:${totalAcciones?'pointer':'not-allowed'};flex-shrink:0">Importar</button>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    paso3=`<div style="${cardOpen};opacity:.6">
+      <div style="display:flex;align-items:center;gap:10px"><div style="width:24px;height:24px;border-radius:50%;background:var(--bg3);color:var(--text3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">3</div><div style="font-size:14px;font-weight:600;color:var(--text2)">Revisa e importa</div></div>
+      <div style="font-size:12.5px;color:var(--text3);margin:6px 0 0 34px">Sube tu Excel para ver aquí la previsualización.</div>
+    </div>`;
+  }
+
+  panel.innerHTML=`
+    <div class="vg-header"><div><div class="vg-title">Importar clientes</div><div class="vg-date">Trae a todos tus clientes desde Excel</div></div></div>
+    <div class="vg-body">
+      <div style="width:100%;display:flex;flex-direction:column;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch">
+        <div style="${cardOpen}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="${numOk}">1</div><div style="font-size:14px;font-weight:600;color:var(--text)">Descarga la plantilla</div></div>
+          <div style="font-size:12.5px;color:var(--text2);margin:0 0 12px 34px;line-height:1.5">Un Excel con las pestañas <b>Clientes</b>, Métricas, Entrenos y Rutina. Rellena solo las que necesites — con el nombre del cliente ya basta para empezar, pero el email es lo que les permite vincular su cuenta.</div>
+          <div style="margin-left:34px"><button onclick="descargarPlantillaClientes()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;height:38px;padding:0 15px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1"/></svg> Descargar plantilla .xlsx</button></div>
+        </div>
+        <div style="${cardOpen}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="${numOk}">2</div><div style="font-size:14px;font-weight:600;color:var(--text)">Sube tu Excel</div></div>
+          <div style="margin-left:34px">
+            <input type="file" id="import-cli-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importClientesFile(this)">
+            <button onclick="document.getElementById('import-cli-input').click()" style="width:100%;border:1.5px dashed var(--border2);border-radius:12px;padding:22px;text-align:center;background:var(--bg);cursor:pointer;color:var(--text2)">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+              <div style="font-size:13px;font-weight:600;margin-top:6px;color:var(--text)">${(_importRows||_importMetrics||_importWorkouts||_importRoutine||_importNutrition)?'Cambiar archivo':'Arrastra o haz clic para subir tu Excel'}</div>
+            </button>
+          </div>
+        </div>
+        </div>
+        ${paso3}
+      </div>
+    </div>`;
 }
 
 let _dashboardInited = false;

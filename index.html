@@ -13503,6 +13503,12 @@ async function _importarRutina(idDe, errores){
   // Biblioteca de ejercicios en memoria (si existe) para casar por nombre
   let lib = (typeof EXERCISE_LIBRARY!=='undefined'&&Array.isArray(EXERCISE_LIBRARY))?EXERCISE_LIBRARY.slice():[];
   const libByName={}; lib.forEach(e=>{ if(e&&e.name)libByName[e.name.trim().toLowerCase()]=e.id; });
+  // Reutilizar TODOS los ejercicios ya existentes del coach (no solo los de memoria),
+  // para no reinsertarlos (fallaría por nombre duplicado y dejaría el plan sin ejercicios).
+  try{
+    const {data:exLib}=await sb.from('exercises').select('id,name').eq('coach_id',coachData.id);
+    (exLib||[]).forEach(e=>{ if(e&&e.name)libByName[e.name.trim().toLowerCase()]=e.id; });
+  }catch(e){ console.warn('cargar exercises:',e); }
   let hechas=0;
   for(const cid in porCliente){
     const filas=porCliente[cid];
@@ -13511,7 +13517,8 @@ async function _importarRutina(idDe, errores){
     const nuevos=nombres.filter(n=>!libByName[n.toLowerCase()]);
     if(nuevos.length){
       try{
-        const {data:ins}=await sb.from('exercises').insert(nuevos.map(n=>({coach_id:coachData.id,name:n}))).select('id,name');
+        const {data:ins,error:exErr}=await sb.from('exercises').insert(nuevos.map(n=>({coach_id:coachData.id,name:n}))).select('id,name');
+        if(exErr){ console.error('import exercises lib:',exErr); errores.push('ejercicios: '+(exErr.message||exErr.code||'error')); }
         (ins||[]).forEach(e=>{ libByName[(e.name||'').trim().toLowerCase()]=e.id; if(typeof EXERCISE_LIBRARY!=='undefined'&&Array.isArray(EXERCISE_LIBRARY))EXERCISE_LIBRARY.push(e); });
       }catch(e){ console.error('import exercises lib:',e); errores.push('ejercicios: '+(e.message||'error')); }
     }

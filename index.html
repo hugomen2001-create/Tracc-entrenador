@@ -4524,6 +4524,52 @@ async function eliminarCuotaCliente(){
   }catch(e){ console.error(e); showToast('✕ Error al eliminar'); }
 }
 
+// Eliminar un cliente de forma permanente, junto con todos sus datos.
+async function eliminarCliente(){
+  const c = currentClient; if(!c) return;
+  const ok = await confirmDestructive({
+    title: 'Eliminar cliente',
+    message: 'Vas a eliminar a <strong style="color:#111">'+escHtml(c.name||'este cliente')+'</strong> de forma permanente.',
+    warning: 'Se borrarán también sus métricas, entrenos, rutina, dieta, fotos y cuota. Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar definitivamente', cancelText: 'Cancelar', danger: true, icon: 'trash',
+  });
+  if(!ok) return;
+  const cid = c.id;
+  const intentar = async (fn)=>{ try{ await fn(); }catch(e){ console.warn('eliminarCliente dependencia:', e); } };
+  try{
+    // Nutrición: opciones (por plan) → planes
+    try{
+      const { data:nps } = await sb.from('nutrition_plans').select('id').eq('client_id', cid);
+      const npIds = (nps||[]).map(p=>p.id);
+      if(npIds.length) await sb.from('nutrition_options').delete().in('nutrition_plan_id', npIds);
+    }catch(e){ console.warn(e); }
+    await intentar(()=> sb.from('nutrition_plans').delete().eq('client_id', cid));
+    // Entreno (plan)
+    await intentar(()=> sb.from('client_plans').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('training_plans').delete().eq('client_id', cid));
+    // Entrenos: series (por sesión) → sesiones
+    try{
+      const { data:ws } = await sb.from('workout_sessions').select('id').eq('client_id', cid);
+      const wsIds = (ws||[]).map(s=>s.id);
+      if(wsIds.length) await sb.from('workout_sets').delete().in('session_id', wsIds);
+    }catch(e){ console.warn(e); }
+    await intentar(()=> sb.from('workout_sessions').delete().eq('client_id', cid));
+    // Métricas, cuestionario, cuota y fotos
+    await intentar(()=> sb.from('daily_metrics').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('client_questionnaire').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('client_billing').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('revision_photos').delete().eq('client_id', cid));
+    await intentar(()=> sb.from('progress_photos').delete().eq('client_id', cid));
+    // Finalmente, el cliente
+    const { error } = await sb.from('clients').delete().eq('id', cid);
+    if(error){ console.error('eliminarCliente:', error); showToast('✕ No se pudo eliminar: '+(error.message||error.code||'')); return; }
+    showToast('✓ Cliente eliminado');
+    currentClient = null;
+    await loadRealClients(); renderSidebar();
+    if(typeof openVgMode==='function') openVgMode('overview');
+  }catch(e){ console.error(e); showToast('✕ Error al eliminar'); }
+}
+
 // Dar de baja / reactivar a un cliente (afecta al resumen de negocio)
 async function toggleClienteBaja(){
   const c = currentClient; if(!c) return;
@@ -8142,7 +8188,10 @@ function renderPerfil() {
     </div>
     <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding-top:12px">
       <div style="font-size:11.5px;color:var(--text3);line-height:1.4">${esBaja?('De baja desde '+(raw.deactivated_at?fmtFecha(raw.deactivated_at):'—')+'. No cuenta en el resumen de negocio.'):'Marca al cliente de baja si deja de entrenar contigo. Dejará de contar en ingresos y cuotas.'}</div>
-      <button onclick="toggleClienteBaja()" style="flex-shrink:0;height:32px;padding:0 14px;border-radius:9px;border:1.5px solid var(--border);background:${esBaja?'var(--green)':'var(--bg)'};color:${esBaja?'#fff':'#dc2626'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">${esBaja?'Reactivar':'Dar de baja'}</button>
+      <div style="flex-shrink:0;display:flex;gap:8px">
+        <button onclick="eliminarCliente()" title="Eliminar al cliente y todos sus datos" style="height:32px;padding:0 14px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Eliminar</button>
+        <button onclick="toggleClienteBaja()" style="height:32px;padding:0 14px;border-radius:9px;border:1.5px solid var(--border);background:${esBaja?'var(--green)':'var(--bg)'};color:${esBaja?'#fff':'#dc2626'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">${esBaja?'Reactivar':'Dar de baja'}</button>
+      </div>
     </div>
   </div>`;
 
@@ -13339,20 +13388,21 @@ async function ejecutarImportClientes(){
     }
   }
 
-  // Recargar para tener los ids de los recién creados y poder casar métricas/entrenos
-  if(nClientes) await loadRealClients();
+  // Recargar SIEMPRE para tener los ids actualizados (aunque el cliente ya existiera)
+  await loadRealClients();
   const byEmail={}, byName={};
   (CLIENTS||[]).forEach(c=>{ if(c.email)byEmail[c.email.toLowerCase()]=c.id; if(c.name)byName[c.name.trim().toLowerCase()]=c.id; });
   const idDe=(row)=> (row.email&&byEmail[row.email])||(row.name&&byName[row.name.trim().toLowerCase()])||null;
+  const errores=[]; let sinCruce=0;
 
   // 2) Métricas diarias
   let nMet=0;
   if(_importMetrics&&_importMetrics.length){
-    const rows=_importMetrics.map(m=>{ const cid=idDe(m); return cid?{client_id:cid,date:m.date,steps:m.steps,weight_kg:m.weight,sleep_hours:m.sleep}:null; }).filter(Boolean);
+    const rows=_importMetrics.map(m=>{ const cid=idDe(m); if(!cid){sinCruce++;return null;} return {client_id:cid,date:m.date,steps:m.steps,weight_kg:m.weight,sleep_hours:m.sleep}; }).filter(Boolean);
     if(rows.length){
       try{ const {error}=await sb.from('daily_metrics').insert(rows);
-        if(error) console.error('import metrics:',error); else nMet=rows.length;
-      }catch(e){ console.error(e); }
+        if(error){ console.error('import metrics:',error); errores.push('métricas: '+(error.message||error.code||'error')); } else nMet=rows.length;
+      }catch(e){ console.error(e); errores.push('métricas: '+(e.message||'error')); }
     }
   }
 
@@ -13360,15 +13410,15 @@ async function ejecutarImportClientes(){
   let nEnt=0;
   if(_importWorkouts&&_importWorkouts.length){
     const groups={};
-    _importWorkouts.forEach(w=>{ const cid=idDe(w); if(!cid)return; const key=cid+'|'+w.date+'|'+(w.type||''); (groups[key]=groups[key]||{client_id:cid,date:w.date,type:w.type,sets:[]}).sets.push(w); });
+    _importWorkouts.forEach(w=>{ const cid=idDe(w); if(!cid){sinCruce++;return;} const key=cid+'|'+w.date+'|'+(w.type||''); (groups[key]=groups[key]||{client_id:cid,date:w.date,type:w.type,sets:[]}).sets.push(w); });
     for(const k in groups){
       const g=groups[k];
       try{
         const {data:sess,error:se}=await sb.from('workout_sessions').insert({client_id:g.client_id,session_date:g.date,session_type:g.type||'Importado',completed:true}).select('id').single();
-        if(se||!sess){ console.error('import session:',se); continue; }
+        if(se||!sess){ console.error('import session:',se); if(se&&!errores.some(x=>x.startsWith('entrenos')))errores.push('entrenos: '+(se.message||se.code||'error')); continue; }
         const cont={};
         const setsRows=g.sets.map(s=>{ const ex=s.exercise||'Ejercicio'; cont[ex]=(cont[ex]||0)+1; return {session_id:sess.id,exercise_name:ex,set_number:s.set!=null?s.set:cont[ex],reps_done:s.reps,weight_kg:s.kg}; });
-        if(setsRows.length){ const {error:we}=await sb.from('workout_sets').insert(setsRows); if(we) console.error('import sets:',we); }
+        if(setsRows.length){ const {error:we}=await sb.from('workout_sets').insert(setsRows); if(we){ console.error('import sets:',we); if(!errores.some(x=>x.startsWith('series')))errores.push('series: '+(we.message||we.code||'error')); } }
         nEnt++;
       }catch(e){ console.error('import entreno:',e); }
     }
@@ -13376,15 +13426,20 @@ async function ejecutarImportClientes(){
 
   // 4) Rutina (plan de entreno)
   let nRut=0;
-  try{ nRut=await _importarRutina(idDe); }catch(e){ console.error('import rutina:',e); }
+  try{ nRut=await _importarRutina(idDe, errores); }catch(e){ console.error('import rutina:',e); errores.push('rutina: '+(e.message||'error')); }
 
   // 5) Nutrición (plan de dieta)
   let nNut=0;
-  try{ nNut=await _importarNutricion(idDe); }catch(e){ console.error('import nutricion:',e); }
+  try{ nNut=await _importarNutricion(idDe, errores); }catch(e){ console.error('import nutricion:',e); errores.push('dieta: '+(e.message||'error')); }
 
-  if(!nClientes&&!nMet&&!nEnt&&!nRut&&!nNut){ showToast('No había datos nuevos para importar'); return; }
+  if(!nClientes&&!nMet&&!nEnt&&!nRut&&!nNut){
+    if(errores.length){ showToast('No se pudo importar: '+errores.slice(0,2).join(' · ')); }
+    else if(sinCruce){ showToast('No se pudo cruzar ningún cliente — revisa que el email coincida'); }
+    else showToast('No había datos nuevos para importar');
+    return;
+  }
   const partes=[]; if(nClientes)partes.push(nClientes+' cliente'+(nClientes!==1?'s':'')); if(nMet)partes.push(nMet+' métrica'+(nMet!==1?'s':'')); if(nEnt)partes.push(nEnt+' entreno'+(nEnt!==1?'s':'')); if(nRut)partes.push(nRut+' rutina'+(nRut!==1?'s':'')); if(nNut)partes.push(nNut+' dieta'+(nNut!==1?'s':''));
-  showToast('✓ Importado: '+partes.join(' · '));
+  showToast('✓ Importado: '+partes.join(' · ')+(errores.length?' · ⚠ '+errores[0]:''));
   _importRows=null; _importMetrics=null; _importWorkouts=null; _importRoutine=null; _importNutrition=null;
   await loadRealClients(); renderSidebar();
   renderImportPanel();
@@ -13394,7 +13449,8 @@ async function ejecutarImportClientes(){
 // crea un training_plan (split derivado de las sesiones) e inserta client_plans.
 // Importa la nutrición: por cliente crea un nutrition_plan (objetivos = suma de
 // la 1ª opción) y una nutrition_options por cada Opción, con sus comidas/alimentos.
-async function _importarNutricion(idDe){
+async function _importarNutricion(idDe, errores){
+  errores=errores||[];
   if(!_importNutrition||!_importNutrition.length) return 0;
   const porCliente={};
   _importNutrition.forEach(r=>{ const cid=idDe(r); if(!cid)return; (porCliente[cid]=porCliente[cid]||[]).push(r); });
@@ -13412,7 +13468,7 @@ async function _importarNutricion(idDe){
     let plan;
     try{
       const {data,error}=await sb.from('nutrition_plans').insert({client_id:cid,coach_id:coachData.id,kcal_goal:Math.round(goal.kcal),protein_g:Math.round(goal.p),carbs_g:Math.round(goal.c),fat_g:Math.round(goal.g),preferences:null,is_active:true,activation_date:new Date().toISOString().slice(0,10)}).select('id').single();
-      if(error||!data){ console.error('import nutrition_plan:',error); continue; }
+      if(error||!data){ console.error('import nutrition_plan:',error); if(error)errores.push('dieta: '+(error.message||error.code||'error')); continue; }
       plan=data;
     }catch(e){ console.error(e); continue; }
     // Construir y crear cada opción
@@ -13421,13 +13477,14 @@ async function _importarNutricion(idDe){
       porOpcion[n].forEach(f=>{ const c=f.comida; (meals[c]=meals[c]||{items:[]}).items.push({name:f.alimento,grams:f.grams,kcal:f.kcal,protein:f.protein,carbs:f.carbs,fat:f.fat}); });
       return { nutrition_plan_id:plan.id, option_number:n, name:'Opción '+n, meals };
     });
-    if(optRows.length){ try{ const {error}=await sb.from('nutrition_options').insert(optRows); if(error)console.error('import nutrition_options:',error); }catch(e){ console.error(e); } }
+    if(optRows.length){ try{ const {error}=await sb.from('nutrition_options').insert(optRows); if(error){console.error('import nutrition_options:',error); errores.push('opciones dieta: '+(error.message||error.code||'error'));} }catch(e){ console.error(e); } }
     hechas++;
   }
   return hechas;
 }
 
-async function _importarRutina(idDe){
+async function _importarRutina(idDe, errores){
+  errores=errores||[];
   if(!_importRoutine||!_importRoutine.length) return 0;
   // Agrupar filas por cliente
   const porCliente={};
@@ -13445,7 +13502,7 @@ async function _importarRutina(idDe){
       try{
         const {data:ins}=await sb.from('exercises').insert(nuevos.map(n=>({coach_id:coachData.id,name:n}))).select('id,name');
         (ins||[]).forEach(e=>{ libByName[(e.name||'').trim().toLowerCase()]=e.id; if(typeof EXERCISE_LIBRARY!=='undefined'&&Array.isArray(EXERCISE_LIBRARY))EXERCISE_LIBRARY.push(e); });
-      }catch(e){ console.error('import exercises lib:',e); }
+      }catch(e){ console.error('import exercises lib:',e); errores.push('ejercicios: '+(e.message||'error')); }
     }
     // 2) Split (7 días) a partir de las sesiones distintas, en orden de aparición
     const sesiones=[...new Set(filas.map(f=>f.sesion))];
@@ -13454,7 +13511,7 @@ async function _importarRutina(idDe){
     let plan;
     try{
       const {data,error}=await sb.from('training_plans').insert({client_id:cid,coach_id:coachData.id,split,split_days:7,is_active:true,activation_date:new Date().toISOString().slice(0,10)}).select('id').single();
-      if(error||!data){ console.error('import training_plan:',error); continue; }
+      if(error||!data){ console.error('import training_plan:',error); if(error)errores.push('rutina: '+(error.message||error.code||'error')); continue; }
       plan=data;
     }catch(e){ console.error(e); continue; }
     // 4) client_plans (un registro por ejercicio)
@@ -13464,7 +13521,7 @@ async function _importarRutina(idDe){
       return { client_id:cid, training_plan_id:plan.id, is_active:true, exercise_id:exId,
         session_type:st, exercise_order:f.orden!=null?f.orden:cont[st], sets:f.series, reps:f.reps, approx:f.approx, rest_sec:f.rest }; })
       .filter(r=>r.exercise_id);
-    if(cpRows.length){ try{ const {error}=await sb.from('client_plans').insert(cpRows); if(error)console.error('import client_plans:',error); }catch(e){ console.error(e); } }
+    if(cpRows.length){ try{ const {error}=await sb.from('client_plans').insert(cpRows); if(error){console.error('import client_plans:',error); errores.push('ejercicios plan: '+(error.message||error.code||'error'));} }catch(e){ console.error(e); } }
     hechas++;
   }
   return hechas;

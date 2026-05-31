@@ -8935,45 +8935,158 @@ function renderPlanPanel(){
   cargarMiPlan().then(()=>{ if(_vgMode==='plan') _renderPlanPanelBody(); });
   _renderPlanPanelBody();
 }
+// ── Página "Mi plan": precios self-service con calculadora ──
+const PLAN_DEFS = [
+  {id:'starter', nombre:'Starter', precio:19, min:1,  max:10, desc:'1–10 clientes'},
+  {id:'pro',     nombre:'Pro',     precio:39, min:11, max:30, desc:'11–30 clientes'},
+  {id:'studio',  nombre:'Studio',  precio:79, min:31, max:80, desc:'31–80 clientes'},
+];
+const EXTRA_DEFS = [
+  {id:'ia',     nombre:'Inteligencia artificial', precio:9,  tipo:'mes',   icon:'✨', desc:'Crea dietas y entrenos 100% con IA (macros orientativos) o con tu biblioteca (datos exactos).'},
+  {id:'blanca', nombre:'Marca blanca',            precio:19, tipo:'mes',   icon:'🎨', desc:'Tu logo, tus colores y sin la marca "Tracc". Dominio propio — te ayudamos a configurarlo.'},
+  {id:'setup',  nombre:'Puesta en marcha',        precio:39, antes:59, tipo:'unico', icon:'🚀', desc:'Nos pasas los archivos de tus clientes y te lo migramos todo, listo para usar. Pago único.'},
+];
+let _planSel = undefined;          // 'starter'|'pro'|'studio'
+let _planCiclo = 'mensual';        // 'mensual'|'anual'
+let _planExtras = {ia:false, blanca:false, setup:false};
+function _planRecomendado(){
+  const n = CLIENTS.filter(c=>!(c._raw && c._raw.active===false)).length;
+  if(n>80) return 'studio';
+  const p = PLAN_DEFS.find(p=>n>=p.min && n<=p.max);
+  return p ? p.id : 'starter';
+}
+function setPlanSel(p){ _planSel=p; _renderPlanPanelBody(); }
+function setPlanCiclo(c){ _planCiclo=c; _renderPlanPanelBody(); }
+function togglePlanExtra(k){ _planExtras[k]=!_planExtras[k]; _renderPlanPanelBody(); }
+function irAlPagoMiPlan(){
+  if(_coachPlan && _coachPlan.pay_link){ window.open(_coachPlan.pay_link,'_blank'); return; }
+  showToast('El pago con tarjeta estará disponible muy pronto. Mientras, escríbenos y lo activamos.');
+}
 function _renderPlanPanelBody(){
-  const b=_coachPlan;
-  let body;
   if(_coachPlan===undefined){
-    body = `<div style="text-align:center;padding:40px;color:var(--text3)">Cargando…</div>`;
-  } else if(!b){
-    body = `<div style="max-width:520px;margin:30px auto;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:34px 24px">
-        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text);margin-bottom:8px">Sin plan activo</div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.6;max-width:380px;margin:0 auto">Todavía no tienes una suscripción de plataforma configurada.</div>
-      </div>`;
-  } else {
-    const st=billingStatus(b);
-    const stMap={al_dia:['Al día','var(--green)','rgba(22,163,74,.12)','rgba(22,163,74,.3)'], pendiente:['Pendiente','#b45309','#fef3c7','#fcd34d'], vencido:['Vencido','#dc2626','#fee2e2','#fca5a5'], saldado:['Saldado','var(--green)','rgba(22,163,74,.12)','rgba(22,163,74,.3)']};
+    document.getElementById('main-panel').innerHTML = `
+      <div class="vg-header"><div><div class="vg-title">Mi plan</div><div class="vg-date">Elige tu plan</div></div></div>
+      <div class="vg-body"><div style="text-align:center;padding:40px;color:var(--text3)">Cargando…</div></div>`;
+    return;
+  }
+  if(_planSel===undefined) _planSel = _planRecomendado();
+  const rec = _planRecomendado();
+  const nClientes = CLIENTS.filter(c=>!(c._raw && c._raw.active===false)).length;
+  const anual = _planCiclo==='anual';
+  const factor = anual ? 10 : 1;                 // anual = 2 meses gratis
+  const sufijo = anual ? '/año' : '/mes';
+  const eur = n => Number(n).toLocaleString('es-ES')+' €';
+
+  // Cards de planes
+  const planCards = PLAN_DEFS.map(p=>{
+    const on = _planSel===p.id;
+    const esRec = rec===p.id;
+    const precio = p.precio*factor;
+    return `<div onclick="setPlanSel('${p.id}')" style="position:relative;flex:1;min-width:150px;background:var(--bg2);border:2px solid ${on?'var(--green)':'var(--border)'};border-radius:16px;padding:16px 16px 15px;cursor:pointer;transition:border-color .15s">
+      ${esRec?`<span style="position:absolute;top:-9px;left:14px;background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:7px">Recomendado · ${nClientes} cliente${nClientes===1?'':'s'}</span>`:''}
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;font-weight:600;color:var(--text2)">${p.nombre}</span>
+        <span style="width:18px;height:18px;border-radius:50%;border:2px solid ${on?'var(--green)':'var(--border2)'};background:${on?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">${on?'✓':''}</span>
+      </div>
+      <div style="font-family:'DM Serif Display',serif;font-size:30px;color:var(--text);line-height:1.1;margin:6px 0 2px">${eur(precio)}<span style="font-size:13px;color:var(--text3);font-family:inherit">${sufijo}</span></div>
+      <div style="font-size:11.5px;color:var(--text3)">${p.desc}</div>
+    </div>`;
+  }).join('');
+
+  // Card "+80 a medida"
+  const customCard = `<div style="flex:1;min-width:150px;background:var(--bg3);border:1.5px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;justify-content:center">
+      <div style="font-size:13px;font-weight:600;color:var(--text2)">+80 clientes</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);margin:4px 0">A medida</div>
+      <div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">Hablamos contigo</div>
+      <button onclick="irAlPagoMiPlan()" style="font-size:12px;font-weight:600;padding:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:9px;cursor:pointer;color:var(--text2);font-family:inherit">Contactar</button>
+    </div>`;
+
+  // Toggle ciclo
+  const cicloBtn = (id,txt)=>{ const on=_planCiclo===id; return `<button onclick="setPlanCiclo('${id}')" style="border:none;background:${on?'var(--bg2)':'transparent'};border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:600;color:${on?'var(--text)':'var(--text3)'};cursor:pointer;font-family:inherit;box-shadow:${on?'0 1px 2px rgba(0,0,0,.06)':'none'}">${txt}</button>`; };
+
+  // Extras
+  const extraCards = EXTRA_DEFS.map(x=>{
+    const on = _planExtras[x.id];
+    const precioTxt = x.tipo==='unico'
+      ? `${x.antes?`<span style="text-decoration:line-through;color:var(--text3);font-weight:400">${x.antes} €</span> `:''}${x.precio} € único`
+      : `+${x.precio} €/mes`;
+    return `<div onclick="togglePlanExtra('${x.id}')" style="background:var(--bg2);border:2px solid ${on?'var(--green)':'var(--border)'};border-radius:14px;padding:14px 15px;cursor:pointer;transition:border-color .15s">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13.5px;font-weight:600;color:var(--text)">${x.icon} ${x.nombre}</span>
+        <span style="font-size:12.5px;font-weight:700;color:${on?'var(--green)':'var(--text2)'}">${precioTxt}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.55">${x.desc}</div>
+    </div>`;
+  }).join('');
+
+  // Cálculo del total
+  const plan = PLAN_DEFS.find(p=>p.id===_planSel) || PLAN_DEFS[0];
+  let recurrente = plan.precio;
+  if(_planExtras.ia)     recurrente += 9;
+  if(_planExtras.blanca) recurrente += 19;
+  const recurrenteCobro = recurrente*factor;
+  const unico = _planExtras.setup ? 39 : 0;
+
+  const lineas = [];
+  lineas.push([plan.nombre, eur(plan.precio*factor)+sufijo]);
+  if(_planExtras.ia)     lineas.push(['IA', '+'+eur(9*factor)+sufijo]);
+  if(_planExtras.blanca) lineas.push(['Marca blanca', '+'+eur(19*factor)+sufijo]);
+  if(_planExtras.setup)  lineas.push(['Puesta en marcha', eur(39)+' único']);
+  const lineasHtml = lineas.map(l=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2);padding:3px 0"><span>${l[0]}</span><span>${l[1]}</span></div>`).join('');
+  const ahorroTxt = anual ? `<div style="font-size:11.5px;color:var(--green);font-weight:600;margin-top:2px">Ahorras ${eur(recurrente*2)} al año (2 meses gratis)</div>` : '';
+
+  const totalBox = `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:18px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Tu resumen</div>
+      ${lineasHtml}
+      <div style="border-top:1px solid var(--border);margin:9px 0 8px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">Total</span>
+        <span style="font-family:'DM Serif Display',serif;font-size:26px;color:var(--text)">${eur(recurrenteCobro)}<span style="font-size:13px;color:var(--text3);font-family:inherit">${sufijo}</span></span>
+      </div>
+      ${unico?`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:2px"><span>+ puesta en marcha (una vez)</span><span>${eur(unico)}</span></div>`:''}
+      ${ahorroTxt}
+      <button onclick="irAlPagoMiPlan()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:var(--accent);color:#fff;border:none;border-radius:13px;cursor:pointer;font-family:inherit;margin-top:14px">Continuar al pago</button>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">Sin permanencia · cancela cuando quieras</div>
+    </div>`;
+
+  // Banner del plan actual (si ya hay una suscripción activa)
+  let bannerActual = '';
+  if(_coachPlan){
+    const st=billingStatus(_coachPlan);
+    const stMap={al_dia:['Al día','var(--green)'],pendiente:['Pendiente','#b45309'],vencido:['Vencido','#dc2626'],saldado:['Saldado','var(--green)'],none:['—','var(--text3)']};
     const si=stMap[st.state]||stMap.al_dia;
-    const amount = st.next?st.next.amount:b.amount;
-    const isPay = (st.state==='pendiente'||st.state==='vencido');
-    const subline = st.state==='saldado' ? 'Plan completado' : (isPay ? ('Pago '+st.next.n+' de '+st.total+' · vence '+fmtFecha(st.next.due)) : (st.paidCount>0?('Pago '+st.paidCount+' hecho · próximo el '+fmtFecha(st.next.due)):('Próximo pago el '+fmtFecha(st.next.due))));
-    const payBtn = isPay ? (b.pay_link
-      ? `<button onclick="pagarMiPlan()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:#635bff;color:#fff;border:none;border-radius:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:14px">💳 Pagar con Stripe</button>`
-      : `<div style="font-size:12px;color:var(--text3);text-align:center;padding:10px;background:var(--bg3);border-radius:11px;margin-top:14px">Aún no hay enlace de pago disponible.</div>`) : '';
-    const histRows = st.sch.map(p=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;color:${p.paid?'var(--text2)':'var(--text3)'};padding:4px 0"><span>Pago ${p.n} · ${fmtFecha(p.due)}</span><span style="${p.paid?'color:var(--green);font-weight:700':''}">${Number(p.amount).toLocaleString('es-ES')} € · ${p.paid?'pagado':'pendiente'}</span></div>`).join('');
-    body = `<div style="max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:14px">
-        <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:20px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-            <div><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Cuota de plataforma</div>
-              <div style="font-family:'DM Serif Display',serif;font-size:34px;color:var(--text);line-height:1">${Number(amount).toLocaleString('es-ES')} €</div></div>
-            <span style="font-size:12px;font-weight:700;color:${si[1]};background:${si[2]};border:1px solid ${si[3]};padding:5px 11px;border-radius:9px">${si[0]}</span>
-          </div>
-          <div style="font-size:12.5px;color:var(--text2);font-weight:600;margin-top:8px">${subline}</div>
-          ${payBtn}
-        </div>
-        <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:18px">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Pagos del plan</div>
-          ${histRows}
-        </div>
+    bannerActual = `<div style="background:var(--gl);border:1.5px solid var(--gm);border-radius:14px;padding:12px 15px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--text)"><b>Ya tienes un plan activo.</b> Aquí puedes cambiarlo o añadir extras.</div>
+        <span style="font-size:11.5px;font-weight:700;color:${si[1]}">${si[0]}</span>
       </div>`;
   }
+
+  const body = `<div style="max-width:880px;margin:0 auto">
+      ${bannerActual}
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div style="font-size:13px;color:var(--text2)">El plan se ajusta solo a tu número de clientes. Cambia únicamente cuando creces.</div>
+        <div style="display:flex;gap:3px;background:var(--bg3);border-radius:11px;padding:3px">${cicloBtn('mensual','Mensual')}${cicloBtn('anual','Anual · 2 meses gratis')}</div>
+      </div>
+      <div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:22px">${planCards}${customCard}</div>
+
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Extras opcionales</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:11px;margin-bottom:14px">${extraCards}</div>
+      <div style="background:var(--bg3);border-radius:11px;padding:10px 14px;font-size:12.5px;color:var(--text2);margin-bottom:22px"><b>Almacenamiento incluido</b> · las fotos de progreso de tus clientes no tienen límite por plan (uso razonable).</div>
+
+      ${totalBox}
+
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-top:16px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px">🛟 Empieza sin agobios, te acompañamos</div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.65">No estás solo. Tienes una <b>guía completa</b> (importar clientes con Excel, crear clientes desde cero, funciones de Tracc y cómo usa MyTracc tu cliente), nuestra <b>puesta en marcha</b> si prefieres que lo hagamos por ti, y <b>soporte directo</b> cuando lo necesites.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button onclick="showToast('La guía completa llegará muy pronto.')" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">Ver la guía</button>
+          <button onclick="irAlPagoMiPlan()" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-family:inherit">Contactar soporte</button>
+        </div>
+      </div>
+    </div>`;
+
   document.getElementById('main-panel').innerHTML = `
-    <div class="vg-header"><div><div class="vg-title">Mi plan</div><div class="vg-date">Tu suscripción con la plataforma</div></div></div>
+    <div class="vg-header"><div><div class="vg-title">Mi plan</div><div class="vg-date">Elige tu plan y tus extras</div></div></div>
     <div class="vg-body">${body}</div>`;
 }
 

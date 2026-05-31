@@ -4949,6 +4949,9 @@ function billingMonthly(b){
   return Number(b.amount)/iv;
 }
 function _eur(n){ return Math.round(n).toLocaleString('es-ES')+' €'; }
+// Pestaña activa dentro de la página de Pagos: 'pendientes' | 'activos'
+let _pagosTab = 'pendientes';
+function setPagosTab(t){ _pagosTab = t; if(typeof renderPagosPanel==='function') renderPagosPanel(); }
 // Bloque "Negocio" para la Vista general
 function businessSummaryHtml(){
   const esActivo = (c)=> !(c._raw && c._raw.active === false);
@@ -4996,6 +4999,47 @@ function businessSummaryHtml(){
   const listHtml = rows
     ? `<div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2)">${rows}</div>`
     : `<div style="font-size:12.5px;color:var(--text3);padding:16px;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:14px">✓ Nadie tiene pagos pendientes ahora mismo.</div>`;
+  const pendientesN = withB.filter(c=>{ const s=billingStatus(c._billing).state; return s==='pendiente'||s==='vencido'; }).length;
+
+  // ── Lista "Clientes activos": todos los activos con su plan, mensual, pagos y estado ──
+  const estadoMap = {
+    saldado:   ['Pagado',    '#15803d', '#dcfce7'],
+    al_dia:    ['Al día',    '#15803d', '#dcfce7'],
+    pendiente: ['Pendiente', '#b45309', '#fef3c7'],
+    vencido:   ['Vencido',   '#dc2626', '#fee2e2'],
+    none:      ['Sin cuota', 'var(--text3)', 'var(--bg3)'],
+  };
+  const activosRows = activos.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>{
+    const b = c._billing;
+    const st = billingStatus(b);
+    const si = estadoMap[st.state] || estadoMap.none;
+    let planTxt, mensualTxt='', pagosTxt='';
+    if(b && b.amount){
+      const num = Math.max(1, parseInt(b.num_payments)||1);
+      const total = (Number(b.amount)||0)*num;
+      planTxt = `${_eur(total)} · ${num} pago${num===1?'':'s'} · ${billingIntervalLabel(b.interval_months)}`;
+      const mensual = billingMonthly(b);
+      mensualTxt = mensual>0 ? `${_eur(mensual)}/mes` : 'pago único';
+      pagosTxt = `${st.paidCount}/${st.total} pagados`;
+    } else {
+      planTxt = 'Sin cuota configurada';
+    }
+    return `<div onclick="selectClientById('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer">
+      <div class="alert-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'};border:none">${c.initials||'?'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${escHtml(c.name||'Cliente')}</div>
+        <div style="font-size:11px;color:var(--text3)">${planTxt}${pagosTxt?' · '+pagosTxt:''}</div>
+      </div>
+      ${mensualTxt?`<div style="font-size:12px;font-weight:700;color:var(--text2);flex-shrink:0;margin-right:4px">${mensualTxt}</div>`:''}
+      <span style="font-size:11px;font-weight:700;color:${si[1]};background:${si[2]};padding:4px 10px;border-radius:7px;flex-shrink:0">${si[0]}</span>
+    </div>`;
+  }).join('');
+  const activosHtml = activos.length
+    ? `<div style="border:1.5px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2)">${activosRows}</div>`
+    : `<div style="font-size:12.5px;color:var(--text3);padding:16px;text-align:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:14px">No tienes clientes activos.</div>`;
+
+  const tab = (typeof _pagosTab!=='undefined'?_pagosTab:'pendientes');
+  const tabBtn = (id,txt,n)=>{ const on=tab===id; return `<button onclick="setPagosTab('${id}')" style="padding:8px 14px;border-radius:9px;border:1.5px solid ${on?'var(--accent)':'var(--border)'};background:${on?'var(--accent)':'var(--bg2)'};color:${on?'#fff':'var(--text2)'};font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">${txt}${n!=null?` (${n})`:''}</button>`; };
 
   return `<div class="sec-hd" style="margin:18px 0 10px"><div class="sec-t">Negocio</div></div>
     <div class="kpi-strip">
@@ -5007,8 +5051,11 @@ function businessSummaryHtml(){
       <div class="kpi"><div class="kpi-lbl">Altas este mes</div><div class="kpi-val g">${altas}</div><div class="kpi-sub">clientes nuevos</div></div>
       <div class="kpi"><div class="kpi-lbl">Bajas este mes</div><div class="kpi-val ${bajas>0?'':''}" style="${bajas>0?'color:#dc2626':''}">${bajas}</div><div class="kpi-sub">${bajas>0?'clientes de baja':'ninguna'}</div></div>
     </div>
-    <div class="sec-hd" style="margin:14px 0 8px"><div class="sec-t">Pendientes de cobro</div></div>
-    ${listHtml}`;
+    <div style="display:flex;gap:8px;margin:16px 0 10px">
+      ${tabBtn('pendientes','Pendientes de cobro',pendientesN)}
+      ${tabBtn('activos','Clientes activos',activos.length)}
+    </div>
+    ${tab==='activos' ? activosHtml : listHtml}`;
 }
 
 

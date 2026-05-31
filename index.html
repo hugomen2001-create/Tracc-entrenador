@@ -13063,6 +13063,17 @@ async function aceptarContrapropuesta(id){
 // en MyTracc con su email (enlace por email en el onboarding).
 // ══════════════════════════════════════════════════════════════════════════
 let _importRows = null;
+// Mapea el sexo del Excel (H/M, hombre/mujer, male/female...) a los valores
+// que admite la BD: 'male' / 'female' / 'other'. Devuelve null si no se reconoce.
+function _mapGenero(v){
+  const s=String(v||'').trim().toLowerCase();
+  if(!s) return null;
+  if(['h','hombre','masculino','varon','varón','male','m (hombre)'].includes(s)) return 'male';
+  if(['m','mujer','femenino','female','f'].includes(s)) return 'female';
+  if(['o','otro','other','x','nb'].includes(s)) return 'other';
+  return null;
+}
+
 let _importMetrics = null;   // [{email,name,date,steps,weight,sleep}]
 let _importWorkouts = null;  // [{email,name,date,type,exercise,set,reps,kg}]
 let _importRoutine = null;   // [{email,name,sesion,orden,exercise,series,reps}]
@@ -13232,7 +13243,7 @@ async function importClientesFile(input){
           const g=(i)=>i>=0?String(r[i]||'').trim():'';
           const name=g(ci.name), email=g(ci.email).toLowerCase();
           const row={ name, email:email||null, weight:num(g(ci.weight)), height:num(g(ci.height)),
-            goal:g(ci.goal)||null, gender:(g(ci.gender)||'').charAt(0).toUpperCase()||null,
+            goal:g(ci.goal)||null, gender:_mapGenero(g(ci.gender)),
             birth:_xlDate(g(ci.birth)), phone:g(ci.phone)||null, steps:int(g(ci.steps)), revw:int(g(ci.revw)) };
           if(!name){ row._status='warn'; row._msg='falta nombre'; }
           else if(email && existing.has(email)){ row._status='dup'; row._msg='ya existe'; }

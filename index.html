@@ -524,6 +524,14 @@ canvas{width:100%!important}
   font-family:'DM Sans',sans-serif;
 }
 #login-layer.hidden{display:none}
+.help-body h4{font-size:13px;font-weight:700;color:var(--text);margin:16px 0 6px}
+.help-body p{margin:0 0 8px}
+.help-body b{color:var(--text)}
+.help-body code{background:var(--bg3);padding:1px 5px;border-radius:5px;font-size:12px;font-family:'Geist Mono',monospace}
+.help-tip{display:flex;gap:8px;background:#fef9ed;border:1px solid #f5e3b8;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:12.5px;color:#7a5a12;line-height:1.5}
+.help-tip::before{content:'💡';flex-shrink:0}
+.help-tip b{color:#5a4209}
+#help-fab:hover{border-color:var(--green)}
 
 .lg-shell{
   width:900px;max-width:100%;height:580px;
@@ -1937,6 +1945,7 @@ function lgEnterApp(nombre){
     document.getElementById('login-layer').classList.add('hidden');
   }, 2150);
   setTimeout(() => { try{ maybeStartTour(); }catch(e){ console.warn('tour autostart:', e); } }, 2700);
+  try{ _ensureHelpFab(); }catch(e){}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2023,6 +2032,99 @@ function _tourPaint(step){
     </div>`;
 }
 window.addEventListener('resize', ()=>{ if(document.getElementById('tour-root')) _tourPaint(TOUR_STEPS[_tourIdx]); });
+
+// ─────────────────────────────────────────────────────────────
+// AYUDA CONTEXTUAL (botón 📖 que explica la pantalla actual)
+// Panel deslizante desde la derecha. El contenido depende de
+// en qué sección/pestaña esté el entrenador.
+// ─────────────────────────────────────────────────────────────
+const HELP_CONTENT = {
+  overview: { t:'Vista general', h:`
+    <p>Es tu <b>panel de control</b>: cómo van todos tus clientes de un vistazo, sin entrar uno a uno.</p>
+    <h4>Lo que ves</h4>
+    <p>Arriba, unos <b>indicadores</b>: clientes al día, los que necesitan atención y la adherencia (entrenos hechos vs. planificados).</p>
+    <p>Debajo, las <b>alertas</b> de quien lleva días sin registrar, y las <b>tarjetas</b> de cada cliente con su estado.</p>
+    <h4>Cómo se usa</h4>
+    <p>Pulsa cualquier tarjeta o cliente de la barra lateral para abrir su ficha completa.</p>
+    <div class="help-tip">Empieza el día aquí: si alguien aparece en alerta, entra y escríbele.</div>` },
+  editar: { t:'Editar plan', h:`
+    <p>Aquí montas el <b>plan completo</b> del cliente: dieta y entrenamiento. Lo que cambies se guarda en su cuenta y lo ve en MyTracc.</p>
+    <h4>🍎 Plan nutricional</h4>
+    <p>Defines los <b>objetivos diarios</b> (kcal y macros) y creas varias <b>opciones de dieta</b> intercambiables.</p>
+    <div class="help-tip">Usa la <b>biblioteca de alimentos</b>: creas un alimento una vez con sus macros y lo reutilizas, así los datos son exactos.</div>
+    <h4>🏋️ Plan de entreno</h4>
+    <p>Eliges el <b>split</b> (qué toca cada día) y añades los <b>ejercicios por sesión</b> con series, reps y descansos.</p>
+    <p>Con <b>“Programar cambio”</b> dejas listo un plan nuevo que entra en una fecha futura.</p>
+    <div class="help-tip">Pulsa <b>Guardar plan completo</b> al terminar para que el cliente lo reciba.</div>` },
+  import: { t:'Importar con Excel', h:`
+    <p>Trae <b>todos tus clientes de golpe</b> desde una hoja de cálculo, con sus métricas, entrenos y dietas.</p>
+    <h4>Paso a paso</h4>
+    <p><b>1.</b> Descarga la plantilla <code>.xlsx</code>. Trae pestañas: Clientes, Métricas, Entrenos, Rutina y Nutrición.</p>
+    <p><b>2.</b> Rellénala. Con el <b>nombre</b> basta para empezar; el <b>email</b> es lo que vincula al cliente con su cuenta de MyTracc.</p>
+    <p><b>3.</b> Súbela y revisa el resumen (cuántos clientes, métricas y entrenos detecta) antes de importar.</p>
+    <div class="help-tip">¿No quieres hacerlo tú? Con el extra de <b>puesta en marcha</b> nos pasas tus archivos y te lo dejamos montado.</div>` },
+  pagos: { t:'Pagos', h:`
+    <p>Tu <b>resumen de negocio</b>: cuánto ingresas, qué tienes por cobrar y el estado de cada cliente.</p>
+    <h4>Indicadores</h4>
+    <p>Ingresos recurrentes (al mes), cobrado este mes, pendiente de cobro y precio medio por cliente.</p>
+    <h4>Pestañas</h4>
+    <p><b>Pendientes de cobro:</b> solo quien tiene un pago pendiente o vencido.</p>
+    <p><b>Clientes activos:</b> todos, con su plan, lo que pagan al mes y si han pagado ya.</p>
+    <div class="help-tip">La cuota de cada cliente se configura en su ficha → pestaña <b>Perfil</b>.</div>` },
+  resumen: { t:'Resumen del cliente', h:`
+    <p>El <b>día a día</b> del cliente: sus entrenos de la semana, métricas de hoy (pasos, sueño, peso), su dieta y las próximas citas.</p>
+    <div class="help-tip">Lo que el cliente registra en MyTracc aparece aquí al instante.</div>` },
+  seguimiento: { t:'Seguimiento del cliente', h:`
+    <p>El <b>progreso</b> del cliente a lo largo del tiempo.</p>
+    <p>Verás la <b>evolución de las cargas</b> en cada ejercicio, el historial de sesiones y las métricas (peso, pasos, sueño) por semana.</p>` },
+  perfil: { t:'Perfil del cliente', h:`
+    <p>Los <b>datos</b> del cliente y su gestión.</p>
+    <p>Aquí editas sus datos básicos, configuras su <b>cuota</b> (lo que paga y cada cuánto), subes <b>fotos de progreso</b> y puedes darlo de baja o eliminarlo.</p>
+    <div class="help-tip">La cuota que pongas aquí es la que se ve luego en la sección <b>Pagos</b>.</div>` },
+  agenda: { t:'Agenda', h:`<p>Tu <b>calendario de citas</b> y sesiones con los clientes. Crea citas con “Nueva cita” para organizarte.</p>` },
+  plan: { t:'Mi plan', h:`<p>Eliges tu <b>plan de Tracc</b> y tus <b>extras</b> según cuántos clientes tengas. Marca el plan y los extras y abajo verás el total.</p>` },
+};
+function _currentHelpKey(){
+  if(typeof _vgMode!=='undefined' && _vgMode){ if(HELP_CONTENT[_vgMode]) return _vgMode; }
+  if(typeof currentClient!=='undefined' && currentClient){ const t=(typeof currentTab!=='undefined'&&currentTab)||'resumen'; return HELP_CONTENT[t]?t:'resumen'; }
+  return 'overview';
+}
+function _ensureHelpFab(){
+  if(document.getElementById('help-fab')) return;
+  const fab=document.createElement('div');
+  fab.id='help-fab';
+  fab.title='Ayuda de esta pantalla';
+  fab.onclick=()=>openHelp();
+  fab.style.cssText='position:fixed;bottom:20px;right:20px;z-index:500;display:flex;align-items:center;gap:7px;background:var(--bg2);border:1.5px solid var(--gm);color:var(--green);font-size:13px;font-weight:600;padding:9px 14px;border-radius:12px;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(0,0,0,.12)';
+  fab.innerHTML='<span style="font-size:15px">📖</span> Ayuda';
+  document.body.appendChild(fab);
+}
+function openHelp(key){
+  key = key || _currentHelpKey();
+  const c = HELP_CONTENT[key] || {t:'Ayuda', h:'<p>Estamos preparando la ayuda de esta pantalla. Mientras, escríbenos si tienes dudas.</p>'};
+  let root=document.getElementById('help-root');
+  if(!root){ root=document.createElement('div'); root.id='help-root'; document.body.appendChild(root); }
+  root.innerHTML=`
+    <div onclick="closeHelp()" style="position:fixed;inset:0;background:rgba(26,26,24,.35);z-index:600"></div>
+    <div id="help-panel" style="position:fixed;top:0;right:0;width:min(360px,90vw);height:100%;background:var(--bg2);border-left:1px solid var(--border);z-index:601;box-shadow:-8px 0 30px rgba(0,0,0,.12);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease">
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">📖 Ayuda de esta pantalla</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text)">${c.t}</div>
+        </div>
+        <div onclick="closeHelp()" style="width:28px;height:28px;min-width:28px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:15px;cursor:pointer">✕</div>
+      </div>
+      <div class="help-body" style="padding:16px 18px;overflow-y:auto;font-size:13px;color:var(--text2);line-height:1.65">${c.h}
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">¿Sigues con dudas? Escríbenos a <b>tracc.support@gmail.com</b> y te ayudamos.</div>
+      </div>
+    </div>`;
+  requestAnimationFrame(()=>{ const p=document.getElementById('help-panel'); if(p) p.style.transform='translateX(0)'; });
+}
+function closeHelp(){
+  const p=document.getElementById('help-panel');
+  if(p){ p.style.transform='translateX(100%)'; setTimeout(()=>{ const r=document.getElementById('help-root'); if(r) r.remove(); },220); }
+  else { const r=document.getElementById('help-root'); if(r) r.remove(); }
+}
 
 // Vuelca el nombre real del coach en la tarjeta del sidebar
 function lgApplyCoachToDashboard(){
@@ -2255,6 +2357,7 @@ function lgApplyError(msg){
         lgApplyCoachToDashboard();
         await initDashboard();
         document.getElementById('login-layer').classList.add('hidden');
+        try{ _ensureHelpFab(); }catch(e){}
         return;
       } else {
         // Hay sesión pero no es coach → cerrarla

@@ -13533,11 +13533,16 @@ async function _importarRutina(idDe, errores){
       plan=data;
     }catch(e){ console.error(e); continue; }
     // 4) client_plans (un registro por ejercicio)
+    // training_plan_id es opcional: solo lo incluimos si la columna existe.
+    let tieneTPI=false;
+    try{ const t=await sb.from('client_plans').select('training_plan_id').limit(1); tieneTPI=!t.error; }catch(e){ tieneTPI=false; }
     const cont={};
     const cpRows=filas.map(f=>{ const exId=libByName[f.exercise.trim().toLowerCase()]||null; const st=f.sesion;
       cont[st]=(cont[st]||0)+1;
-      return { client_id:cid, training_plan_id:plan.id, is_active:true, exercise_id:exId,
-        session_type:st, exercise_order:f.orden!=null?f.orden:cont[st], sets:f.series, reps:f.reps, approx:f.approx, rest_sec:f.rest }; })
+      const row={ client_id:cid, is_active:true, exercise_id:exId,
+        session_type:st, exercise_order:f.orden!=null?f.orden:cont[st], sets:f.series, reps:f.reps, approx:f.approx, rest_sec:f.rest };
+      if(tieneTPI) row.training_plan_id=plan.id;
+      return row; })
       .filter(r=>r.exercise_id);
     if(cpRows.length){ try{ const {error}=await sb.from('client_plans').insert(cpRows); if(error){console.error('import client_plans:',error); errores.push('ejercicios plan: '+(error.message||error.code||'error'));} }catch(e){ console.error(e); } }
     hechas++;

@@ -788,7 +788,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
           </div>
           <div style="text-align:center;font-size:12px;color:#a3a39e;margin-bottom:14px">
             ¿Eres entrenador y aún no tienes cuenta?
-            <a onclick="lgGoto('apply')" style="color:#16a34a;font-weight:600;cursor:pointer">Solicita acceso</a>
+            <a onclick="lgGoto('signup')" style="color:#16a34a;font-weight:600;cursor:pointer">Crea tu cuenta gratis</a>
           </div>
           <div class="lg-support">¿Problemas para acceder? Contacta con<br><b>tracc.support@gmail.com</b></div>
         </div>
@@ -893,6 +893,64 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       </div>
 
       <!-- ── ESTADO: SOLICITAR ACCESO — formulario de entrenador ── -->
+      <!-- ── REGISTRO SELF-SERVICE ── -->
+      <div class="lg-screen" id="lg-screen-signup">
+        <div style="width:100%;max-width:320px">
+          <div class="lg-back" onclick="lgGoto('login')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Volver al inicio de sesión
+          </div>
+          <div class="lg-form-tag">Únete a Tracc</div>
+          <div class="lg-form-title">Crea tu cuenta<br>gratis</div>
+          <div class="lg-form-sub" id="lg-signup-sub">Empieza a gestionar tus clientes hoy</div>
+        </div>
+        <div class="lg-form">
+          <div class="lg-err-banner" id="lg-signup-err" style="display:none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div class="lg-err-txt" id="lg-signup-err-txt">No se pudo crear la cuenta</div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Nombre completo</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="text" id="lg-su-name" placeholder="Tu nombre y apellidos" autocomplete="name" oninput="lgValidateSignup()">
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Email</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="email" id="lg-su-email" placeholder="tu@email.com" autocomplete="email" oninput="lgValidateSignup()">
+            </div>
+          </div>
+          <div class="lg-field">
+            <div class="lg-field-lbl">Contraseña</div>
+            <div class="lg-inp-wrap">
+              <input class="lg-inp" type="password" id="lg-su-pwd" placeholder="Mínimo 6 caracteres" autocomplete="new-password" oninput="lgValidateSignup()" onkeydown="if(event.key==='Enter')lgDoSignup()">
+            </div>
+          </div>
+          <div style="height:6px"></div>
+          <button class="lg-btn" id="lg-su-btn" onclick="lgDoSignup()">
+            <span id="lg-su-btn-label">Crear cuenta gratis</span>
+          </button>
+          <div style="text-align:center;font-size:11.5px;color:#a3a39e;margin-top:-6px">Gratis para empezar · sin tarjeta · sin permanencia</div>
+          <div style="text-align:center;font-size:12px;color:#a3a39e;margin-top:14px">
+            ¿Prefieres que te contactemos? <a onclick="lgGoto('apply')" style="color:#16a34a;font-weight:600;cursor:pointer">Solicita acceso</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ESTADO: CONFIRMA TU EMAIL ── -->
+      <div class="lg-screen" id="lg-screen-confirm">
+        <div class="lg-success">
+          <div class="lg-success-ring">✓</div>
+          <div class="lg-success-title" style="font-size:23px">Cuenta creada</div>
+          <div style="font-size:13px;color:#a3a39e;margin-top:4px;text-align:center;line-height:1.5">Te hemos enviado un email para confirmar tu cuenta.<br>Ábrelo, confírmala y vuelve a iniciar sesión.</div>
+          <div style="margin-top:16px">
+            <button class="lg-btn" style="width:auto;height:34px;padding:0 18px;font-size:12px;margin-bottom:0" onclick="lgGoto('login')">← Ir al inicio de sesión</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SOLICITA ACCESO (modelo de contacto) ── -->
       <div class="lg-screen" id="lg-screen-apply">
         <div style="width:100%;max-width:320px">
           <div class="lg-back" onclick="lgGoto('login')">
@@ -985,6 +1043,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       <div class="avatar">PB</div>
       <div><div class="coach-name">Pol De Blas</div><div class="coach-role">Entrenador personal</div></div>
       <div style="margin-left:auto;display:flex;gap:5px">
+        <button onclick="startTour()" title="Ver el tour de bienvenida" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:13px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">?</button>
         <button onclick="openGroqKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
         <button onclick="lgLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);display:flex;align-items:center;transition:all .15s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -1678,14 +1737,19 @@ async function lgDoLogin(){
       return;
     }
 
-    // 2. Verificar que el usuario es un entrenador (existe en la tabla coaches)
-    const ok = await lgVerifyCoach(authData.user.id);
-    if (!ok){
-      // No es coach → cerramos la sesión que se acaba de abrir y avisamos
+    // 2. Verificar que el usuario es un entrenador (o crear su ficha si se
+    //    registró como tal y aún no la tiene — p.ej. tras confirmar el email)
+    const ok = await ensureCoach(authData.user);
+    if (ok !== true){
+      // No es coach (o falló la creación) → cerramos sesión y avisamos
       await sb.auth.signOut();
       lgClearLoginLoading();
-      lgShowLoginError('Esta cuenta no es de entrenador',
-        'El acceso a Tracc es solo para entrenadores');
+      if (ok && ok.error){
+        lgShowLoginError('No se pudo preparar tu cuenta', ok.error.message || 'Escríbenos y lo resolvemos');
+      } else {
+        lgShowLoginError('Esta cuenta no es de entrenador',
+          'El acceso a Tracc es solo para entrenadores');
+      }
       return;
     }
 
@@ -1715,6 +1779,122 @@ async function lgVerifyCoach(userId){
   } catch(e){
     console.error('verifyCoach exception:', e);
     return false;
+  }
+}
+
+// Genera un código de coach único (p.ej. "JUAN4821") para que sus clientes
+// se registren en MyTracc. Reintenta si choca con uno existente.
+async function _genCodigoCoach(nombre){
+  let base = (nombre||'').toUpperCase().replace(/[^A-ZÑ]/g,'').slice(0,4) || 'COACH';
+  for(let i=0;i<6;i++){
+    const code = base + Math.floor(1000+Math.random()*9000);
+    try{
+      const { data } = await sb.from('coaches').select('id').eq('code', code).maybeSingle();
+      if(!data) return code;
+    }catch(e){ return code; }
+  }
+  return base + Date.now().toString().slice(-5);
+}
+
+// Asegura que el usuario autenticado tiene su ficha en `coaches`.
+// Si no existe y se registró como entrenador, la crea. Rellena coachData.
+// Devuelve true si hay coach válido; {error} si falló la creación; false si no procede.
+async function ensureCoach(user){
+  if(!user) return false;
+  try{
+    const { data: existing, error } = await sb
+      .from('coaches').select('*').eq('user_id', user.id).maybeSingle();
+    if(error){ console.error('ensureCoach read:', error); return false; }
+    if(existing){ coachData = existing; return true; }
+    // No existe: solo creamos ficha si se registró como entrenador
+    const meta = user.user_metadata || {};
+    if(meta.role !== 'coach') return false;
+    const nombre = (meta.name || '').trim() || 'Entrenador';
+    const code = await _genCodigoCoach(nombre);
+    const row = { user_id: user.id, name: nombre, email: user.email || null, code };
+    const { data: creado, error: insErr } = await sb
+      .from('coaches').insert(row).select('*').single();
+    if(insErr || !creado){ console.error('ensureCoach insert:', insErr); return {error: insErr}; }
+    coachData = creado;
+    return true;
+  }catch(e){ console.error('ensureCoach exception:', e); return false; }
+}
+
+// ── Validación visual del formulario de registro ──
+function lgValidateSignup(){
+  const name = (document.getElementById('lg-su-name')||{}).value || '';
+  const email = (document.getElementById('lg-su-email')||{}).value || '';
+  const pwd = (document.getElementById('lg-su-pwd')||{}).value || '';
+  const nameOk = name.trim().length >= 2;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const pwdOk = pwd.length >= 6;
+  const btn = document.getElementById('lg-su-btn');
+  if(btn) btn.classList.toggle('ready', nameOk && emailOk && pwdOk);
+  return { nameOk, emailOk, pwdOk, allOk: nameOk && emailOk && pwdOk };
+}
+function lgSignupError(msg, sub){
+  const banner = document.getElementById('lg-signup-err');
+  const txt = document.getElementById('lg-signup-err-txt');
+  if(txt) txt.textContent = msg || 'No se pudo crear la cuenta';
+  if(banner) banner.style.display = 'flex';
+  const subEl = document.getElementById('lg-signup-sub');
+  if(subEl && sub){ subEl.textContent = sub; }
+}
+// ── Registro real contra Supabase ──
+async function lgDoSignup(){
+  const name = document.getElementById('lg-su-name').value.trim();
+  const email = document.getElementById('lg-su-email').value.trim();
+  const pwd = document.getElementById('lg-su-pwd').value;
+  const v = lgValidateSignup();
+  document.getElementById('lg-su-name').classList.toggle('error', !v.nameOk);
+  document.getElementById('lg-su-email').classList.toggle('error', !v.emailOk);
+  document.getElementById('lg-su-pwd').classList.toggle('error', !v.pwdOk);
+  if(!v.nameOk){ lgSignupError('Escribe tu nombre completo'); return; }
+  if(!v.emailOk){ lgSignupError('Introduce un email válido'); return; }
+  if(!v.pwdOk){ lgSignupError('La contraseña debe tener al menos 6 caracteres'); return; }
+
+  const btn = document.getElementById('lg-su-btn');
+  const label = document.getElementById('lg-su-btn-label');
+  document.getElementById('lg-signup-err').style.display = 'none';
+  btn.classList.add('loading');
+  label.innerHTML = '<span class="lg-spin" style="margin-right:2px"></span>Creando tu cuenta...';
+
+  try{
+    const { data, error } = await sb.auth.signUp({
+      email, password: pwd,
+      options: { data: { name, role: 'coach' } }
+    });
+    if(error){
+      btn.classList.remove('loading'); label.textContent = 'Crear cuenta gratis';
+      const m = (error.message||'').toLowerCase();
+      if(m.includes('already') || m.includes('registered') || m.includes('exists')){
+        lgSignupError('Ese email ya tiene cuenta', 'Inicia sesión o usa otro email');
+      } else {
+        lgSignupError('No se pudo crear la cuenta', error.message || 'Inténtalo de nuevo');
+      }
+      return;
+    }
+    // ¿Hay sesión activa? (depende de si Supabase exige confirmar email)
+    if(data && data.session && data.user){
+      // Confirmación desactivada → ya está dentro: creamos su ficha y entramos
+      const res = await ensureCoach(data.user);
+      btn.classList.remove('loading'); label.textContent = 'Crear cuenta gratis';
+      if(res === true){
+        lgEnterApp(coachData.name);
+      } else if(res && res.error){
+        lgSignupError('Cuenta creada, pero falló tu ficha', (res.error.message||'')+' · Escríbenos y lo resolvemos');
+      } else {
+        lgSignupError('No se pudo completar el alta', 'Inténtalo de nuevo o escríbenos');
+      }
+    } else {
+      // Confirmación activada → no hay sesión todavía: pedimos confirmar email
+      btn.classList.remove('loading'); label.textContent = 'Crear cuenta gratis';
+      lgGoto('confirm');
+    }
+  }catch(e){
+    console.error('signup exception:', e);
+    btn.classList.remove('loading'); label.textContent = 'Crear cuenta gratis';
+    lgSignupError('Error de conexión', 'Comprueba tu conexión a internet');
   }
 }
 
@@ -1756,7 +1936,93 @@ function lgEnterApp(nombre){
   setTimeout(() => {
     document.getElementById('login-layer').classList.add('hidden');
   }, 2150);
+  setTimeout(() => { try{ maybeStartTour(); }catch(e){ console.warn('tour autostart:', e); } }, 2700);
 }
+
+// ─────────────────────────────────────────────────────────────
+// TOUR DE BIENVENIDA (onboarding guiado, 12 pasos)
+// Overlay superpuesto que no toca los datos del entrenador.
+// ─────────────────────────────────────────────────────────────
+function _tourOpenClient(tab){
+  try{
+    const list = CLIENTS.filter(c=>!(c._raw && c._raw.active===false));
+    if(list.length){ selectClient(list[0].id); switchTab(tab); return true; }
+  }catch(e){ console.warn('tour open client:', e); }
+  return false;
+}
+const TOUR_STEPS = [
+  {t:'Tu vista general', b:'Aquí ves de un vistazo cómo van todos tus clientes: quién está al día, quién necesita atención y la adherencia general. Tu punto de partida cada día.', sel:'#overview-btn', place:'right', nav:()=>openVgMode('overview')},
+  {t:'Tus clientes', b:'Esta es tu lista de clientes. Pulsa en cualquiera para abrir su ficha completa con su plan, seguimiento y datos.', sel:'#client-list', place:'right', nav:()=>{}},
+  {t:'Crear un cliente nuevo', b:'Con el botón “Nuevo” das de alta a un cliente desde cero, sin datos previos. Rellenas sus datos básicos y ya puedes montarle su plan.', sel:'#pending-btn', place:'right', nav:()=>{}},
+  {t:'Importar con Excel', b:'¿Vienes de otra herramienta? Trae todos tus clientes de golpe con una plantilla de Excel: datos, métricas, entrenos y dietas. O nos lo pasas y lo hacemos por ti.', sel:'#import-btn', place:'right', nav:()=>openVgMode('import')},
+  {t:'Pestaña Resumen', b:'Dentro de cada cliente, Resumen es su día a día: entrenos de la semana, métricas de hoy, dieta y próximas citas.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('resumen')},
+  {t:'Pestaña Seguimiento', b:'En Seguimiento ves su progreso: evolución de las cargas por ejercicio, historial de sesiones y métricas (peso, pasos, sueño).', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('seguimiento')},
+  {t:'Editar plan: rutina y dieta', b:'Aquí montas su entrenamiento (el split y los ejercicios de cada sesión) y su plan nutricional con varias opciones de dieta.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('editar')},
+  {t:'Pestaña Perfil', b:'Los datos del cliente, su cuota (lo que paga), las fotos de progreso y el estado de su cuenta.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('perfil')},
+  {t:'Tu código y MyTracc', b:()=>`Tus clientes usan la app <b>MyTracc</b> y se conectan contigo con tu código${(coachData&&coachData.code)?(': <b>'+coachData.code+'</b>'):''}. Desde MyTracc registran sus entrenos, métricas y fotos, y tú lo ves al instante aquí.`, sel:null, place:'center', nav:()=>{}},
+  {t:'Pagos', b:'Tu resumen de negocio: ingresos, cobros pendientes y todos tus clientes con su cuota y estado de pago.', sel:'#pagos-btn', place:'right', nav:()=>openVgMode('pagos')},
+  {t:'Agenda', b:'Tu calendario de citas y sesiones con los clientes, para organizarte.', sel:'#agenda-btn', place:'right', nav:()=>openVgMode('agenda')},
+  {t:'Mi plan', b:'Y aquí eliges tu plan de Tracc y tus extras, según cuántos clientes tengas. ¡Listo para empezar!', sel:'#plan-btn', place:'right', nav:()=>openVgMode('plan')},
+];
+let _tourIdx = 0;
+function startTour(){ _tourIdx = 0; _tourShow(); }
+function _tourEnd(){ try{ localStorage.setItem('tracc_tour_seen_v1','1'); }catch(e){} const r=document.getElementById('tour-root'); if(r) r.remove(); }
+function tourSkip(){ _tourEnd(); }
+function tourPrev(){ if(_tourIdx>0){ _tourIdx--; _tourShow(); } }
+function tourNext(){
+  if(_tourIdx>=TOUR_STEPS.length-1){ _tourEnd(); try{ if(typeof openVgMode==='function') openVgMode('plan'); }catch(e){} return; }
+  _tourIdx++; _tourShow();
+}
+function maybeStartTour(){ try{ if(localStorage.getItem('tracc_tour_seen_v1')) return; }catch(e){} startTour(); }
+function _tourShow(){
+  const step = TOUR_STEPS[_tourIdx];
+  try{ if(step.nav) step.nav(); }catch(e){ console.warn('tour nav:', e); }
+  setTimeout(()=>_tourPaint(step), 70);
+}
+function _tourPaint(step){
+  let root = document.getElementById('tour-root');
+  if(!root){ root = document.createElement('div'); root.id='tour-root'; document.body.appendChild(root); }
+  const total = TOUR_STEPS.length, n = _tourIdx+1, isLast = _tourIdx===total-1;
+  const bodyHtml = (typeof step.b==='function') ? step.b() : step.b;
+  const dots = TOUR_STEPS.map((s,i)=>`<span style="width:${i===_tourIdx?'16px':'5px'};height:5px;border-radius:3px;background:${i===_tourIdx?'var(--green)':'var(--border2)'};display:inline-block"></span>`).join('');
+  let rect = null;
+  if(step.sel){ const tgt=document.querySelector(step.sel); if(tgt){ try{ tgt.scrollIntoView({block:'nearest'}); }catch(e){} rect=tgt.getBoundingClientRect(); } }
+  let spotHtml;
+  if(rect && rect.width>0){
+    const pad=6;
+    spotHtml = `<div style="position:fixed;left:${rect.left-pad}px;top:${rect.top-pad}px;width:${rect.width+pad*2}px;height:${rect.height+pad*2}px;border:2px solid var(--green);border-radius:10px;box-shadow:0 0 0 9999px rgba(26,26,24,.55);pointer-events:none;z-index:99998"></div>`;
+  } else {
+    spotHtml = `<div style="position:fixed;inset:0;background:rgba(26,26,24,.55);pointer-events:none;z-index:99998"></div>`;
+  }
+  const bw=330, vw=window.innerWidth, vh=window.innerHeight;
+  let place = step.place||'center', bx=0, by=0;
+  if(rect && rect.width>0 && place==='right'){ bx=rect.right+18; by=rect.top; }
+  else if(rect && rect.width>0 && place==='bottom'){ bx=Math.max(16,rect.left); by=rect.bottom+16; }
+  else place='center';
+  if(place!=='center'){ if(bx+bw>vw-12) bx=vw-bw-12; if(bx<12) bx=12; if(by<12) by=12; if(by>vh-230) by=vh-230; }
+  const balloonPos = place==='center'
+    ? `left:50%;top:50%;transform:translate(-50%,-50%);`
+    : `left:${bx}px;top:${by}px;`;
+  root.innerHTML = `
+    <div style="position:fixed;inset:0;z-index:99997"></div>
+    ${spotHtml}
+    <div style="position:fixed;${balloonPos}width:${bw}px;z-index:99999;background:var(--bg2);border-radius:16px;padding:18px 19px;box-shadow:0 12px 40px rgba(0,0,0,.28);font-family:inherit">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)">Paso ${n} de ${total}</span>
+        <span onclick="tourSkip()" style="font-size:11.5px;color:var(--text3);cursor:pointer">Saltar tour ✕</span>
+      </div>
+      <div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text);margin-bottom:6px">${step.t}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:15px">${bodyHtml}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;gap:5px;align-items:center">${dots}</div>
+        <div style="display:flex;gap:7px">
+          ${_tourIdx>0?`<button onclick="tourPrev()" style="background:var(--bg2);color:var(--text2);border:1.5px solid var(--border);border-radius:10px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Atrás</button>`:''}
+          <button onclick="tourNext()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">${isLast?'¡Empezar!':'Siguiente →'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+window.addEventListener('resize', ()=>{ if(document.getElementById('tour-root')) _tourPaint(TOUR_STEPS[_tourIdx]); });
 
 // Vuelca el nombre real del coach en la tarjeta del sidebar
 function lgApplyCoachToDashboard(){
@@ -1983,8 +2249,8 @@ function lgApplyError(msg){
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session && session.user){
-      const ok = await lgVerifyCoach(session.user.id);
-      if (ok){
+      const ok = await ensureCoach(session.user);
+      if (ok === true){
         // Entrar directo, sin animación larga
         lgApplyCoachToDashboard();
         await initDashboard();

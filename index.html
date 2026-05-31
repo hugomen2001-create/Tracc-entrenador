@@ -4468,29 +4468,59 @@ function billingIntervalLabel(iv){
 }
 // Selección temporal del intervalo en el formulario de cuota
 function setCuotaIv(v){ if(currentClient){ currentClient._cuotaIv = v; renderClientPanel(); } }
-function toggleCuotaEdit(on){ if(currentClient){ currentClient._cuotaEdit = on; currentClient._cuotaIv = null; renderClientPanel(); } }
+function toggleCuotaEdit(on){ if(currentClient){ currentClient._cuotaEdit = on; currentClient._cuotaIv = null; currentClient._cuotaModo = null; renderClientPanel(); } }
+// Cambiar entre "importe por pago" e "importe total del plan".
+// Convierte el número del campo para que el resumen siga cuadrando.
+function setCuotaModo(m){
+  const c = currentClient; if(!c) return;
+  const prev = c._cuotaModo || 'pago';
+  if(prev===m) return;
+  const amtEl = document.getElementById('cuota-amount');
+  const num = parseInt((document.getElementById('cuota-num')||{}).value)||1;
+  if(amtEl){
+    const v = parseFloat(amtEl.value)||0;
+    if(v>0 && num>0){
+      if(prev==='pago' && m==='total')      amtEl.value = Math.round(v*num*100)/100;
+      else if(prev==='total' && m==='pago') amtEl.value = Math.round((v/num)*100)/100;
+    }
+  }
+  c._cuotaModo = m;
+  const bp=document.getElementById('cuota-modo-pago'), bt=document.getElementById('cuota-modo-total');
+  if(bp&&bt){ bp.style.background=m==='pago'?'var(--accent)':'var(--bg)'; bp.style.color=m==='pago'?'#fff':'var(--text2)';
+              bt.style.background=m==='total'?'var(--accent)':'var(--bg)'; bt.style.color=m==='total'?'#fff':'var(--text2)'; }
+  const lbl=document.getElementById('cuota-amount-label'); if(lbl) lbl.textContent = (m==='total'?'Importe total':'Importe por pago');
+  updateCuotaPreview();
+}
 // Previsualización en vivo del resumen del plan mientras se rellena el formulario
 function updateCuotaPreview(){
   const c = currentClient; if(!c) return;
-  const amount = parseFloat((document.getElementById('cuota-amount')||{}).value)||0;
+  const modo = c._cuotaModo || 'pago';
+  const val = parseFloat((document.getElementById('cuota-amount')||{}).value)||0;
   const num = parseInt((document.getElementById('cuota-num')||{}).value)||1;
   const iv = (c._cuotaIv!=null)?c._cuotaIv:(c._billing?c._billing.interval_months:1);
   const el = document.getElementById('cuota-preview'); if(!el) return;
-  if(!amount){ el.innerHTML = 'Rellena el importe para ver el resumen.'; return; }
-  const total = amount*num;
+  if(!val){ el.innerHTML = 'Rellena el importe para ver el resumen.'; return; }
+  let perPago, total;
+  if(modo==='total'){ total = val; perPago = Math.round((val/num)*100)/100; }
+  else              { perPago = val; total = Math.round(val*num*100)/100; }
   const each = num>1 ? (' · '+billingIntervalLabel(iv)) : '';
-  el.innerHTML = (num>1?('<b>'+num+' pagos de '+amount.toLocaleString('es-ES')+' €</b>'+each):('<b>1 pago de '+amount.toLocaleString('es-ES')+' €</b> (pago único)'))+
-    '<br>Total del plan: <b>'+total.toLocaleString('es-ES')+' €</b>';
+  const fmt = n => n.toLocaleString('es-ES',{maximumFractionDigits:2});
+  el.innerHTML = (num>1?('<b>'+num+' pagos de '+fmt(perPago)+' €</b>'+each):('<b>1 pago de '+fmt(perPago)+' €</b> (pago único)'))+
+    '<br>Total del plan: <b>'+fmt(total)+' €</b>';
 }
 async function guardarCuotaCliente(){
   const c = currentClient; if(!c) return;
-  const amount = parseFloat((document.getElementById('cuota-amount')||{}).value);
+  const modo = c._cuotaModo || 'pago';
+  const inputVal = parseFloat((document.getElementById('cuota-amount')||{}).value);
   const num = parseInt((document.getElementById('cuota-num')||{}).value)||1;
   const iv = (c._cuotaIv!=null)?c._cuotaIv:(c._billing?c._billing.interval_months:1);
   const first = (document.getElementById('cuota-first')||{}).value;
   const link = ((document.getElementById('cuota-link')||{}).value||'').trim();
-  if(!amount || amount<=0){ showToast('Pon un importe válido'); return; }
+  if(!inputVal || inputVal<=0){ showToast('Pon un importe válido'); return; }
   if(!first){ showToast('Pon la fecha del primer cobro'); return; }
+  // En la BD siempre guardamos el importe POR PAGO (amount). Si el entrenador
+  // escribió el total, lo dividimos entre el nº de pagos.
+  const amount = (modo==='total') ? (Math.round((inputVal/num)*100)/100) : inputVal;
   const row = {client_id:c.id, coach_id:coachData.id, amount:amount, num_payments:num, interval_months:iv, first_charge:first, pay_link:link||null, pay_label:'Stripe', currency:'EUR', active:true, updated_at:new Date().toISOString()};
   if(c._billing && Array.isArray(c._billing.paid_numbers)) row.paid_numbers = c._billing.paid_numbers.filter(n=>n<=num);
   try{
@@ -8252,16 +8282,24 @@ function renderPerfil() {
       return `<div onclick="setCuotaIv(${o[0]})" style="flex:1;text-align:center;font-size:11.5px;font-weight:600;padding:9px 4px;border-radius:9px;cursor:pointer;${on?'background:var(--accent);color:#fff':'background:var(--bg);color:var(--text2);border:1.5px solid var(--border)'}">${o[1]}</div>`;
     }).join('');
     const inp = 'border:1.5px solid var(--border);border-radius:9px;padding:10px;background:var(--bg);font-size:14px;color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;outline:none';
+    const cuotaModo = (c._cuotaModo)||'pago';
     cardCuota = `<div style="${cardStyle}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div style="${secTitle}">Cuota del cliente</div>
         ${b?`<button onclick="toggleCuotaEdit(false)" style="height:26px;padding:0 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">Cancelar</button>`:''}
       </div>
+      <div style="margin-bottom:10px">
+        <div style="${lblStyle};margin-bottom:5px">El importe que escribo es…</div>
+        <div style="display:flex;gap:6px">
+          <button type="button" onclick="setCuotaModo('pago')" id="cuota-modo-pago" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:${cuotaModo==='pago'?'var(--accent)':'var(--bg)'};color:${cuotaModo==='pago'?'#fff':'var(--text2)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Por pago</button>
+          <button type="button" onclick="setCuotaModo('total')" id="cuota-modo-total" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:${cuotaModo==='total'?'var(--accent)':'var(--bg)'};color:${cuotaModo==='total'?'#fff':'var(--text2)'};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Total del plan</button>
+        </div>
+      </div>
       <div style="display:flex;gap:10px;margin-bottom:12px">
         <div style="flex:1">
-          <div style="${lblStyle}">Importe por pago</div>
+          <div id="cuota-amount-label" style="${lblStyle}">${cuotaModo==='total'?'Importe total':'Importe por pago'}</div>
           <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;padding:0 10px;background:var(--bg)">
-            <input id="cuota-amount" type="number" inputmode="decimal" step="0.01" value="${b?b.amount:''}" oninput="updateCuotaPreview()" placeholder="120" style="border:none;background:none;font-size:14px;padding:10px 0;width:100%;color:var(--text);outline:none;font-family:inherit">
+            <input id="cuota-amount" type="number" inputmode="decimal" step="0.01" value="${b?(cuotaModo==='total'?(Math.round(b.amount*(b.num_payments||1)*100)/100):b.amount):''}" oninput="updateCuotaPreview()" placeholder="${cuotaModo==='total'?'420':'120'}" style="border:none;background:none;font-size:14px;padding:10px 0;width:100%;color:var(--text);outline:none;font-family:inherit">
             <span style="font-size:13px;color:var(--text3)">€</span>
           </div>
         </div>

@@ -2564,7 +2564,7 @@ function lastSessionLabel(lastSessionDate){
 // Construye un objeto cliente con la forma que espera el dashboard.
 // Mezcla datos reales (clients) con una plantilla neutra para los campos
 // que todavía no están conectados.
-function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition, training, sessionsRows){
+function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metricsRows, photosRows, nutrition, training, sessionsRows, unseenCheckin){
   const pal = CLIENT_PALETTE[index % CLIENT_PALETTE.length];
   const status = statusFromLastSession(lastSessionDate);
   return {
@@ -2584,6 +2584,8 @@ function buildClientObject(row, index, lastSessionDate, questRow, mesoRow, metri
     // Guardamos también los campos crudos por si hacen falta luego
     _raw: row,
     _lastSessionDate: lastSessionDate || null,
+    // ¿Hay un check-in enviado que Pol aún no ha visto?
+    _unseenCheckin: !!unseenCheckin,
     // Cuestionario inicial real (fila de client_questionnaire) o null si no existe
     _questionnaire: questRow || null,
     // Mesociclo activo real (fila de mesocycles) o null
@@ -2676,6 +2678,21 @@ async function loadRealClients(){
         // si hubiera varios activos por error, nos quedamos con el primero
         if (!mesoByClient[m.client_id]) mesoByClient[m.client_id] = m;
       });
+    }
+
+    // 4b. Check-ins sin ver de cada cliente (para el aviso en la lista)
+    let unseenCheckinByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      try{
+        const { data: cks } = await sb
+          .from('weekly_checkins')
+          .select('client_id')
+          .in('client_id', ids)
+          .eq('seen_by_coach', false)
+          .not('submitted_at','is',null);
+        (cks || []).forEach(k => { unseenCheckinByClient[k.client_id] = true; });
+      }catch(e){ console.warn('check-ins sin ver:', e); }
     }
 
     // 5. Métricas diarias de cada cliente (tabla daily_metrics) — para la
@@ -2904,7 +2921,7 @@ async function loadRealClients(){
       const c = buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
                         mesoByClient[row.id], metricsByClient[row.id],
                         photosByClient[row.id], nutritionByClient[row.id],
-                        trainingByClient[row.id], sessionsByClient[row.id]);
+                        trainingByClient[row.id], sessionsByClient[row.id], unseenCheckinByClient[row.id]);
       // Inyectar info de planes programados
       c._scheduledTrainingDate = scheduledTrainByClient[row.id] || null;
       c._scheduledNutritionDate = scheduledNutriByClient[row.id] || null;
@@ -4028,11 +4045,12 @@ function renderClientList() {
     const isActive = currentClient && currentClient.id === c.id;
     const lastLbl = lastSessionLabel(c._lastSessionDate);
     const lastColor = dot==='green' ? 'var(--green)' : dot==='amber' ? 'var(--amber)' : 'var(--text3)';
+    const ckDot = c._unseenCheckin ? '<div title="Check-in nuevo" style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;margin-left:6px"></div>' : '';
     return `<div class="client-item${isActive?' active':''}" id="ci-${c.id}" onclick="selectClient('${c.id}')">
       <div class="cdot ${dotColors[dot]}"></div>
       <div class="c-av">${c.initials}</div>
       <div style="flex:1;min-width:0">
-        <div class="client-name">${c.name}</div>
+        <div class="client-name" style="display:flex;align-items:center">${c.name}${ckDot}</div>
         <div style="font-size:10.5px;color:${lastColor};font-weight:600;margin-top:1px">${lastLbl}</div>
       </div>
       <div class="client-tag">${c.stats.sessions}/${c.stats.sessionGoal}</div>
@@ -4136,7 +4154,7 @@ function selectClient(id) {
   renderMiniSidebar();
   // El tab por defecto al seleccionar cliente es Resumen → cargar ajustes
   // (retrasos/reorganización) y re-renderizar cuando lleguen.
-  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); renderClientPanel(); }, 0);
+  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); await cargarCheckinsCliente(); renderClientPanel(); }, 0);
 }
 
 
@@ -4325,6 +4343,86 @@ async function cargarSeriesCliente(){
     });
   }catch(e){ console.warn('cargar notas ejercicio:', e); c._exerciseNotes = {}; }
   renderClientPanel();
+}
+
+// Carga los check-ins semanales del cliente y marca como vistos los nuevos
+async function cargarCheckinsCliente(){
+  const c = currentClient;
+  if (!c || c._checkins != null) return;
+  c._checkins = [];
+  try{
+    const { data, error } = await sb
+      .from('weekly_checkins')
+      .select('*')
+      .eq('client_id', c.id)
+      .not('submitted_at','is',null)
+      .order('week_start',{ascending:false})
+      .limit(12);
+    if (error){ console.warn('cargarCheckinsCliente:', error); return; }
+    c._checkins = data || [];
+    // Marcar como vistos los que el cliente envió y Pol aún no ha visto
+    const unseen = c._checkins.filter(k => k.seen_by_coach === false);
+    if (unseen.length){
+      unseen.forEach(k => { k.seen_by_coach = true; });
+      c._unseenCheckin = false;
+      if (typeof renderClientList === 'function') renderClientList();
+      sb.from('weekly_checkins').update({seen_by_coach:true}).in('id', unseen.map(k=>k.id)).then(()=>{}, ()=>{});
+    }
+  }catch(e){ console.warn('cargarCheckinsCliente exception:', e); }
+  renderClientPanel();
+}
+
+// Tarjeta con el último check-in del cliente (+ historial breve)
+function renderCheckinCard(c){
+  const list = (c && c._checkins) || [];
+  const planLabel = {medias:'A medias', casi:'Casi todo', todo:'Todo'};
+  const planColor = {medias:'var(--amber)', casi:'var(--green)', todo:'var(--green)'};
+  const fmtWk = (ws)=>{ try{ return new Date(ws+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){ return ws; } };
+  if (!list.length){
+    return `<div style="margin-bottom:18px">
+      <div class="section-title" style="margin-bottom:8px">Check-in semanal</div>
+      <div class="panel-card">
+        <div style="padding:18px 14px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6">
+          El cliente aún no ha enviado ningún check-in.<br>Aparecen automáticamente cada fin de semana.
+        </div>
+      </div>
+    </div>`;
+  }
+  const latest = list[0];
+  const a = latest.answers || {};
+  const chip = (label,val)=>`<div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">${val!=null?val:'—'}<span style="font-size:10px;color:var(--text3);font-weight:500">/5</span></div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-top:2px">${label}</div>
+    </div>`;
+  const planTag = a.plan?`<span style="font-size:11px;font-weight:700;color:${planColor[a.plan]||'var(--text2)'};background:${(planColor[a.plan]||'var(--text2)')}18;padding:3px 10px;border-radius:6px">Plan: ${planLabel[a.plan]||a.plan}</span>`:'';
+  const notesHtml = (latest.notes&&latest.notes.trim())?`<div style="background:var(--bg2);border-radius:10px;padding:10px 12px;margin-top:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:4px">💬 Nota del cliente</div>
+      <div style="font-size:12.5px;color:var(--text);line-height:1.5;white-space:pre-wrap">${escHtml(latest.notes)}</div>
+    </div>`:'';
+  // Historial breve (semanas anteriores)
+  const hist = list.slice(1,5);
+  const histHtml = hist.length?`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Semanas anteriores</div>
+      ${hist.map(k=>{const ka=k.answers||{};return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text2)">
+        <span style="width:54px;color:var(--text3)">${fmtWk(k.week_start)}</span>
+        <span>😴 ${ka.sleep!=null?ka.sleep:'—'}</span>
+        <span>⚡ ${ka.energy!=null?ka.energy:'—'}</span>
+        <span>🍽️ ${ka.hunger!=null?ka.hunger:'—'}</span>
+        <span style="margin-left:auto;color:${planColor[ka.plan]||'var(--text3)'}">${planLabel[ka.plan]||'—'}</span>
+      </div>`;}).join('')}
+    </div>`:'';
+  return `<div style="margin-bottom:18px">
+    <div class="section-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px">Check-in semanal
+      <span style="font-size:10.5px;font-weight:600;color:var(--text3)">· ${fmtWk(latest.week_start)}</span></div>
+    <div class="panel-card">
+      <div style="display:flex;gap:7px;margin-bottom:10px">
+        ${chip('Sueño',a.sleep)}${chip('Energía',a.energy)}${chip('Hambre',a.hunger)}
+      </div>
+      ${planTag}
+      ${notesHtml}
+      ${histHtml}
+    </div>
+  </div>`;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -5038,6 +5136,8 @@ function renderResumen() {
         </div>
       </div>
     </div>
+
+    ${renderCheckinCard(c)}
 
     <!-- ROW: diet + cheats -->
     <div class="two-col">

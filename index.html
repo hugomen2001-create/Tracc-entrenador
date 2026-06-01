@@ -5511,23 +5511,37 @@ async function refreshCheckinDots(){
 }
 
 // Tarjeta con el último check-in del cliente (+ historial breve)
-function renderCheckinCard(c){
+function renderCheckinCard(c, mondayRef){
   const list = (c && c._checkins) || [];
   const planLabel = {medias:'A medias', casi:'Casi todo', todo:'Todo'};
   const planColor = {medias:'var(--amber)', casi:'var(--green)', todo:'var(--green)'};
   const fmtWk = (ws)=>{ try{ return new Date(ws+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){ return ws; } };
-  if (!list.length){
+
+  // El check-in que corresponde a la semana que se está viendo.
+  // Se busca por week_start = lunes de la semana visible. Si no se pasa
+  // mondayRef (compat), cae al más reciente.
+  let latest = null;
+  if (mondayRef){
+    const y = mondayRef.getFullYear();
+    const m = String(mondayRef.getMonth()+1).padStart(2,'0');
+    const d = String(mondayRef.getDate()).padStart(2,'0');
+    const lunesStr = `${y}-${m}-${d}`;
+    latest = list.find(k => String(k.week_start).slice(0,10) === lunesStr) || null;
+  } else {
+    latest = list[0] || null;
+  }
+
+  if (!latest){
     return `<div style="margin-bottom:18px">
       <div class="section-title" style="margin-bottom:8px">Check-in semanal</div>
       <div class="panel-card">
         <div style="padding:22px 16px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6">
           <div style="font-size:24px;margin-bottom:8px;opacity:.5">📋</div>
-          El cliente aún no ha enviado ningún check-in.<br>Aparecen automáticamente cada fin de semana.
+          ${list.length ? 'El cliente no envió check-in esta semana.' : 'El cliente aún no ha enviado ningún check-in.'}<br>Se envían cada domingo desde la app del cliente.
         </div>
       </div>
     </div>`;
   }
-  const latest = list[0];
   const a = latest.answers || {};
   const metric = (label,val,color,emoji)=>{
     let bars='';
@@ -5548,8 +5562,9 @@ function renderCheckinCard(c){
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px">💬 Nota del cliente</div>
       <div style="font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap">${escHtml(latest.notes)}</div>
     </div>`:'';
-  // Historial breve (semanas anteriores)
-  const hist = list.slice(1,5);
+  // Historial breve: check-ins anteriores al que se está mostrando
+  const idxLatest = list.indexOf(latest);
+  const hist = list.slice(idxLatest+1, idxLatest+5);
   const histHtml = hist.length?`<div style="margin-top:13px;border-top:1px solid var(--border);padding-top:11px">
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px">Semanas anteriores</div>
       ${hist.map(k=>{const ka=k.answers||{};return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12px;color:var(--text2)">
@@ -5796,12 +5811,15 @@ function cheatsSemana(c, mondayDate){
    { fecha, tipo, ejercicios: [{nombre, nSeries, repsRange, pesoMax, tendencia}] }
    o null si no hay. tendencia: 'up'|'down'|'same' comparando con la sesión
    anterior del mismo tipo. */
-function ultimoEntrenoReal(c){
+function ultimoEntrenoReal(c, hastaFecha){
   const ses = (c && c._sessions) || [];
   const sets = (c && c._workoutSets) || [];
-  // Sesiones completadas con fecha, más reciente primero
-  const comp = ses.filter(s => s && s.completed && s.session_date)
+  const esOffT = t => { const x=String(t||'').toUpperCase(); return !x || x==='OFF' || x==='DESCANSO' || x==='DSC'; };
+  // Sesiones completadas (no descanso) con fecha, más reciente primero.
+  // Si se pasa hastaFecha (YYYY-MM-DD), solo cuenta entrenos hasta esa fecha.
+  let comp = ses.filter(s => s && s.completed && s.session_date && !esOffT(s.session_type))
                   .sort((a,b)=> String(b.session_date).localeCompare(String(a.session_date)));
+  if (hastaFecha) comp = comp.filter(s => String(s.session_date).slice(0,10) <= hastaFecha);
   if (!comp.length) return null;
   const last = comp[0];
   const fecha = String(last.session_date).slice(0,10);
@@ -6101,7 +6119,11 @@ function renderResumen() {
   }
 
   // ── BLOQUE D: ÚLTIMO ENTRENO REAL (sesiones + series de Supabase) ────────
-  const ultEntreno = ultimoEntrenoReal(c);
+  // Último entreno: en semana actual, el más reciente; en semanas pasadas,
+  // el último realizado hasta el final de esa semana (domingo visible).
+  const _domingoRef = new Date(mondayRef); _domingoRef.setDate(mondayRef.getDate()+6);
+  const _hastaStr = weekOffset===0 ? null : `${_domingoRef.getFullYear()}-${String(_domingoRef.getMonth()+1).padStart(2,'0')}-${String(_domingoRef.getDate()).padStart(2,'0')}`;
+  const ultEntreno = ultimoEntrenoReal(c, _hastaStr);
   const SPLIT_COL = (t)=> (typeof SPLIT_COLORS!=='undefined' && SPLIT_COLORS[t]) || '#16a34a';
   function trendIconD(t){
     if(t==='up')   return '<span style="font-size:11px;color:var(--green);font-weight:700">↑</span>';
@@ -6395,31 +6417,13 @@ function renderResumen() {
       </div>
       <div>
         <div class="section-title" style="margin-bottom:8px">Último entreno</div>
-        <div class="panel-card" style="${weekOffset===0?'':'padding:0;overflow:hidden'}">
-          ${weekOffset===0 ? todayWorkoutHtml : (()=>{
-            if (!planCiclo) return '<div style="padding:14px;font-size:12px;color:var(--text3)">Sin datos</div>';
-            const DIAS_W = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-            return planCiclo.map((tipoPlan,i)=>{
-              const isOff = esDescanso(tipoPlan);
-              const type = isOff ? 'OFF' : tipoPlan;
-              const color=SPLIT_COLORS[type]||'#a3a39e';
-              const real = realWeek[i];
-              const done = isOff ? true : !!(real && real.completed);
-              return `<div style="border-bottom:1px solid var(--border)">
-                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--bg2);user-select:none">
-                  <span style="font-size:11px;font-weight:600;color:var(--text2);width:80px">${DIAS_W[i]}</span>
-                  ${isOff?'<span style="font-size:10px;font-weight:600;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:1px 8px;border-radius:5px">OFF</span>'
-                         :`<span style="font-size:11px;font-weight:700;color:${color};background:${color}18;padding:2px 8px;border-radius:5px">${type}</span>`}
-                  ${isOff?'':(`<span style="margin-left:auto;font-size:11px;font-weight:600;color:${done?'var(--green)':'var(--text3)'}">` + (done?'✓ Completado':'No completado') + '</span>')}
-                </div>
-              </div>`;
-            }).join('');
-          })()}
+        <div class="panel-card">
+          ${todayWorkoutHtml}
         </div>
       </div>
     </div>
 
-    ${renderCheckinCard(c)}
+    ${renderCheckinCard(c, mondayRef)}
 
     <!-- ROW: diet + cheats -->
     <div class="two-col">

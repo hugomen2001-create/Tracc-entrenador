@@ -4770,6 +4770,7 @@ function renderClientPanel() {
 function switchTab(tab) {
   currentTab = tab;
   editandoObjetivos = false;  // salir de modo edición al cambiar de tab
+  if (typeof _perfilEdit !== 'undefined') _perfilEdit = false;
   editandoEjercicioId = null;
   editandoComida = null;
   comidaBorrador = null;
@@ -8928,120 +8929,66 @@ function renderPerfil() {
   const valStyle  = 'font-size:14px;font-weight:600;color:var(--text);line-height:1.3';
   const secTitle  = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
 
-  // Botón "Editar" — en el Bloque 3A es solo visual (no guarda todavía)
-  const editBtn = `<button onclick="showToast('La edición se activará próximamente')" style="height:26px;padding:0 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:4px">
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Editar</button>`;
+  // Estilo de input para el modo edición
+  const inpPf = 'border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;background:var(--bg);font-size:14px;color:var(--text);width:100%;box-sizing:border-box;font-family:inherit;outline:none';
 
-  // ── TARJETA: Datos básicos ──
+  // ── TARJETA: Datos básicos (ficha de identidad) ──
   const edadTxt = c.edad ? ` <span style="font-size:11px;color:var(--text3)">(${c.edad} años)</span>` : '';
   const meses = mesesDesde(raw.member_since);
-  const mesesTxt = meses !== null ? ` <span style="font-size:11px;color:var(--text3)">(${meses} ${meses===1?'mes':'meses'})</span>` : '';  const generoMap = { male:'Hombre', female:'Mujer', hombre:'Hombre', mujer:'Mujer', otro:'Otro', other:'Otro' };
+  const mesesTxt = meses !== null ? ` <span style="font-size:11px;color:var(--text3)">(${meses} ${meses===1?'mes':'meses'})</span>` : '';
+  const generoMap = { male:'Hombre', female:'Mujer', hombre:'Hombre', mujer:'Mujer', otro:'Otro', other:'Otro' };
   const genero = raw.gender ? (generoMap[String(raw.gender).toLowerCase()] || escHtml(raw.gender)) : '<span style="color:var(--text3);font-weight:400">Sin datos</span>';
+  const esBajaTop = raw.active === false;
+  const pesoIniMeso = (function(){ const pi = pesoInicialMeso(c._metrics, c._mesocycle); return pi != null ? pi : '—'; })();
 
-  const cardDatos = `<div style="${cardStyle}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="${secTitle}">Datos básicos</div>${editBtn}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div style="${datoStyle}"><div style="${lblStyle}">Nombre</div><div style="${valStyle}">${escHtml(c.name)}</div></div>
-      <div style="${datoStyle}"><div style="${lblStyle}">Fecha de nacimiento</div><div style="${valStyle}">${fmtFecha(raw.birth_date)}${edadTxt}</div></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-      <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Altura</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${c.altura||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> cm</span></div></div>
-      <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso inicial<br><span style="font-size:8px;color:var(--text3)">del meso</span></div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${
-        (function(){ const pi = pesoInicialMeso(c._metrics, c._mesocycle); return pi != null ? pi : '—'; })()
-      }<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
-      <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso actual</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--green)">${c.peso||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      <div style="${datoStyle}"><div style="${lblStyle}">Género</div><div style="${valStyle}">${genero}</div></div>
-      <div style="${datoStyle}"><div style="${lblStyle}">Cliente desde</div><div style="${valStyle}">${fmtFecha(raw.member_since)}${mesesTxt}</div></div>
-    </div>
-  </div>`;
-
-  // ── TARJETA: Objetivo y experiencia (cuestionario) ──
-  let cardObjetivo;
-  if (!q) {
-    cardObjetivo = `<div style="${cardStyle}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="${secTitle}">Objetivo y experiencia</div>
-      </div>
-      <div style="font-size:12px;color:var(--text3);line-height:1.6;padding:8px 0">
-        El cliente aún no ha completado el cuestionario inicial en MyTracc.
-      </div>
-    </div>`;
-  } else {
-    const firstTime = q.first_time_coach === true ? 'Sí, primera vez'
-                    : q.first_time_coach === false ? 'No, ya había trabajado con uno'
-                    : null;
-    cardObjetivo = `<div style="${cardStyle}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="${secTitle}">Objetivo y experiencia</div>
-        <span style="font-size:10px;color:var(--text3)">Cuestionario inicial</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="${datoStyle}"><div style="${lblStyle}">Objetivo principal</div><div style="margin-top:6px">${
-          c.goal && c.goal!=='—' ? ansChip(c.goal) : '<span style="color:var(--text3);font-size:12px">Sin datos</span>'
-        }</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Primera vez con entrenador</div><div style="margin-top:6px">${
-          firstTime ? ansChip(firstTime, true) : '<span style="color:var(--text3);font-size:12px">Sin datos</span>'
-        }</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Tipo de split preferido</div><div style="margin-top:6px">${
-          q.split_preference ? ansChip('Split '+q.split_preference, true) : '<span style="color:var(--text3);font-size:12px">Sin datos</span>'
-        }</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Experiencia previa</div><div style="margin-top:4px;font-size:13px;color:var(--text2)">${qVal(q.experience_description)}</div></div>
-      </div>
-    </div>`;
-  }
-
-  // ── TARJETA: Salud y alimentación (cuestionario) ──
-  let cardSalud;
-  if (!q) {
-    cardSalud = '';
-  } else {
-    cardSalud = `<div style="${cardStyle}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="${secTitle}">Salud y alimentación</div>
-        <span style="font-size:10px;color:var(--text3)">Cuestionario inicial</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="${datoStyle}"><div style="${lblStyle}">Alergias o intolerancias</div><div style="margin-top:4px;font-size:13px;color:var(--text2)">${qVal(q.allergies)}</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Enfermedades relevantes</div><div style="margin-top:4px;font-size:13px;color:var(--text2)">${qVal(q.diseases)}</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Alimentos que no le gustan</div><div style="margin-top:4px;font-size:13px;color:var(--text2)">${qVal(q.disliked_foods)}</div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="${datoStyle}"><div style="${lblStyle}">Comidas al día</div><div style="font-family:'DM Serif Display',serif;font-size:26px;color:var(--text)">${q.meals_per_day || '—'}</div></div>
-          <div style="${datoStyle}"><div style="${lblStyle}">Suplementación</div><div style="margin-top:4px;font-size:12.5px;color:var(--text2)">${qVal(q.supplements)}</div></div>
+  let cardDatos;
+  if (_perfilEdit){
+    const gOpts = [['','Sin especificar'],['Hombre','Hombre'],['Mujer','Mujer'],['Otro','Otro']];
+    const gActual = raw.gender ? (generoMap[String(raw.gender).toLowerCase()] || raw.gender) : '';
+    cardDatos = `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="${secTitle}">Editar datos básicos</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="guardarDatosBasicos()" style="height:30px;padding:0 14px;border-radius:9px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Guardar</button>
+          <button onclick="togglePerfilEdit(false)" style="height:30px;padding:0 13px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
         </div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div style="${lblStyle}">Nombre</div><input id="pf-name" value="${escHtml(c.name||'')}" style="${inpPf}"></div>
+        <div><div style="${lblStyle}">Fecha de nacimiento</div><input id="pf-birth" type="date" value="${raw.birth_date?String(raw.birth_date).slice(0,10):''}" style="${inpPf}"></div>
+        <div><div style="${lblStyle}">Altura (cm)</div><input id="pf-height" type="number" min="0" value="${c.altura||''}" style="${inpPf}"></div>
+        <div><div style="${lblStyle}">Género</div><select id="pf-gender" style="${inpPf}">${gOpts.map(o=>`<option value="${o[0]}" ${(o[1]===gActual)||(o[0]===''&&!gActual)?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      </div>
+    </div>`;
+  } else {
+    cardDatos = `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;gap:13px;margin-bottom:15px">
+        <div style="width:50px;height:50px;border-radius:50%;background:${c.color||'#1a1a18'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600;flex-shrink:0">${escHtml(clientInitials(c.name))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'DM Serif Display',serif;font-size:22px;line-height:1.1">${escHtml(c.name)}</div>
+          <div style="display:flex;gap:7px;margin-top:5px;flex-wrap:wrap">
+            ${c.goal && c.goal!=='—' ? `<span style="font-size:11px;font-weight:600;color:var(--green);background:var(--gl);border:1.5px solid rgba(22,163,74,.2);padding:3px 9px;border-radius:7px">${escHtml(c.goal)}</span>` : ''}
+            <span style="font-size:11px;font-weight:600;${esBajaTop?'color:#dc2626;background:#fee2e2':'color:var(--green);background:rgba(22,163,74,.12)'};padding:3px 9px;border-radius:7px">${esBajaTop?'De baja':'Activo'}</span>
+          </div>
+        </div>
+        <button onclick="togglePerfilEdit(true)" style="height:30px;padding:0 13px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Editar</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:9px">
+        <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Altura</div><div style="font-family:'DM Serif Display',serif;font-size:23px;color:var(--text)">${c.altura||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> cm</span></div></div>
+        <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso inicial <span style="font-size:8px;color:var(--text3)">(meso)</span></div><div style="font-family:'DM Serif Display',serif;font-size:23px;color:var(--text)">${pesoIniMeso}<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
+        <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Peso actual</div><div style="font-family:'DM Serif Display',serif;font-size:23px;color:var(--green)">${c.peso||'—'}<span style="font-size:13px;font-weight:400;color:var(--text3)"> kg</span></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+        <div style="${datoStyle}"><div style="${lblStyle}">Fecha de nacimiento</div><div style="${valStyle}">${fmtFecha(raw.birth_date)}${edadTxt}</div></div>
+        <div style="${datoStyle}"><div style="${lblStyle}">Género</div><div style="${valStyle}">${genero}</div></div>
+        <div style="${datoStyle}"><div style="${lblStyle}">Cliente desde</div><div style="${valStyle}">${fmtFecha(raw.member_since)}${mesesTxt}</div></div>
+      </div>
     </div>`;
   }
 
-  // ── TARJETA: Entreno y descanso (cuestionario) ──
-  let cardEntreno;
-  if (!q) {
-    cardEntreno = '';
-  } else {
-    cardEntreno = `<div style="${cardStyle}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="${secTitle}">Entreno y descanso</div>
-        <span style="font-size:10px;color:var(--text3)">Cuestionario inicial</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="${datoStyle}"><div style="${lblStyle}">Entrenamiento previo</div><div style="margin-top:4px;font-size:13px;color:var(--text2);line-height:1.5">${qVal(q.previous_training)}</div></div>
-        <div style="${datoStyle}"><div style="${lblStyle}">Días disponibles por semana</div><div style="margin-top:6px">${
-          q.available_days_per_week ? ansChip(q.available_days_per_week+' días') : '<span style="color:var(--text3);font-size:12px">Sin datos</span>'
-        }</div></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Horas de sueño</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${
-            q.sleep_hours != null ? q.sleep_hours : '—'
-          }<span style="font-size:13px;font-weight:400;color:var(--text3)"> h</span></div></div>
-          <div style="${datoStyle};text-align:center"><div style="${lblStyle}">Calidad del sueño</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${
-            q.sleep_quality != null ? q.sleep_quality : '—'
-          }<span style="font-size:13px;font-weight:400;color:var(--text3)">/10</span></div></div>
-        </div>
-      </div>
-    </div>`;
-  }
+  // ── TARJETA: Cuestionario (compacta) + botón "Ver cuestionario completo" ──
+  const cardCuestionario = cardCuestionarioCompacto(c);
 
   // ── TARJETA: Cuenta ──
   const esBaja = raw.active === false;
@@ -9052,10 +8999,10 @@ function renderPerfil() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
       <div style="${datoStyle}"><div style="${lblStyle}">Email</div><div style="${valStyle};font-size:13px">${
-        raw.email ? escHtml(raw.email) : '<span style="color:var(--text3);font-weight:400">Sin datos</span>'
+        raw.email ? `<a href="mailto:${escHtml(raw.email)}" style="color:var(--green);text-decoration:none">${escHtml(raw.email)}</a>` : '<span style="color:var(--text3);font-weight:400">Sin datos</span>'
       }</div></div>
       <div style="${datoStyle}"><div style="${lblStyle}">Teléfono</div><div style="${valStyle};font-size:13px">${
-        raw.phone ? escHtml(raw.phone) : '<span style="color:var(--text3);font-weight:400">Sin datos</span>'
+        raw.phone ? `<a href="tel:${escHtml(String(raw.phone).replace(/\s+/g,''))}" style="color:var(--green);text-decoration:none">${escHtml(raw.phone)}</a>` : '<span style="color:var(--text3);font-weight:400">Sin datos</span>'
       }</div></div>
       <div style="${datoStyle}"><div style="${lblStyle}">Revisiones cada</div><div style="margin-top:6px">${
         ansChip(c.revisionCadaSemanas + (c.revisionCadaSemanas===1?' semana':' semanas'), true)
@@ -9070,40 +9017,14 @@ function renderPerfil() {
     </div>
   </div>`;
 
-  // ── Ensamblado: 3 columnas equilibradas + filas inferiores ──
-  let gridHtml;
-  if (q) {
-    // Con cuestionario: reparto equilibrado de las 3 columnas
-    //  Col 1: Datos básicos (grande) + Entreno y descanso (media)
-    //  Col 2: Salud y alimentación (la más alta) + Evolución del peso (compacta)
-    //  Col 3: Objetivo y experiencia (media) + Mesociclo (compacta)
-    gridHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start">
-      <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardDatos}
-        ${cardEntreno}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardSalud}
-        ${cardEvolucionPeso(c)}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardObjetivo}
-        ${cardMesociclo(c)}
-      </div>
+  // ── Ensamblado: ficha de identidad a lo ancho + fila de tarjetas ──
+  const gridHtml = `
+    ${cardDatos}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;align-items:start">
+      ${cardCuestionario}
+      ${cardEvolucionPeso(c)}
+      ${cardMesociclo(c)}
     </div>`;
-  } else {
-    // Sin cuestionario: Datos básicos a la izquierda, aviso + pendientes a la derecha
-    gridHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
-      <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardDatos}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        ${cardObjetivo}
-        ${cardEvolucionPeso(c)}
-        ${cardMesociclo(c)}
-      </div>
-    </div>`;
-  }
   // ── TARJETA: Cuota / Pagos (Fase 1) ──
   const b = c._billing;
   const editing = (!b) || c._cuotaEdit;
@@ -9210,6 +9131,125 @@ function renderPerfil() {
     ${cardCuenta}
   </div>`;
 }
+
+// ── PERFIL · Edición de datos básicos y cuestionario completo ──
+let _perfilEdit = false;
+
+function togglePerfilEdit(on){ _perfilEdit = !!on; renderClientPanel(); }
+
+async function guardarDatosBasicos(){
+  const c = currentClient; if(!c) return;
+  const raw = c._raw || (c._raw = {});
+  const g = id => { const el = document.getElementById(id); return el ? el.value : null; };
+  const nm = (g('pf-name')||'').trim();
+  if(!nm){ alert('El nombre no puede estar vacío.'); return; }
+  const birth = (g('pf-birth')||'').trim() || null;
+  const hRaw = (g('pf-height')||'').trim();
+  let h = null;
+  if(hRaw !== ''){ h = Number(hRaw); if(isNaN(h) || h < 0){ alert('La altura debe ser un número válido.'); return; } h = Math.round(h); }
+  const gender = (g('pf-gender')||'').trim() || null;
+  const upd = { name: nm, birth_date: birth, height_cm: h, gender: gender };
+  const { error } = await sb.from('clients').update(upd).eq('id', c.id);
+  if(error){ console.error('guardarDatosBasicos:', error); showToast('✕ No se pudo guardar'); return; }
+  // Reflejar en memoria
+  raw.name = nm; raw.birth_date = birth; raw.height_cm = h; raw.gender = gender;
+  c.name = nm; c.initials = clientInitials(nm); c.altura = h || 0; c.edad = ageFromBirthdate(birth);
+  _perfilEdit = false;
+  renderClientPanel();
+  showToast('✓ Datos guardados');
+}
+
+// Tarjeta compacta del cuestionario + botón "Ver cuestionario completo"
+function cardCuestionarioCompacto(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
+  const lblStyle  = 'font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px';
+  const q = c._questionnaire;
+  const hdrIcon = `<div style="width:30px;height:30px;border-radius:9px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📋</div>`;
+  if(!q){
+    return `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">${hdrIcon}<div style="font-size:15px;font-weight:600">Cuestionario inicial</div></div>
+      <div style="font-size:12.5px;color:var(--text3);line-height:1.6">El cliente aún no ha completado el cuestionario inicial en MyTracc.</div>
+    </div>`;
+  }
+  const tile = (lbl, valHtml) => `<div style="flex:1;min-width:130px;background:var(--bg);border-radius:11px;padding:9px 12px"><div style="${lblStyle}">${lbl}</div>${valHtml}</div>`;
+  const chip = (txt) => `<span style="font-size:12px;font-weight:600;color:var(--green);background:var(--gl);border:1.5px solid rgba(22,163,74,.2);padding:3px 10px;border-radius:7px">${escHtml(txt)}</span>`;
+  const objetivoHtml = (c.goal && c.goal!=='—') ? chip(c.goal) : '<span style="color:var(--text3);font-size:12px">Sin datos</span>';
+  const diasHtml = q.available_days_per_week ? `<span style="font-size:13.5px;font-weight:600">${escHtml(String(q.available_days_per_week))} días</span>` : '<span style="color:var(--text3);font-size:12px">Sin datos</span>';
+  const alergiasHtml = `<div style="font-size:13px;color:var(--text2)">${qVal(q.allergies)}</div>`;
+  return `<div style="${cardStyle}">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px">
+      ${hdrIcon}
+      <div style="font-size:15px;font-weight:600">Cuestionario inicial</div>
+      <button onclick="openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border:1.5px solid var(--green);border-radius:8px;background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">👁 Ver cuestionario completo</button>
+    </div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap">
+      ${tile('Objetivo', '<div style="margin-top:2px">'+objetivoHtml+'</div>')}
+      ${tile('Días / semana', '<div style="margin-top:4px">'+diasHtml+'</div>')}
+      ${tile('Alergias', '<div style="margin-top:2px">'+alergiasHtml+'</div>')}
+    </div>
+  </div>`;
+}
+
+// Modal con TODAS las preguntas del cuestionario
+function openCuestionarioModal(){
+  const c = currentClient; const q = c && c._questionnaire;
+  if(!q){ showToast('Este cliente aún no ha completado el cuestionario'); return; }
+  let ov = document.getElementById('cuest-overlay');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'cuest-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:260;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.onclick = (e)=>{ if(e.target===ov) cerrarCuestionarioModal(); };
+    document.body.appendChild(ov);
+  }
+  const firstTime = q.first_time_coach === true ? 'Sí, primera vez'
+                  : q.first_time_coach === false ? 'No, ya había trabajado con uno'
+                  : 'Sin datos';
+  const lbl = 'font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px';
+  const sec = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin:16px 0 8px';
+  const row = (l, v) => `<div style="background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-size:13.5px;color:var(--text);line-height:1.5">${v}</div></div>`;
+  const big = (l, v, u) => `<div style="flex:1;background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${v}<span style="font-size:12px;color:var(--text3)">${u||''}</span></div></div>`;
+  ov.innerHTML = `<div style="width:100%;max-width:580px;background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:20px 22px">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:4px">
+      <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📋</div>
+      <div>
+        <div style="font-family:'DM Serif Display',serif;font-size:19px;line-height:1.1;color:var(--text)">Cuestionario inicial</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${escHtml(c.name)} · completado en MyTracc</div>
+      </div>
+      <button onclick="cerrarCuestionarioModal()" style="margin-left:auto;width:30px;height:30px;border:none;background:var(--bg);border-radius:8px;color:var(--text2);cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+    </div>
+
+    <div style="${sec}">Objetivo y experiencia</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${row('Objetivo principal', (c.goal && c.goal!=='—') ? escHtml(c.goal) : '<span style="color:var(--text3)">Sin datos</span>')}
+      ${row('Primera vez con entrenador', firstTime)}
+      ${row('Split preferido', q.split_preference ? 'Split '+escHtml(String(q.split_preference)) : '<span style="color:var(--text3)">Sin datos</span>')}
+      ${row('Experiencia previa', qVal(q.experience_description))}
+    </div>
+
+    <div style="${sec}">Salud y alimentación</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${row('Alergias o intolerancias', qVal(q.allergies))}
+      ${row('Enfermedades relevantes', qVal(q.diseases))}
+      ${row('Alimentos que no le gustan', qVal(q.disliked_foods))}
+      <div style="display:flex;gap:8px">
+        ${big('Comidas al día', q.meals_per_day || '—', '')}
+        ${row('Suplementación', qVal(q.supplements))}
+      </div>
+    </div>
+
+    <div style="${sec}">Entreno y descanso</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${row('Entrenamiento previo', qVal(q.previous_training))}
+      ${row('Días disponibles por semana', q.available_days_per_week ? escHtml(String(q.available_days_per_week))+' días' : '<span style="color:var(--text3)">Sin datos</span>')}
+      <div style="display:flex;gap:8px">
+        ${big('Horas de sueño', q.sleep_hours != null ? q.sleep_hours : '—', ' h')}
+        ${big('Calidad del sueño', q.sleep_quality != null ? q.sleep_quality : '—', '/10')}
+      </div>
+    </div>
+  </div>`;
+  ov.style.display = 'flex';
+}
+function cerrarCuestionarioModal(){ const ov = document.getElementById('cuest-overlay'); if(ov) ov.remove(); }
 
 
 // ── QUESTIONNAIRE ────────────────────────────────────────────────────────
@@ -14166,7 +14206,7 @@ function scheduleLiveRefreshCoach(){ clearTimeout(_lrTC); _lrTC=setTimeout(liveR
 async function liveRefreshCoach(){
   if(!coachData) return;
   // No pisar ediciones en curso: si está en "Editar plan", solo refresca datos+sidebar
-  const editing = (typeof currentTab!=='undefined' && currentTab==='editar');
+  const editing = (typeof currentTab!=='undefined' && currentTab==='editar') || (typeof _perfilEdit!=='undefined' && _perfilEdit);
   const sel = currentClient ? currentClient.id : null;
   try{ await loadRealClients(); }catch(e){ console.warn('liveRefreshCoach:',e); return; }
   if(sel){ const still=CLIENTS.find(c=>String(c.id)===String(sel)); if(still) currentClient=still; }
@@ -14194,7 +14234,8 @@ function _traccBusy(){
   if(typeof editandoBorradorPlan!=='undefined'&&editandoBorradorPlan) return true;
   if(typeof editandoObjetivos!=='undefined'&&editandoObjetivos) return true;
   if(typeof editandoEjercicioId!=='undefined'&&editandoEjercicioId) return true;
-  for(const id of ['cita-overlay','cita-det-ov','cmp-overlay']){
+  if(typeof _perfilEdit!=='undefined'&&_perfilEdit) return true;
+  for(const id of ['cita-overlay','cita-det-ov','cmp-overlay','cuest-overlay']){
     const el=document.getElementById(id);
     if(el&&el.style.display&&el.style.display!=='none') return true;
   }

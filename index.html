@@ -260,7 +260,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
 
 /* CHART MODAL */
-.chart-modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:slideUp .2s ease}
+.chart-modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:18px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:slideUp .2s ease}
 
 /* AI CHAT */
 .ai-messages{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;min-height:80px}
@@ -286,16 +286,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .mp-r{background:var(--rl);color:var(--red)}
 
 /* CHART */
-.chart-range-tabs{display:flex;gap:4px;margin-bottom:16px}
-.range-tab{padding:5px 12px;border-radius:7px;font-size:11.5px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:transparent;font-family:'DM Sans',sans-serif;transition:all .12s}
-.range-tab:hover{background:var(--bg3)}
-.range-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chart-range-tabs{display:inline-flex;gap:3px;margin-bottom:18px;background:var(--bg3);border-radius:10px;padding:3px}
+.range-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--text2);background:transparent;font-family:'DM Sans',sans-serif;transition:all .12s}
+.range-tab:hover{color:var(--text)}
+.range-tab.active{background:var(--accent);color:#fff;font-weight:700}
 .chart-wrap{position:relative;height:200px;margin-bottom:8px}
 canvas{width:100%!important}
-.chart-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
-.chart-stat{background:var(--bg3);border-radius:9px;padding:10px 12px;text-align:center}
-.chart-stat-val{font-size:16px;font-weight:600;font-family:Geist Mono,monospace;letter-spacing:-.5px}
-.chart-stat-lbl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.chart-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.chart-stat{background:var(--bg);border-radius:12px;padding:13px 12px;text-align:center}
+.chart-stat-val{font-size:23px;font-weight:400;font-family:'DM Serif Display',serif;letter-spacing:0;line-height:1}
+.chart-stat-lbl{font-size:9.5px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
 
 
 /* ── DIET SYSTEM ── */
@@ -1442,11 +1442,14 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
 
 <!-- ACTIVIDAD MODAL -->
 <div id="act-modal" style="display:none" class="modal-overlay" onclick="if(event.target===this)closeActividadModal()">
-  <div class="modal-box" style="width:500px">
+  <div class="modal-box" style="width:480px">
     <div class="modal-hdr">
-      <div>
-        <div class="modal-title"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.818a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .845-.143Z" clip-rule="evenodd"></path></svg> Actividad física</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Registro semanal de actividades del cliente</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--al);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0">⚡</div>
+        <div>
+          <div class="modal-title" style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:400">Actividad física</div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:1px">Registro semanal del cliente</div>
+        </div>
       </div>
       <button class="modal-close" onclick="closeActividadModal()">✕</button>
     </div>
@@ -1486,9 +1489,12 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
 <div id="chart-modal" style="display:none" class="modal-overlay" onclick="if(event.target===this)closeChartModal()">
   <div class="chart-modal-box">
     <div class="modal-hdr">
-      <div>
-        <div class="modal-title" id="chart-modal-title">Pasos diarios</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="chart-modal-sub"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="chart-modal-icon" style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0">📊</div>
+        <div>
+          <div class="modal-title" id="chart-modal-title" style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:400">Pasos diarios</div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:1px" id="chart-modal-sub"></div>
+        </div>
       </div>
       <button class="modal-close" onclick="closeChartModal()">✕</button>
     </div>
@@ -6710,29 +6716,29 @@ function renderActModal() {
   const nDias = diasData.filter(x=>x.txt).length;
 
   const diasHtml = diasData.map(({dia,txt})=>{
-    if(!txt) return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;font-weight:500;color:var(--text2)">${dia}</span>
-      <span style="font-size:11px;color:var(--text3)">Sin actividad</span>
+    if(!txt) return `<div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--bg3)">
+      <span style="font-size:12.5px;font-weight:500;color:var(--text2);min-width:80px">${dia}</span>
+      <span style="font-size:12px;color:var(--text3)">Sin actividad</span>
     </div>`;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;font-weight:500;color:var(--text2);min-width:74px">${dia}</span>
-      <span style="font-size:18px">${iconoActividad(txt)}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${txt}</span>
+    return `<div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--bg3)">
+      <span style="font-size:12.5px;font-weight:600;color:var(--text2);min-width:80px">${dia}</span>
+      <span style="font-size:19px">${iconoActividad(txt)}</span>
+      <span style="font-size:13.5px;font-weight:600;color:var(--text);flex:1">${txt}</span>
     </div>`;
   }).join('');
 
   document.getElementById('act-modal-body').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-      <button onclick="actWeekOffset--;renderActModal()" style="font-size:11.5px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif">‹ Anterior</button>
+      <button onclick="actWeekOffset--;renderActModal()" style="font-size:12px;padding:6px 13px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif">‹ Anterior</button>
       <div style="flex:1;text-align:center">
-        <div style="font-size:12px;font-weight:600;color:var(--text)">${weekLabel}</div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--text)">${weekLabel}</div>
         <div style="font-size:10.5px;color:var(--text3)">${rangoLabel}</div>
       </div>
-      ${actWeekOffset<0?`<button onclick="actWeekOffset++;renderActModal()" style="font-size:11.5px;padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif">Siguiente ›</button>`:'<div style="width:78px"></div>'}
+      ${actWeekOffset<0?`<button onclick="actWeekOffset++;renderActModal()" style="font-size:12px;padding:6px 13px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:'DM Sans',sans-serif">Siguiente ›</button>`:'<div style="width:84px"></div>'}
     </div>
-    <div style="background:var(--al);border-radius:9px;padding:10px 14px;text-align:center;margin-bottom:14px">
-      <div style="font-size:20px;font-weight:700;font-family:Geist Mono,monospace;color:var(--amber)">${nDias}</div>
-      <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em">${nDias===1?'día con actividad':'días con actividad'}</div>
+    <div style="background:var(--al);border-radius:12px;padding:13px;text-align:center;margin-bottom:16px">
+      <div style="font-family:'DM Serif Display',serif;font-size:30px;color:var(--amber);line-height:1">${nDias}</div>
+      <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-top:2px">${nDias===1?'día con actividad':'días con actividad'}</div>
     </div>
     <div>${diasHtml}</div>`;
 }
@@ -13692,6 +13698,9 @@ function openChartModal(metric) {
   const weekLbl=weekOffset===0?'Semana actual':weekOffset===-1?'Semana anterior':'Hace '+Math.abs(weekOffset)+' semanas';
   document.getElementById('chart-modal-title').textContent=cfg.title;
   document.getElementById('chart-modal-sub').textContent=weekLbl+(cfg.sub?' — '+cfg.sub:'');
+  const _chartIcons={pasos:'👟',peso:'⚖️',sueno:'😴',actividad:'⚡',sessions:'🏋️',cheats:'🍕'};
+  const _chIcon=document.getElementById('chart-modal-icon');
+  if(_chIcon){ _chIcon.textContent=_chartIcons[metric]||'📊'; if(cfg.color){ _chIcon.style.background=cfg.color+'1f'; _chIcon.style.color=cfg.color; } }
   document.getElementById('chart-modal').style.display='flex';
   renderChartRangeTabs();
   if(metric==='cheats'){ renderCheatsView(); }

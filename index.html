@@ -3253,11 +3253,21 @@ async function loadRealClients(){
         });
       });
       // 8e. Combinar split + ejercicios por cliente
+      // El split puede venir como array ya, o como string JSON (según cómo lo
+      // devuelva la BD). Lo normalizamos a array en ambos casos.
+      const parseSplit = (raw) => {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string' && raw.trim()){
+          try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; }
+          catch(e){ return []; }
+        }
+        return [];
+      };
       (tplans || []).forEach(tp => {
         if (!trainingByClient[tp.client_id]){
           trainingByClient[tp.client_id] = {
             plan: tp,
-            split: Array.isArray(tp.split) ? tp.split : [],
+            split: parseSplit(tp.split),
             exercises: exByClient[tp.client_id] || [],
           };
         }

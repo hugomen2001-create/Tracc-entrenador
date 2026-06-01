@@ -7606,7 +7606,7 @@ function s3ToggleVerTodos(){ s3VerTodos = !s3VerTodos; renderClientPanel(); }
 
 // Gráfica de evolución de cargas (SVG)
 function graficaEvolucionCargas(sesiones){
-  const W = 720, H = 150, padX = 44, padY = 20;
+  const W = 720, H = 115, padX = 44, padY = 16;
   if (!sesiones.length){
     return `<div style="height:${H}px;display:flex;align-items:center;justify-content:center;
       font-size:12px;color:var(--text3);background:var(--bg);border-radius:11px">

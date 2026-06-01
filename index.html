@@ -10157,24 +10157,24 @@ function seccionPreferenciasNutri(c, plan){
     const fnAdd = origen === "plan" ? "anadirEtiquetaPref" : "anadirEtiquetaCuest";
     const fnDel = origen === "plan" ? "quitarEtiquetaPref" : "quitarEtiquetaCuest";
     const chips = tags.map((t,idx) => `
-      <span style="display:inline-flex;align-items:center;height:23px;border-radius:7px;
-        border:1.5px solid ${color};background:${color}1a;color:var(--text);font-size:10.5px;font-weight:600;white-space:nowrap">
+      <span style="display:inline-flex;align-items:center;height:25px;border-radius:7px;
+        border:1.5px solid ${color};background:${color}1a;color:var(--text);font-size:11.5px;font-weight:600;white-space:nowrap">
         <span style="padding:0 2px 0 8px">${escHtml(t)}</span>
         <button onclick="${fnDel}('${campo}',${idx})" title="Quitar" style="
-          background:none;border:none;cursor:pointer;color:var(--text3);font-size:10px;padding:0 5px 0 2px;line-height:1">&#10005;</button>
+          background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:0 5px 0 2px;line-height:1">&#10005;</button>
       </span>`).join("");
-    const vacio = tags.length ? "" : `<div style="font-size:10.5px;color:var(--text3);margin-bottom:4px">Sin elementos</div>`;
-    return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:9px 10px">
-      <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${color};margin-bottom:6px">${titulo}</div>
+    const vacio = tags.length ? "" : `<div style="font-size:11.5px;color:var(--text3);margin-bottom:4px">Sin elementos</div>`;
+    return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:10px 11px">
+      <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${color};margin-bottom:6px">${titulo}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
       ${vacio}
       <div style="display:flex;gap:4px;align-items:center">
         <input id="nueva-etq-${campo}" placeholder="Anadir..." onkeydown="if(event.key==='Enter')${fnAdd}('${campo}')" style="
-          flex:1;min-width:0;height:24px;border:1.5px dashed var(--border2);border-radius:7px;padding:0 7px;
-          background:var(--bg);color:var(--text);font-size:10.5px">
+          flex:1;min-width:0;height:27px;border:1.5px dashed var(--border2);border-radius:7px;padding:0 8px;
+          background:var(--bg);color:var(--text);font-size:11.5px">
         <button onclick="${fnAdd}('${campo}')" style="
-          height:24px;width:24px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg);color:var(--green);font-size:15px;font-weight:700;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
+          height:27px;width:27px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg);color:var(--green);font-size:17px;font-weight:700;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
       </div>
     </div>`;
   };
@@ -10186,7 +10186,7 @@ function seccionPreferenciasNutri(c, plan){
       ${grupo("Alimentos que no le gustan", "disliked_foods", q.disliked_foods, "#6b7280", "cuest")}
       ${grupo("Preferencias", "preferences", plan ? plan.preferences : null, "#16a34a", "plan")}
     </div>
-    <div style="font-size:9.5px;color:var(--text3);margin-top:7px">Alergias, enfermedades y alimentos que no le gustan se comparten con el cuestionario del cliente (tab Perfil).</div>
+    <div style="font-size:10.5px;color:var(--text3);margin-top:7px">Alergias, enfermedades y alimentos que no le gustan se comparten con el cuestionario del cliente (tab Perfil).</div>
   </div>`;
 }
 
@@ -10293,19 +10293,19 @@ async function guardarEtiquetasPref(lista){
 function tiraBibliotecaAlimentos(){
   const n = (FOOD_LIBRARY || []).length;
   return `<div style="background:var(--gl);border:1.5px solid rgba(22,163,74,.25);border-radius:13px;
-    padding:11px 15px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
     <div>
-      <div style="font-size:12.5px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
-      <div style="font-size:10.5px;color:var(--green);opacity:.75;margin-top:1px">${n} ${n===1?'alimento guardado':'alimentos guardados'} · crea alimentos una vez y reutilízalos en las dietas</div>
+      <div style="font-size:13.5px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
+      <div style="font-size:11.5px;color:var(--green);opacity:.75;margin-top:1px">${n} ${n===1?'alimento guardado':'alimentos guardados'} · crea alimentos una vez y reutilízalos en las dietas</div>
     </div>
     <div style="display:flex;gap:7px">
       <button title="Disponible próximamente" disabled style="
-        height:30px;padding:0 13px;border-radius:10px;background:var(--bg2);
-        border:1.5px solid var(--border);font-size:12px;font-weight:600;color:var(--text3);
+        height:32px;padding:0 14px;border-radius:10px;background:var(--bg2);
+        border:1.5px solid var(--border);font-size:13px;font-weight:600;color:var(--text3);
         cursor:not-allowed;opacity:.7">✦ Generar con IA</button>
       <button onclick="abrirBiblioteca()" style="
-        height:30px;padding:0 13px;border-radius:10px;background:var(--green);
-        border:none;font-size:12px;font-weight:600;color:#fff;cursor:pointer">📚 Abrir biblioteca (${n})</button>
+        height:32px;padding:0 14px;border-radius:10px;background:var(--green);
+        border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer">📚 Abrir biblioteca (${n})</button>
     </div>
   </div>`;
 }
@@ -10972,20 +10972,20 @@ function seccionPlanNutricional(c){
 
   // ── Objetivos (macros / kcal del plan) — editables (Bloque 6A) ──
   const objetivo = (lbl, val, unidad, color) => `
-    <div style="background:var(--bg);border-radius:11px;padding:10px 12px;text-align:center;flex:1">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:3px">${lbl}</div>
-      <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${color||'var(--text)'}">${val ?? '—'}<span style="font-size:11px;font-weight:400;color:var(--text3)">${unidad||''}</span></div>
+    <div style="background:var(--bg);border-radius:11px;padding:12px 12px;text-align:center;flex:1">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:3px">${lbl}</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:${color||'var(--text)'}">${val ?? '—'}<span style="font-size:12px;font-weight:400;color:var(--text3)">${unidad||''}</span></div>
     </div>`;
 
   // Campo editable (input numérico)
   const objetivoEdit = (lbl, id, val, unidad) => `
     <div style="background:var(--bg);border-radius:11px;padding:10px 12px;text-align:center;flex:1">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:5px">${lbl}</div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:5px">${lbl}</div>
       <div style="display:flex;align-items:baseline;justify-content:center;gap:3px">
         <input id="${id}" type="number" min="0" value="${val ?? ''}" style="
-          width:64px;text-align:center;font-family:'DM Serif Display',serif;font-size:18px;
+          width:68px;text-align:center;font-family:'DM Serif Display',serif;font-size:20px;
           border:1.5px solid var(--green);border-radius:8px;padding:2px 4px;background:var(--bg2);color:var(--text)">
-        <span style="font-size:11px;color:var(--text3)">${unidad||''}</span>
+        <span style="font-size:12px;color:var(--text3)">${unidad||''}</span>
       </div>
     </div>`;
 
@@ -11009,10 +11009,10 @@ function seccionPlanNutricional(c){
   } else {
     objetivosHtml = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Objetivos diarios</div>
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Objetivos diarios</div>
         <button onclick="editarObjetivosNutri()" style="
-          height:26px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">✏️ Editar</button>
+          height:28px;padding:0 13px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">✏️ Editar</button>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
         ${objetivo('Calorías', plan.kcal_goal, ' kcal', 'var(--green)')}
@@ -11041,7 +11041,7 @@ function seccionPlanNutricional(c){
     const pills = opciones.map((o,i) => {
       const activa = i === editNutriOpcion;
       return `<button onclick="seleccionarOpcionNutri(${i})" style="
-        height:30px;padding:0 13px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;
+        height:32px;padding:0 15px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;
         border:1.5px solid ${activa?'var(--green)':'var(--border)'};
         background:${activa?'var(--green)':'var(--bg2)'};
         color:${activa?'#fff':'var(--text2)'}">Opción ${o.option_number ?? (i+1)}</button>`;
@@ -11125,8 +11125,8 @@ function seccionPlanNutricional(c){
         c:a.c+(Number(it.carbs)||0), g:a.g+(Number(it.fat)||0)
       }), {kcal:0,p:0,c:0,g:0});
       const num = n => { const v=Number(n); return Number.isFinite(v)? (Math.round(v*10)/10).toLocaleString('es-ES') : '·'; };
-      const headCol = 'font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;text-align:right;padding:0 0 5px';
-      const cell = 'font-size:11.5px;color:var(--text2);text-align:right;padding:5px 0;white-space:nowrap';
+      const headCol = 'font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;text-align:right;padding:0 0 5px';
+      const cell = 'font-size:12.5px;color:var(--text2);text-align:right;padding:5px 0;white-space:nowrap';
       const filas = items.length ? items.map(it => `
         <tr style="border-bottom:1px solid var(--border)">
           <td style="${cell};text-align:left;color:var(--text3);width:46px">${it.grams!=null?escHtml(it.grams)+' g':'·'}</td>
@@ -11136,11 +11136,11 @@ function seccionPlanNutricional(c){
           <td style="${cell}">${num(it.carbs)}</td>
           <td style="${cell}">${num(it.fat)}</td>
         </tr>`).join('')
-        : `<tr><td colspan="6" style="font-size:11px;color:var(--text3);padding:8px 0;text-align:center">Sin alimentos</td></tr>`;
-      return `<div style="background:var(--bg);border-radius:11px;padding:12px 14px">
+        : `<tr><td colspan="6" style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">Sin alimentos</td></tr>`;
+      return `<div style="background:var(--bg);border-radius:11px;padding:13px 15px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
-          <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0">✏️</button>
+          <span style="font-size:13.5px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
+          <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">✏️</button>
         </div>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <colgroup><col style="width:44px"><col><col style="width:42px"><col style="width:28px"><col style="width:32px"><col style="width:28px"></colgroup>
@@ -11154,7 +11154,7 @@ function seccionPlanNutricional(c){
           </tr></thead>
           <tbody>${filas}</tbody>
           <tfoot><tr style="border-top:2px solid var(--border2)">
-            <td colspan="2" style="font-size:10.5px;font-weight:700;color:var(--text);text-align:left;padding:7px 0">Total comida</td>
+            <td colspan="2" style="font-size:11.5px;font-weight:700;color:var(--text);text-align:left;padding:7px 0">Total comida</td>
             <td style="${cell};color:var(--green);font-weight:700;padding-top:7px">${num(totC.kcal)}</td>
             <td style="${cell};font-weight:700;padding-top:7px">${num(totC.p)}</td>
             <td style="${cell};font-weight:700;padding-top:7px">${num(totC.c)}</td>
@@ -11183,8 +11183,8 @@ function seccionPlanNutricional(c){
   return `<div style="${cardStyle};margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:11px">
-        <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🥗</div>
-        <div style="font-family:'DM Serif Display',serif;font-size:19px;line-height:1.1;color:var(--text)">Plan nutricional</div>
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🥗</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:21px;line-height:1.1;color:var(--text)">Plan nutricional</div>
         ${(!editandoBorradorPlan && !c._scheduledNutritionDate)
           ? `<button onclick="abrirModalProgramarCambio('diet')" title="Crear un borrador del plan que se activará en una fecha futura" style="
               height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
@@ -11204,7 +11204,7 @@ function seccionPlanNutricional(c){
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
     ${tiraBibliotecaAlimentos()}
     ${panelBibliotecaHtml()}
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Opciones de dieta</div>
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Opciones de dieta</div>
     ${opcionesHtml}
   </div>`;
 }
@@ -11230,9 +11230,9 @@ function _barraMacrosHtml(plan){
       <div style="width:${pp}%;background:var(--green)"></div><div style="width:${cp}%;background:#f59e0b"></div><div style="width:${fp}%;background:#6b7280"></div>
     </div>
     <div style="display:flex;gap:16px;margin-bottom:6px">
-      <span style="font-size:10px;color:var(--text2)">${punto('var(--green)')}Proteína ${pp}%</span>
-      <span style="font-size:10px;color:var(--text2)">${punto('#f59e0b')}Carbos ${cp}%</span>
-      <span style="font-size:10px;color:var(--text2)">${punto('#6b7280')}Grasa ${fp}%</span>
+      <span style="font-size:11px;color:var(--text2)">${punto('var(--green)')}Proteína ${pp}%</span>
+      <span style="font-size:11px;color:var(--text2)">${punto('#f59e0b')}Carbos ${cp}%</span>
+      <span style="font-size:11px;color:var(--text2)">${punto('#6b7280')}Grasa ${fp}%</span>
     </div>`;
 }
 
@@ -11241,10 +11241,10 @@ function _macroCompCell(label, total, obj, unidad){
   const t = Math.round(Number(total)||0);
   const tStr = t.toLocaleString('es-ES');
   const esKcal = unidad === ' kcal';
-  const big = `<div style="font-family:'DM Serif Display',serif;font-size:20px;line-height:1.1;color:${esKcal?'var(--green)':'var(--text)'}">${tStr}${unidad?`<span style="font-size:9px;color:var(--text3)">${unidad}</span>`:''}</div>`;
+  const big = `<div style="font-family:'DM Serif Display',serif;font-size:22px;line-height:1.1;color:${esKcal?'var(--green)':'var(--text)'}">${tStr}${unidad?`<span style="font-size:10px;color:var(--text3)">${unidad}</span>`:''}</div>`;
   let sub;
   if (obj == null || obj === ''){
-    sub = `<div style="font-size:9.5px;color:var(--text3);margin-top:2px">sin objetivo</div>`;
+    sub = `<div style="font-size:10.5px;color:var(--text3);margin-top:2px">sin objetivo</div>`;
   } else {
     const o = Math.round(Number(obj)||0);
     const d = t - o;
@@ -11254,10 +11254,10 @@ function _macroCompCell(label, total, obj, unidad){
     const txt = ok
       ? `✓ objetivo ${o.toLocaleString('es-ES')}`
       : `${d>0?'+':''}${d.toLocaleString('es-ES')} ${d>0?'▲':'▼'} · obj ${o.toLocaleString('es-ES')}`;
-    sub = `<div style="font-size:9.5px;color:${col};font-weight:600;margin-top:2px">${txt}</div>`;
+    sub = `<div style="font-size:10.5px;color:${col};font-weight:600;margin-top:2px">${txt}</div>`;
   }
-  return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:9px 8px;text-align:center">
-    <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;color:var(--text3)">${label}</div>${big}${sub}</div>`;
+  return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:10px 8px;text-align:center">
+    <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--text3)">${label}</div>${big}${sub}</div>`;
 }
 
 // ── Bloque "Total de la opción N vs objetivo" ──
@@ -11272,11 +11272,11 @@ function _totalOpcionComparado(plan, tot, numOpcion){
     && dentro(tot.carbs, plan.carbs_g, false)
     && dentro(tot.fat, plan.fat_g, false);
   const badge = allOk
-    ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--green);background:var(--gl);border-radius:7px;padding:3px 9px">✓ Cuadra con el objetivo</span>`
-    : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1.5px solid #fde68a;border-radius:7px;padding:2px 9px">⚠ Revisar macros</span>`;
-  return `<div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin-bottom:14px">
+    ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--green);background:var(--gl);border-radius:7px;padding:3px 10px">✓ Cuadra con el objetivo</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1.5px solid #fde68a;border-radius:7px;padding:2px 10px">⚠ Revisar macros</span>`;
+  return `<div style="background:var(--bg);border-radius:12px;padding:13px 15px;margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total de la opción ${numOpcion} vs objetivo</span>
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total de la opción ${numOpcion} vs objetivo</span>
       ${badge}
     </div>
     <div style="display:flex;gap:8px">
@@ -11285,7 +11285,7 @@ function _totalOpcionComparado(plan, tot, numOpcion){
       ${_macroCompCell('Carbohid.', tot.carbs, plan.carbs_g, ' g')}
       ${_macroCompCell('Grasa', tot.fat, plan.fat_g, ' g')}
     </div>
-    <div style="font-size:9px;color:var(--text3);margin-top:9px">Cuando una opción se pasa o no llega, el macro afectado se marca en <span style="color:#d97706;font-weight:700">ámbar</span> con la diferencia.</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:9px">Cuando una opción se pasa o no llega, el macro afectado se marca en <span style="color:#d97706;font-weight:700">ámbar</span> con la diferencia.</div>
   </div>`;
 }
 
@@ -11296,14 +11296,14 @@ function _accionesOpcionHtml(opciones){
   const dupDis = opciones.length >= 7;
   const delDis = opciones.length <= 1;
   return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
-    <span style="font-size:10px;color:var(--text3);font-weight:600">Acciones de la Opción ${num}</span>
+    <span style="font-size:11px;color:var(--text3);font-weight:600">Acciones de la Opción ${num}</span>
     <div style="display:flex;gap:7px">
       <button onclick="duplicarOpcionNutri()" ${dupDis?'disabled':''} title="${dupDis?'Máximo 7 opciones de dieta':'Duplicar esta opción'}" style="
-        height:27px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg2);
-        color:${dupDis?'var(--text3)':'var(--text2)'};font-size:11px;font-weight:600;cursor:${dupDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Duplicar opción</button>
+        height:29px;padding:0 13px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg2);
+        color:${dupDis?'var(--text3)':'var(--text2)'};font-size:12px;font-weight:600;cursor:${dupDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Duplicar opción</button>
       <button onclick="borrarOpcionNutri()" ${delDis?'disabled':''} title="${delDis?'Debe quedar al menos una opción':'Borrar esta opción'}" style="
-        height:27px;padding:0 12px;border:1.5px solid ${delDis?'var(--border)':'#f3d0d0'};border-radius:8px;background:var(--bg2);
-        color:${delDis?'var(--text3)':'var(--red)'};font-size:11px;font-weight:600;cursor:${delDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Borrar opción</button>
+        height:29px;padding:0 13px;border:1.5px solid ${delDis?'var(--border)':'#f3d0d0'};border-radius:8px;background:var(--bg2);
+        color:${delDis?'var(--text3)':'var(--red)'};font-size:12px;font-weight:600;cursor:${delDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Borrar opción</button>
     </div>
   </div>`;
 }

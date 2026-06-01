@@ -7606,7 +7606,7 @@ function s3ToggleVerTodos(){ s3VerTodos = !s3VerTodos; renderClientPanel(); }
 
 // Gráfica de evolución de cargas (SVG)
 function graficaEvolucionCargas(sesiones){
-  const W = 720, H = 115, padX = 44, padY = 16;
+  const W = 720, H = 145, padX = 54, padY = 18, padBottom = 32;
   if (!sesiones.length){
     return `<div style="height:${H}px;display:flex;align-items:center;justify-content:center;
       font-size:12px;color:var(--text3);background:var(--bg);border-radius:11px">
@@ -7629,14 +7629,15 @@ function graficaEvolucionCargas(sesiones){
   const yRng = yMax - yMin;
   const n = sesiones.length;
   const x = i => padX + (n === 1 ? (W - padX*2)/2 : (i/(n-1)) * (W - padX*2));
-  const y = v => padY + (1 - (v - yMin)/yRng) * (H - padY*2);
+  // El área de la línea reserva padBottom abajo para las etiquetas de fecha
+  const y = v => padY + (1 - (v - yMin)/yRng) * (H - padY - padBottom);
 
   // Líneas de cuadrícula horizontal (4 niveles)
   const grids = [0, 0.33, 0.66, 1].map(t => {
-    const yy = padY + t * (H - padY*2);
+    const yy = padY + t * (H - padY - padBottom);
     const valor = (yMax - t * yRng).toFixed(0);
     return `<line x1="${padX}" y1="${yy}" x2="${W-padX/2}" y2="${yy}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
-            <text x="${padX-6}" y="${yy+3}" font-size="9" fill="var(--text3)" text-anchor="end">${valor}</text>`;
+            <text x="${padX-12}" y="${yy+3}" font-size="9" fill="var(--text3)" text-anchor="end">${valor}</text>`;
   }).join('');
 
   const linePts = sesiones.map((s,i) => `${x(i).toFixed(1)},${y(s.pesoMax).toFixed(1)}`).join(' ');
@@ -7664,7 +7665,7 @@ function graficaEvolucionCargas(sesiones){
     [0, Math.floor(n/3), Math.floor(2*n/3), n-1];
   const xLabels = indicesLabel.map(i => {
     const xx = x(i).toFixed(1);
-    return `<text x="${xx}" y="${H-4}" font-size="9" fill="var(--text3)" text-anchor="middle">${formatearFechaCorta(sesiones[i].fecha)}</text>`;
+    return `<text x="${xx}" y="${H-8}" font-size="9" fill="var(--text3)" text-anchor="middle">${formatearFechaCorta(sesiones[i].fecha)}</text>`;
   }).join('');
 
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;background:var(--bg);border-radius:11px">

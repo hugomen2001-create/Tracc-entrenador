@@ -7061,6 +7061,31 @@ function tarjetaPesoMesociclo(c){
   </div>`;
 }
 
+// Línea limpia para métricas de largo plazo (muchos puntos): sin un círculo
+// por día, solo la línea + punto final. Altura contenida, ancho completo.
+function lineaLargoPlazo(puntos, color, sufijo){
+  const W = 700, H = 130, padX = 10, padY = 16;
+  const vals = puntos.map(p => p.valor).filter(v => v != null);
+  if (vals.length < 2){
+    return `<div style="height:${H}px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3)">Sin datos suficientes</div>`;
+  }
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const rango = (max - min) || 1;
+  const n = puntos.length;
+  const x = i => padX + (i/(n-1)) * (W - padX*2);
+  const y = v => padY + (1 - (v - min)/rango) * (H - padY*2);
+  const conValor = puntos.map((p,i)=>({i,v:p.valor})).filter(o=>o.v!=null);
+  const linePts = conValor.map(o => `${x(o.i).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
+  const last = conValor[conValor.length-1];
+  // Área suave bajo la línea
+  const areaPts = `${x(conValor[0].i).toFixed(1)},${(H-padY).toFixed(1)} ` + linePts + ` ${x(last.i).toFixed(1)},${(H-padY).toFixed(1)}`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;overflow:visible" preserveAspectRatio="none">
+    <polygon points="${areaPts}" fill="${color}" opacity="0.07"/>
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(last.i).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5" fill="${color}"/>
+  </svg>`;
+}
+
 function seccionMetricas(c){
   const metrics = (c._metrics || []).slice();
 
@@ -7122,7 +7147,7 @@ function seccionMetricas(c){
         <span style="font-size:24px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text)">${fmtV(ultimo.v)}<span style="font-size:13px;color:var(--text3)">${sufijo}</span></span>
         <span style="font-size:11.5px;font-weight:600;color:${diffColor}">${diffFmt} en ${periodo}</span>
       </div>
-      ${miniLineChart(chartPts, cfg.color, cfg.unidad, sufijo)}`;
+      ${lineaLargoPlazo(chartPts, cfg.color, sufijo)}`;
   }
 
   return `<div style="margin-bottom:18px">
@@ -7288,13 +7313,13 @@ function seccionHistorialSesiones(c){
 
   const _histHtml = `<div style="margin-bottom:22px">
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Historial de sesiones</div>
-    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:18px;display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);gap:24px;align-items:start">
       <div>
         <div style="font-size:10.5px;color:var(--text3);margin-bottom:12px">Últimas 12 semanas · pulsa un día</div>
-        <div style="display:grid;grid-template-columns:14px repeat(${SEMANAS}, 1fr);gap:4px">
+        <div style="display:grid;grid-template-columns:12px repeat(${SEMANAS}, 1fr);gap:3px;max-width:340px">
           ${filas}
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
           ${leyenda}
           <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
             <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
@@ -7348,7 +7373,7 @@ async function abrirDetalleSesion(sessionId, fechaStr, esUltimo){
     // Agrupar por ejercicio
     const porEj = {};
     sets.forEach(s => { (porEj[s.exercise_name] = porEj[s.exercise_name] || []).push(s); });
-    cuerpo = `<div style="display:flex;flex-direction:column;gap:10px">` + Object.keys(porEj).map(nombre => {
+    cuerpo = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px">` + Object.keys(porEj).map(nombre => {
       const series = porEj[nombre].sort((a,b)=>(a.set_number||0)-(b.set_number||0));
       const seriesTxt = series.map(s =>
         `<span style="font-size:10px;color:var(--text2);background:var(--bg3);border-radius:5px;padding:2px 7px">
@@ -7479,7 +7504,7 @@ function s3ToggleVerTodos(){ s3VerTodos = !s3VerTodos; renderClientPanel(); }
 
 // Gráfica de evolución de cargas (SVG)
 function graficaEvolucionCargas(sesiones){
-  const W = 720, H = 220, padX = 44, padY = 22;
+  const W = 720, H = 150, padX = 44, padY = 20;
   if (!sesiones.length){
     return `<div style="height:${H}px;display:flex;align-items:center;justify-content:center;
       font-size:12px;color:var(--text3);background:var(--bg);border-radius:11px">

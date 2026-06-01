@@ -7210,14 +7210,44 @@ function seccionMetricas(c){
       return { valor: o.v, fechaTxt: fTxt, mediaTxt: medTxt };
     });
 
+    // Stats del periodo: media global, mejor y peor semana
+    const fmtV2 = (v) => cfg.unidad==='kg' ? v.toFixed(1)+' kg' : cfg.campo==='steps' ? Math.round(v).toLocaleString('es-ES') : v.toFixed(1)+'h';
+    const mediasSemanales = Object.keys(mediaPorSemana).map(k => {
+      const arr = mediaPorSemana[k];
+      return arr.reduce((a,b)=>a+b,0)/arr.length;
+    });
+    const mediaPeriodo = mediasSemanales.reduce((a,b)=>a+b,0) / (mediasSemanales.length||1);
+    const mejorSem = cfg.mejorBaja ? Math.min(...mediasSemanales) : Math.max(...mediasSemanales);
+    const peorSem  = cfg.mejorBaja ? Math.max(...mediasSemanales) : Math.min(...mediasSemanales);
+
+    const grafica = segMetrica==='weight'
+      ? lineaLargoPlazo(chartPts, cfg.color, sufijo)
+      : barrasSemanales(puntos, cfg.color, cfg.unidad);
+
+    const statBox = (valor, etiqueta, color) => `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:11px 13px">
+        <div style="font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;color:${color||'var(--text)'};line-height:1">${valor}</div>
+        <div style="font-size:9.5px;color:var(--text3);margin-top:4px">${etiqueta}</div>
+      </div>`;
+
     cuerpo = `
-      <div style="display:flex;align-items:baseline;gap:10px;margin:14px 0 12px">
-        <span style="font-size:24px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text)">${fmtV(ultimo.v)}<span style="font-size:13px;color:var(--text3)">${sufijo}</span></span>
-        <span style="font-size:11.5px;font-weight:600;color:${diffColor}">${diffFmt} en ${periodo}</span>
-      </div>
-      ${segMetrica==='weight'
-        ? lineaLargoPlazo(chartPts, cfg.color, sufijo)
-        : barrasSemanales(puntos, cfg.color, cfg.unidad)}`;
+      <div style="display:grid;grid-template-columns:210px 1fr;gap:24px;align-items:center;margin-top:16px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:13px 15px">
+            <div style="font-size:24px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text);line-height:1">${fmtV(mediaPeriodo)}<span style="font-size:12px;color:var(--text3)">${sufijo}</span></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px">Media del periodo</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            ${statBox(fmtV2(mejorSem), 'Mejor sem.', '#16a34a')}
+            ${statBox(fmtV2(peorSem), 'Peor sem.', '#d97706')}
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:11px 14px">
+            <div style="font-size:14px;font-weight:600;color:${diffColor};line-height:1">${diffFmt}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px">vs ${periodo}</div>
+          </div>
+        </div>
+        <div>${grafica}</div>
+      </div>`;
   }
 
   return `<div style="margin-bottom:18px">

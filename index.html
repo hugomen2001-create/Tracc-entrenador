@@ -3341,6 +3341,22 @@ async function loadRealClients(){
       });
     }
 
+    // 9e. Notas de revisión de cada cliente (tabla revision_notes).
+    //     Ordenadas por fecha ascendente: la última del array = la más reciente
+    //     (el render hace .reverse() para mostrar la más nueva arriba).
+    let notesByClient = {};
+    if (rows.length){
+      const ids = rows.map(r => r.id);
+      const { data: notes } = await sb
+        .from('revision_notes')
+        .select('id, client_id, note, week_number, created_at')
+        .in('client_id', ids)
+        .order('created_at', { ascending:true });
+      (notes || []).forEach(n => {
+        (notesByClient[n.client_id] = notesByClient[n.client_id] || []).push(n);
+      });
+    }
+
     // 10. Construir objetos cliente y reemplazar el contenido de CLIENTS
     const built = rows.map((row, i) => {
       const c = buildClientObject(row, i, lastByClient[row.id], questByClient[row.id],
@@ -3350,6 +3366,8 @@ async function loadRealClients(){
       // Inyectar info de planes programados
       c._scheduledTrainingDate = scheduledTrainByClient[row.id] || null;
       c._scheduledNutritionDate = scheduledNutriByClient[row.id] || null;
+      // Inyectar notas de revisión reales (tabla revision_notes)
+      c.revisionNotes = notesByClient[row.id] || [];
       return c;
     });
     CLIENTS.length = 0;
@@ -9402,21 +9420,49 @@ Mismas kcal totales (${ds.params.kcal} ±30 kcal).`;
 }
 
 // ── REVISION NOTES ───────────────────────────────────────────────────────────
-function addRevisionNote() {
+// Formatea el created_at (timestamptz) de una nota a "01 jun 2026"
+function fmtFechaNota(iso){
+  try{
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'});
+  }catch(e){ return ''; }
+}
+
+async function addRevisionNote() {
   const input = document.getElementById('new-note-input');
   if(!input||!input.value.trim()) return;
   const c = currentClient;
-  if(!c.revisionNotes) c.revisionNotes = [];
+  if(!c) return;
+  const texto = input.value.trim();
   const now = new Date();
   const weekNum = Math.ceil((now - new Date(now.getFullYear(),0,1))/(7*24*3600*1000));
-  c.revisionNotes.push({text:input.value.trim(),date:now.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}),week:'Semana '+weekNum});
-  saveStorage(); input.value=''; refreshContent();
+  input.value='';
+  const { data, error } = await sb
+    .from('revision_notes')
+    .insert({ client_id: c.id, coach_id: coachData.id, note: texto, week_number: weekNum })
+    .select('id, client_id, note, week_number, created_at')
+    .single();
+  if(error){
+    console.error('addRevisionNote error:', error);
+    alert('No se pudo guardar la nota. Inténtalo de nuevo.');
+    return;
+  }
+  if(!c.revisionNotes) c.revisionNotes = [];
+  c.revisionNotes.push(data);   // al final = más reciente (el render hace reverse)
+  refreshContent();
 }
-function deleteRevisionNote(idx) {
+async function deleteRevisionNote(id) {
   const c = currentClient;
-  if(!c.revisionNotes) return;
-  c.revisionNotes.splice(idx,1);
-  saveStorage(); refreshContent();
+  if(!c || !c.revisionNotes) return;
+  const { error } = await sb.from('revision_notes').delete().eq('id', id);
+  if(error){
+    console.error('deleteRevisionNote error:', error);
+    alert('No se pudo eliminar la nota. Inténtalo de nuevo.');
+    return;
+  }
+  c.revisionNotes = c.revisionNotes.filter(n => String(n.id) !== String(id));
+  refreshContent();
 }
 
 // ── SMART ALERTS ─────────────────────────────────────────────────────────────
@@ -10128,7 +10174,7 @@ function seccionPreferenciasNutri(c, plan){
           background:var(--bg);color:var(--text);font-size:10.5px">
         <button onclick="${fnAdd}('${campo}')" style="
           height:24px;width:24px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg);color:var(--green);font-size:13px;font-weight:700;padding:0">+</button>
+          background:var(--bg);color:var(--green);font-size:15px;font-weight:700;padding:0;display:flex;align-items:center;justify-content:center;line-height:1">+</button>
       </div>
     </div>`;
   };
@@ -11096,7 +11142,8 @@ function seccionPlanNutricional(c){
           <span style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
           <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0">✏️</button>
         </div>
-        <table style="width:100%;border-collapse:collapse;table-layout:auto">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+          <colgroup><col style="width:44px"><col><col style="width:42px"><col style="width:28px"><col style="width:32px"><col style="width:28px"></colgroup>
           <thead><tr>
             <th style="${headCol};text-align:left;width:46px">Cant.</th>
             <th style="${headCol};text-align:left;padding-left:6px">Alimento</th>
@@ -11120,27 +11167,12 @@ function seccionPlanNutricional(c){
       return `<div style="min-width:0">${htmlComida}</div>`;
     }).join('');
 
+    const _numOp = opt.option_number ?? (editNutriOpcion + 1);
     opcionesHtml = `
-      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <div style="flex:1;background:var(--gl);border-radius:10px;padding:8px 11px;text-align:center">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--green);opacity:.8">Total opción</div>
-          <div style="font-size:16px;font-weight:700;color:var(--green)">${tot.kcal} kcal</div>
-        </div>
-        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Proteína</div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.protein)} g</div>
-        </div>
-        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Carbohid.</div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.carbs)} g</div>
-        </div>
-        <div style="flex:1;background:var(--bg);border-radius:10px;padding:8px 11px;text-align:center">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3)">Grasa</div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.fat)} g</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;align-items:start">${comidasHtml}</div>`;
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px">${pills}</div>
+      ${_accionesOpcionHtml(opciones)}
+      ${_totalOpcionComparado(plan, tot, _numOp)}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:9px;align-items:start">${comidasHtml}</div>`;
   }
 
   // Badge "Cambia el [fecha]" si hay plan nutricional futuro programado
@@ -11150,8 +11182,9 @@ function seccionPlanNutricional(c){
 
   return `<div style="${cardStyle};margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:9px">
-        <div style="${secTitle}">🥗 Plan nutricional</div>
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🥗</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:19px;line-height:1.1;color:var(--text)">Plan nutricional</div>
         ${(!editandoBorradorPlan && !c._scheduledNutritionDate)
           ? `<button onclick="abrirModalProgramarCambio('diet')" title="Crear un borrador del plan que se activará en una fecha futura" style="
               height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
@@ -11164,9 +11197,9 @@ function seccionPlanNutricional(c){
           : ''}
         ${schedNutriBadge}
       </div>
-      <span style="font-size:10px;color:var(--text3)">${opciones.length} ${opciones.length===1?'opción':'opciones'} de dieta</span>
     </div>
     ${objetivosHtml}
+    ${_barraMacrosHtml(plan)}
     ${metaHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
     ${tiraBibliotecaAlimentos()}
@@ -11182,6 +11215,147 @@ function seleccionarOpcionNutri(i){
   editandoComida = null;  // al cambiar de opción, salir de edición de comida
   comidaBorrador = null;
   mostrandoSelectorAlimento = false;
+  renderClientPanel();
+}
+
+// ── Barra de reparto de macros (P/C/G por % de kcal) del plan ──
+function _barraMacrosHtml(plan){
+  if (!plan) return '';
+  const p = Number(plan.protein_g)||0, c = Number(plan.carbs_g)||0, f = Number(plan.fat_g)||0;
+  const pc = p*4, cc = c*4, fc = f*9, tot = pc+cc+fc;
+  if (tot <= 0) return '';
+  const pp = Math.round(pc/tot*100), cp = Math.round(cc/tot*100), fp = 100 - pp - cp;
+  const punto = col => `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col};vertical-align:middle;margin-right:4px"></span>`;
+  return `<div style="display:flex;height:9px;border-radius:6px;overflow:hidden;background:var(--border);margin-bottom:7px">
+      <div style="width:${pp}%;background:var(--green)"></div><div style="width:${cp}%;background:#f59e0b"></div><div style="width:${fp}%;background:#6b7280"></div>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:6px">
+      <span style="font-size:10px;color:var(--text2)">${punto('var(--green)')}Proteína ${pp}%</span>
+      <span style="font-size:10px;color:var(--text2)">${punto('#f59e0b')}Carbos ${cp}%</span>
+      <span style="font-size:10px;color:var(--text2)">${punto('#6b7280')}Grasa ${fp}%</span>
+    </div>`;
+}
+
+// ── Una celda de comparación total-de-opción vs objetivo ──
+function _macroCompCell(label, total, obj, unidad){
+  const t = Math.round(Number(total)||0);
+  const tStr = t.toLocaleString('es-ES');
+  const esKcal = unidad === ' kcal';
+  const big = `<div style="font-family:'DM Serif Display',serif;font-size:20px;line-height:1.1;color:${esKcal?'var(--green)':'var(--text)'}">${tStr}${unidad?`<span style="font-size:9px;color:var(--text3)">${unidad}</span>`:''}</div>`;
+  let sub;
+  if (obj == null || obj === ''){
+    sub = `<div style="font-size:9.5px;color:var(--text3);margin-top:2px">sin objetivo</div>`;
+  } else {
+    const o = Math.round(Number(obj)||0);
+    const d = t - o;
+    const tol = Math.max(Math.round(o*0.05), esKcal ? 40 : 5);
+    const ok = Math.abs(d) <= tol;
+    const col = ok ? 'var(--green)' : '#d97706';
+    const txt = ok
+      ? `✓ objetivo ${o.toLocaleString('es-ES')}`
+      : `${d>0?'+':''}${d.toLocaleString('es-ES')} ${d>0?'▲':'▼'} · obj ${o.toLocaleString('es-ES')}`;
+    sub = `<div style="font-size:9.5px;color:${col};font-weight:600;margin-top:2px">${txt}</div>`;
+  }
+  return `<div style="flex:1;min-width:0;background:var(--bg2);border-radius:10px;padding:9px 8px;text-align:center">
+    <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;color:var(--text3)">${label}</div>${big}${sub}</div>`;
+}
+
+// ── Bloque "Total de la opción N vs objetivo" ──
+function _totalOpcionComparado(plan, tot, numOpcion){
+  const dentro = (t,o,esK) => {
+    if (o == null || o === '') return true;
+    const tol = Math.max(Math.round(Number(o)*0.05), esK ? 40 : 5);
+    return Math.abs(Math.round(Number(t)||0) - Math.round(Number(o))) <= tol;
+  };
+  const allOk = dentro(tot.kcal, plan.kcal_goal, true)
+    && dentro(tot.protein, plan.protein_g, false)
+    && dentro(tot.carbs, plan.carbs_g, false)
+    && dentro(tot.fat, plan.fat_g, false);
+  const badge = allOk
+    ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--green);background:var(--gl);border-radius:7px;padding:3px 9px">✓ Cuadra con el objetivo</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1.5px solid #fde68a;border-radius:7px;padding:2px 9px">⚠ Revisar macros</span>`;
+  return `<div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total de la opción ${numOpcion} vs objetivo</span>
+      ${badge}
+    </div>
+    <div style="display:flex;gap:8px">
+      ${_macroCompCell('Calorías', tot.kcal, plan.kcal_goal, ' kcal')}
+      ${_macroCompCell('Proteína', tot.protein, plan.protein_g, ' g')}
+      ${_macroCompCell('Carbohid.', tot.carbs, plan.carbs_g, ' g')}
+      ${_macroCompCell('Grasa', tot.fat, plan.fat_g, ' g')}
+    </div>
+    <div style="font-size:9px;color:var(--text3);margin-top:9px">Cuando una opción se pasa o no llega, el macro afectado se marca en <span style="color:#d97706;font-weight:700">ámbar</span> con la diferencia.</div>
+  </div>`;
+}
+
+// ── Acciones de la opción activa: duplicar / borrar ──
+function _accionesOpcionHtml(opciones){
+  const op = opciones[editNutriOpcion];
+  const num = op ? (op.option_number ?? (editNutriOpcion+1)) : (editNutriOpcion+1);
+  const dupDis = opciones.length >= 7;
+  const delDis = opciones.length <= 1;
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+    <span style="font-size:10px;color:var(--text3);font-weight:600">Acciones de la Opción ${num}</span>
+    <div style="display:flex;gap:7px">
+      <button onclick="duplicarOpcionNutri()" ${dupDis?'disabled':''} title="${dupDis?'Máximo 7 opciones de dieta':'Duplicar esta opción'}" style="
+        height:27px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg2);
+        color:${dupDis?'var(--text3)':'var(--text2)'};font-size:11px;font-weight:600;cursor:${dupDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Duplicar opción</button>
+      <button onclick="borrarOpcionNutri()" ${delDis?'disabled':''} title="${delDis?'Debe quedar al menos una opción':'Borrar esta opción'}" style="
+        height:27px;padding:0 12px;border:1.5px solid ${delDis?'var(--border)':'#f3d0d0'};border-radius:8px;background:var(--bg2);
+        color:${delDis?'var(--text3)':'var(--red)'};font-size:11px;font-weight:600;cursor:${delDis?'not-allowed':'pointer'};font-family:'DM Sans',sans-serif">Borrar opción</button>
+    </div>
+  </div>`;
+}
+
+// Duplica automáticamente la opción seleccionada (tope 7) — INSERT en nutrition_options
+async function duplicarOpcionNutri(){
+  const c = currentClient;
+  if (!c || !c._nutrition || !c._nutrition.plan) return;
+  const opts = c._nutrition.options || [];
+  if (opts.length >= 7){ alert('Máximo 7 opciones de dieta.'); return; }
+  const op = opts[editNutriOpcion];
+  if (!op){ return; }
+  const maxNum = opts.reduce((m,o)=>Math.max(m, Number(o.option_number)||0), 0);
+  const fila = Object.assign({}, op);
+  delete fila.id;
+  delete fila.created_at;
+  fila.nutrition_plan_id = c._nutrition.plan.id;
+  fila.option_number = maxNum + 1;
+  fila.meals = JSON.parse(JSON.stringify(op.meals || {}));
+  const { data, error } = await sb
+    .from('nutrition_options')
+    .insert(fila)
+    .select('*')
+    .single();
+  if (error){
+    console.error('duplicarOpcionNutri error:', error);
+    alert('No se pudo duplicar la opción. Inténtalo de nuevo.');
+    return;
+  }
+  opts.push(data);
+  editNutriOpcion = opts.length - 1;   // saltar a la nueva opción
+  renderClientPanel();
+}
+
+// Borra la opción seleccionada (con confirmación) — DELETE en nutrition_options
+async function borrarOpcionNutri(){
+  const c = currentClient;
+  if (!c || !c._nutrition) return;
+  const opts = c._nutrition.options || [];
+  const op = opts[editNutriOpcion];
+  if (!op) return;
+  if (opts.length <= 1){ alert('Debe quedar al menos una opción de dieta.'); return; }
+  const num = op.option_number ?? (editNutriOpcion + 1);
+  if (!confirm('¿Borrar la Opción ' + num + '? Esta acción no se puede deshacer.')) return;
+  const { error } = await sb.from('nutrition_options').delete().eq('id', op.id);
+  if (error){
+    console.error('borrarOpcionNutri error:', error);
+    alert('No se pudo borrar la opción. Inténtalo de nuevo.');
+    return;
+  }
+  opts.splice(editNutriOpcion, 1);
+  if (editNutriOpcion >= opts.length) editNutriOpcion = opts.length - 1;
   renderClientPanel();
 }
 
@@ -12834,19 +13008,19 @@ function renderEditar() {
       </div>
       <div style="margin-bottom:10px">
         <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="new-note-input" class="edit-input" placeholder="Añadir nota de revisión (ej: Subir 200 kcal esta semana...)" style="flex:1">
+          <input id="new-note-input" class="edit-input" placeholder="Añadir nota de revisión (ej: Subir 200 kcal esta semana...)" onkeydown="if(event.key==='Enter')addRevisionNote()" style="flex:1">
           <button onclick="addRevisionNote()" class="ai-btn" style="padding:8px 14px;font-size:12px;white-space:nowrap">+ Añadir</button>
         </div>
         <div id="notes-list">
           ${(c.revisionNotes||[]).length===0
             ? `<div style="font-size:12px;color:var(--text3);padding:8px 0">Sin notas. Añade la primera nota de revisión.</div>`
-            : (c.revisionNotes||[]).slice().reverse().map((n,i,arr)=>`
+            : (c.revisionNotes||[]).slice().reverse().map(n=>`
             <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
               <div style="flex:1">
-                <div style="font-size:12px;color:var(--text2);line-height:1.5">${n.text}</div>
-                <div style="font-size:10px;color:var(--text3);margin-top:3px">${n.date} · ${n.week||''}</div>
+                <div style="font-size:12px;color:var(--text2);line-height:1.5">${escHtml(n.note||'')}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:3px">${fmtFechaNota(n.created_at)}${n.week_number!=null?' · Semana '+n.week_number:''}</div>
               </div>
-              <button onclick="deleteRevisionNote(${arr.length-1-i})" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;flex-shrink:0" title="Eliminar">✕</button>
+              <button onclick="deleteRevisionNote('${escHtml(n.id)}')" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;flex-shrink:0" title="Eliminar">✕</button>
             </div>`).join('')
           }
         </div>

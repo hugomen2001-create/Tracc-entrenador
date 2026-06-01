@@ -38,7 +38,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .client-list::-webkit-scrollbar{width:4px}
 .client-list::-webkit-scrollbar-track{background:transparent}
 .client-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-.client-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;cursor:pointer;transition:background .12s;user-select:none}
+.client-item{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:13px;cursor:pointer;transition:background .12s;user-select:none}
 .client-item:hover{background:var(--bg3)}
 .client-item.active{background:var(--accent)}
 .client-item.active .client-name{color:#fff}
@@ -69,10 +69,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 .pill-r{background:var(--rl);color:var(--red)}
 
 /* VIEW TABS */
-.view-tabs{display:flex;gap:0;margin-top:14px;border-bottom:1px solid var(--border)}
-.vtab{padding:9px 16px;font-size:12.5px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+.view-tabs{display:inline-flex;gap:5px;margin-top:14px;background:var(--bg3);border-radius:999px;padding:5px}
+.vtab{padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--text3);cursor:pointer;border-radius:999px;transition:all .15s}
 .vtab:hover{color:var(--text2)}
-.vtab.active{color:var(--text);border-bottom-color:var(--accent)}
+.vtab.active{color:#fff;background:var(--accent)}
 
 /* CONTENT */
 .content{padding:20px 26px 48px;flex:1}
@@ -482,10 +482,10 @@ canvas{width:100%!important}
 
 /* ── SIDEBAR FILTERS ── */
 .sb-filter-bar{padding:0 10px 8px;display:flex;flex-direction:column;gap:6px}
-.sb-search{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none}
+.sb-search{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none}
 .sb-search:focus{border-color:var(--border2)}
-.sb-filter-row{display:flex;gap:5px}
-.sb-filter-btn{flex:1;padding:4px 0;border-radius:6px;font-size:10.5px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text3);font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap;text-align:center}
+.sb-filter-row{display:flex;gap:8px;margin-bottom:8px}
+.sb-filter-btn{flex:1;padding:7px 0;border-radius:999px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text3);font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap;text-align:center}
 .sb-filter-btn:hover{background:var(--bg3)}
 .sb-filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .sb-sort-select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer}
@@ -1061,25 +1061,25 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   </div>
   <div id="sb-clientes-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 7px">
     <div style="display:flex;flex-direction:column;gap:6px;width:100%;margin-bottom:6px">
-      <button onclick="openVgMode('overview')" id="overview-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
+      <button onclick="openVgMode('overview')" id="overview-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M2.25 13.5a8.25 8.25 0 0 1 8.25-8.25.75.75 0 0 1 .75.75v6.75H18a.75.75 0 0 1 .75.75 8.25 8.25 0 0 1-16.5 0Z" clip-rule="evenodd"></path><path fill-rule="evenodd" d="M12.75 3a.75.75 0 0 1 .75-.75 8.25 8.25 0 0 1 8.25 8.25.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75V3Z" clip-rule="evenodd"></path></svg>
         Vista general
       </button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      <button onclick="openVgMode('pagos')" id="pagos-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
+      <button onclick="openVgMode('pagos')" id="pagos-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M2.25 8.25h19.5v-1.5A2.25 2.25 0 0 0 19.5 4.5h-15A2.25 2.25 0 0 0 2.25 6.75v1.5Zm19.5 3H2.25v6A2.25 2.25 0 0 0 4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25v-6Zm-15 4.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1-.75-.75Z"></path></svg>
         Pagos
       </button>
-      <button onclick="openVgMode('plan')" id="plan-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
+      <button onclick="openVgMode('plan')" id="plan-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd"></path></svg>
         Mi plan
       </button>
-      <button onclick="openVgMode('agenda')" id="agenda-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px;position:relative">
+      <button onclick="openVgMode('agenda')" id="agenda-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px;position:relative">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clip-rule="evenodd"></path></svg>
         Agenda
         <span id="agenda-badge" style="display:none;position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:9px;font-weight:700;align-items:center;justify-content:center">0</span>
       </button>
-      <button onclick="openVgMode('import')" id="import-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
+      <button onclick="openVgMode('import')" id="import-btn" style="width:100%;font-size:11px;font-weight:500;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-family:&#39;Geist&#39;,sans-serif;text-align:left;display:flex;align-items:center;gap:5px">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1"/></svg>
         Importar
       </button>
@@ -1099,23 +1099,30 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
     </div>
   </div>
   <div class="sb-filter-bar">
-    <input class="sb-search" type="text" id="sb-search" placeholder="Buscar cliente..." oninput="renderClientList()">
-    <div class="sb-filter-row">
-      <button class="sb-filter-btn active" id="filter-all" onclick="setFilter(&#39;all&#39;)">Todos</button>
-      <button class="sb-filter-btn" id="filter-green" onclick="setFilter(&#39;green&#39;)" style="color: var(--green);">●</button>
-      <button class="sb-filter-btn" id="filter-amber" onclick="setFilter(&#39;amber&#39;)" style="color: var(--amber);">●</button>
-      <button class="sb-filter-btn" id="filter-red" onclick="setFilter(&#39;red&#39;)" style="color: var(--red);">●</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input class="sb-search" type="text" id="sb-search" placeholder="Buscar cliente..." oninput="renderClientList()" style="flex:1">
+      <button id="sb-filter-toggle" onclick="toggleFiltros()" title="Filtros y orden" style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1.5px solid var(--border);border-radius:999px;background:var(--bg2);cursor:pointer;color:var(--text2)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      </button>
     </div>
-    <select class="sb-sort-select" id="sb-sort" onchange="renderClientList()">
-      <option value="name">Ordenar: Nombre A-Z</option>
-      <option value="name-desc">Ordenar: Nombre Z-A</option>
-      <option value="age">Edad ↑</option>
-      <option value="age-desc">Edad ↓</option>
-      <option value="weeks">Tiempo en equipo ↑</option>
-      <option value="weeks-desc">Tiempo en equipo ↓</option>
-      <option value="revision">Próx. revisión ↑</option>
-      <option value="revision-desc">Próx. revisión ↓</option>
-    </select>
+    <div id="sb-filtros-panel" style="display:none;margin-top:8px">
+      <div class="sb-filter-row">
+        <button class="sb-filter-btn active" id="filter-all" onclick="setFilter(&#39;all&#39;)">Todos</button>
+        <button class="sb-filter-btn" id="filter-green" onclick="setFilter(&#39;green&#39;)" style="color: var(--green);">●</button>
+        <button class="sb-filter-btn" id="filter-amber" onclick="setFilter(&#39;amber&#39;)" style="color: var(--amber);">●</button>
+        <button class="sb-filter-btn" id="filter-red" onclick="setFilter(&#39;red&#39;)" style="color: var(--red);">●</button>
+      </div>
+      <select class="sb-sort-select" id="sb-sort" onchange="renderClientList()">
+        <option value="name">Ordenar: Nombre A-Z</option>
+        <option value="name-desc">Ordenar: Nombre Z-A</option>
+        <option value="age">Edad ↑</option>
+        <option value="age-desc">Edad ↓</option>
+        <option value="weeks">Tiempo en equipo ↑</option>
+        <option value="weeks-desc">Tiempo en equipo ↓</option>
+        <option value="revision">Próx. revisión ↑</option>
+        <option value="revision-desc">Próx. revisión ↓</option>
+      </select>
+    </div>
   </div>
   <div class="client-list" id="client-list">
   </div>
@@ -4388,6 +4395,26 @@ function marcarRevision(clientId) {
 // ── SIDEBAR FILTER & SORT ─────────────────────────────────────────────────
 let activeFilter = 'all';
 
+// Muestra/oculta el panel de filtros y orden (oculto por defecto)
+function toggleFiltros(){
+  const p = document.getElementById('sb-filtros-panel');
+  const b = document.getElementById('sb-filter-toggle');
+  if(!p) return;
+  const abrir = p.style.display === 'none';
+  p.style.display = abrir ? 'block' : 'none';
+  if(b){ b.style.background = abrir ? 'var(--accent)' : 'var(--bg2)'; b.style.color = abrir ? '#fff' : 'var(--text2)'; b.style.borderColor = abrir ? 'var(--accent)' : 'var(--border)'; }
+}
+// Marca el botón de filtros si hay un filtro de estado activo (aunque esté cerrado)
+function _refreshFilterToggleDot(){
+  const b = document.getElementById('sb-filter-toggle');
+  if(!b) return;
+  const panelAbierto = (document.getElementById('sb-filtros-panel')||{}).style.display !== 'none';
+  if(panelAbierto) return; // si está abierto ya se ve en accent
+  const activo = activeFilter !== 'all';
+  b.style.borderColor = activo ? 'var(--green)' : 'var(--border)';
+  b.style.color = activo ? 'var(--green)' : 'var(--text2)';
+}
+
 function setFilter(f) {
   activeFilter = f;
   ['all','green','amber','red'].forEach(k => {
@@ -4399,6 +4426,7 @@ function setFilter(f) {
     const btn = document.getElementById('filter-' + k);
     if (btn && k !== 'all') btn.style.color = f === k ? '#fff' : colors[k];
   });
+  _refreshFilterToggleDot();
   renderClientList();
 }
 
@@ -10695,25 +10723,51 @@ function seccionPlanNutricional(c){
         </div>`;
       }
 
-      // ── Comida en modo lectura ──
-      const filas = items.map(it => `
-        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
-          <span style="font-size:12px;color:var(--text)">${escHtml(it.name||'—')}</span>
-          <span style="font-size:12px;color:var(--text3);white-space:nowrap;padding-left:10px">${it.grams!=null?escHtml(it.grams)+' g':''}</span>
-        </div>`).join('') || `<div style="font-size:11px;color:var(--text3);padding:5px 0">Sin alimentos</div>`;
-      return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
-          <span style="font-size:11.5px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
-          <span style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;font-weight:700;color:var(--green)">${kcalComida} kcal</span>
-            <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0">✏️</button>
-          </span>
+      // ── Comida en modo lectura (estilo tabla: cantidad · alimento · kcal · P · C · G) ──
+      const totC = items.reduce((a,it)=>({
+        kcal:a.kcal+(Number(it.kcal)||0), p:a.p+(Number(it.protein)||0),
+        c:a.c+(Number(it.carbs)||0), g:a.g+(Number(it.fat)||0)
+      }), {kcal:0,p:0,c:0,g:0});
+      const num = n => { const v=Number(n); return Number.isFinite(v)? (Math.round(v*10)/10).toLocaleString('es-ES') : '·'; };
+      const headCol = 'font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;text-align:right;padding:0 0 5px';
+      const cell = 'font-size:11.5px;color:var(--text2);text-align:right;padding:5px 0;white-space:nowrap';
+      const filas = items.length ? items.map(it => `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="${cell};text-align:left;color:var(--text3);width:46px">${it.grams!=null?escHtml(it.grams)+' g':'·'}</td>
+          <td style="${cell};text-align:left;color:var(--text);padding-left:6px;white-space:normal">${escHtml(it.name||'—')}</td>
+          <td style="${cell};color:var(--green);font-weight:600">${num(it.kcal)}</td>
+          <td style="${cell}">${num(it.protein)}</td>
+          <td style="${cell}">${num(it.carbs)}</td>
+          <td style="${cell}">${num(it.fat)}</td>
+        </tr>`).join('')
+        : `<tr><td colspan="6" style="font-size:11px;color:var(--text3);padding:8px 0;text-align:center">Sin alimentos</td></tr>`;
+      return `<div style="background:var(--bg);border-radius:11px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
+          <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0">✏️</button>
         </div>
-        ${filas}
+        <table style="width:100%;border-collapse:collapse;table-layout:auto">
+          <thead><tr>
+            <th style="${headCol};text-align:left;width:46px">Cant.</th>
+            <th style="${headCol};text-align:left;padding-left:6px">Alimento</th>
+            <th style="${headCol}">Kcal</th>
+            <th style="${headCol}">P</th>
+            <th style="${headCol}">C</th>
+            <th style="${headCol}">G</th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+          <tfoot><tr style="border-top:2px solid var(--border2)">
+            <td colspan="2" style="font-size:10.5px;font-weight:700;color:var(--text);text-align:left;padding:7px 0">Total comida</td>
+            <td style="${cell};color:var(--green);font-weight:700;padding-top:7px">${num(totC.kcal)}</td>
+            <td style="${cell};font-weight:700;padding-top:7px">${num(totC.p)}</td>
+            <td style="${cell};font-weight:700;padding-top:7px">${num(totC.c)}</td>
+            <td style="${cell};font-weight:700;padding-top:7px">${num(totC.g)}</td>
+          </tr></tfoot>
+        </table>
       </div>`;
       })();
-      // Cada comida es una columna que se estira para llenar el ancho
-      return `<div style="flex:1;min-width:0">${htmlComida}</div>`;
+      // Cada comida es una celda de la cuadrícula
+      return `<div style="min-width:0">${htmlComida}</div>`;
     }).join('');
 
     opcionesHtml = `
@@ -10736,7 +10790,7 @@ function seccionPlanNutricional(c){
           <div style="font-size:16px;font-weight:700;color:var(--text)">${Math.round(tot.fat)} g</div>
         </div>
       </div>
-      <div style="display:flex;gap:9px;align-items:flex-start">${comidasHtml}</div>`;
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;align-items:start">${comidasHtml}</div>`;
   }
 
   // Badge "Cambia el [fecha]" si hay plan nutricional futuro programado

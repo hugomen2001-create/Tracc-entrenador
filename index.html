@@ -11909,14 +11909,14 @@ function seccionPlanEntreno(c){
     } else {
       // ── Modo lectura: filas con badge de día de color ──
       splitHtml = `
-        <div style="margin-bottom:14px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split</div>
+        <div style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split</div>
             <button onclick="editarSplit()" style="
-              height:26px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">✏️ Editar</button>
+              height:28px;padding:0 13px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">✏️ Editar</button>
           </div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${split.map((s,i) => {
               const off = !s || s === 'OFF';
               // El color del cuadrado se basa en el tipo BASE
@@ -11931,10 +11931,10 @@ function seccionPlanEntreno(c){
                 : 'border:1.5px solid var(--border)';
               const onclick = off ? '' : `onclick="seleccionarSesionPorTipo('${escHtml(s)}',${i})"`;
               const title = off ? 'Día de descanso' : 'Ver ejercicios de '+escHtml(s);
-              return `<div ${onclick} title="${title}" style="flex:1;min-width:62px;background:var(--bg);${ringStyle};border-radius:10px;padding:8px 4px;text-align:center;cursor:${cursor};transition:transform .12s, box-shadow .12s" ${off?'':`onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''"`}>
-                <div style="width:22px;height:22px;border-radius:6px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
-                  font-size:9px;font-weight:700;color:#fff;background:${col}">D${i+1}</div>
-                <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${off?'var(--text3)':col}">${off?'Descanso':escHtml(s)}</div>
+              return `<div ${onclick} title="${title}" style="flex:1;min-width:62px;background:var(--bg2);${ringStyle};border-radius:10px;padding:9px 4px;text-align:center;cursor:${cursor};transition:transform .12s, box-shadow .12s" ${off?'':`onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''"`}>
+                <div style="width:24px;height:24px;border-radius:6px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;
+                  font-size:10px;font-weight:700;color:#fff;background:${col}">D${i+1}</div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:${off?'var(--text3)':col}">${off?'Descanso':escHtml(s)}</div>
               </div>`;
             }).join('')}
           </div>
@@ -11965,11 +11965,15 @@ function seccionPlanEntreno(c){
     // Pestañas de sesión (TORSO, LEG, PUSH, PULL...)
     const pills = tiposSesion.map((t,i) => {
       const activa = i === editSesionEntreno;
-      return `<button onclick="seleccionarSesionEntreno(${i})" style="
-        height:30px;padding:0 13px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;
+      const vacia = ((porSesion[t] || []).length === 0);
+      const dot = vacia
+        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${activa?'#fde68a':'#f59e0b'};margin-right:6px;vertical-align:middle"></span>`
+        : '';
+      return `<button onclick="seleccionarSesionEntreno(${i})" title="${vacia?'Esta sesión aún no tiene ejercicios':''}" style="
+        height:32px;padding:0 15px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;
         border:1.5px solid ${activa?'var(--green)':'var(--border)'};
         background:${activa?'var(--green)':'var(--bg2)'};
-        color:${activa?'#fff':'var(--text2)'};text-transform:capitalize">${escHtml(t.toLowerCase())}</button>`;
+        color:${activa?'#fff':'var(--text2)'};text-transform:capitalize">${dot}${escHtml(t.toLowerCase())}</button>`;
     }).join('');
 
     // Ejercicios de la sesión seleccionada
@@ -11979,7 +11983,7 @@ function seccionPlanEntreno(c){
 
     const filas = lista.map((ej,idx) => {
       const enEdicion = editandoEjercicioId && ej.id === editandoEjercicioId;
-      const numero = `<div style="width:22px;height:22px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${idx+1}</div>`;
+      const numero = `<div style="width:24px;height:24px;border-radius:7px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3);flex-shrink:0">${idx+1}</div>`;
 
       if (enEdicion){
         // ── Fila en modo edición ──
@@ -12033,12 +12037,12 @@ function seccionPlanEntreno(c){
         ? `<button onclick="quitarEjercicio('${escHtml(ej.id)}')" title="Quitar" style="
             background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;color:var(--red)">✕</button>`
         : '';
-      return `<div style="background:var(--bg);border-radius:11px;padding:11px 13px;margin-bottom:7px">
-        <div style="display:flex;align-items:flex-start;gap:8px">
+      return `<div style="background:var(--bg);border-radius:11px;padding:12px 14px;margin-bottom:7px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
           ${numero}
           <div style="flex:1;min-width:0">
-            <div style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:10px">
+            <div style="font-size:13.5px;font-weight:700;color:var(--text)">${escHtml(ej.name||'Ejercicio')}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px">
               <span><span style="opacity:.6">Series:</span> ${ej.sets ?? '—'}</span>
               <span><span style="opacity:.6">Reps:</span> ${escHtml(ej.reps || '—')}</span>
               <span><span style="opacity:.6">Descanso:</span> ${fmtDescanso(ej.rest_sec)}</span>
@@ -12047,10 +12051,10 @@ function seccionPlanEntreno(c){
           </div>
           ${ej.video_url
             ? `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-                <a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;white-space:nowrap;font-weight:600">▶ Ver vídeo</a>
-                <button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Editar el link del vídeo" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:2px 4px">✎</button>
+                <a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--green);text-decoration:none;white-space:nowrap;font-weight:600">▶ Ver vídeo</a>
+                <button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Editar el link del vídeo" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:2px 4px">✎</button>
               </div>`
-            : `<button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Añadir link de vídeo (YouTube/Vimeo)" style="font-size:10.5px;color:var(--text3);background:var(--bg);border:1.5px dashed var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif">🔗 Pegar link</button>`}
+            : `<button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Añadir link de vídeo (YouTube/Vimeo)" style="font-size:11.5px;color:var(--text3);background:var(--bg);border:1.5px dashed var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif">🔗 Pegar link</button>`}
           ${flechas}
           ${botonEditar}
           ${botonQuitar}
@@ -12060,15 +12064,15 @@ function seccionPlanEntreno(c){
 
     sesionesHtml = `
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${pills}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:11px;color:var(--text3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-size:12px;color:var(--text3)">
           ${lista.length
             ? `<strong style="color:var(--text2)">${escHtml(tipoSel)}</strong> · ${lista.length} ${lista.length===1?'ejercicio':'ejercicios'}`
             : `<strong style="color:var(--text2)">${escHtml(tipoSel)}</strong> · sin ejercicios todavía`}
         </span>
         ${lista.length ? `<button onclick="guardarSesionComoPlantilla()" style="
-          height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">💾 Guardar sesión como plantilla</button>` : ''}
+          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">💾 Guardar sesión como plantilla</button>` : ''}
       </div>
       ${filas}
       ${selectorEjercicioHtml(tipoSel)}`;
@@ -12080,36 +12084,37 @@ function seccionPlanEntreno(c){
     : '';
 
   return `<div style="${cardStyle}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:9px">
-        <div style="${secTitle}">🏋️ Plan de entreno</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏋️</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:21px;line-height:1.1;color:var(--text)">Plan de entreno</div>
         <button onclick="abrirMesociclo()" style="
-          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 ${etiquetaBotonMeso(c)}</button>
+          height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📅 ${etiquetaBotonMeso(c)}</button>
         ${(!editandoBorradorPlan && !c._scheduledTrainingDate)
           ? `<button onclick="abrirModalProgramarCambio('train')" title="Crear un borrador del plan que se activará en una fecha futura" style="
-              height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 Programar cambio</button>`
+              height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📅 Programar cambio</button>`
           : ''}
         ${(!editandoBorradorPlan && c._scheduledTrainingDate)
           ? `<button onclick="entrarBorradorExistente('train')" title="Editar el borrador programado" style="
-              height:26px;padding:0 11px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
-              background:#fffbeb;color:#92400e;font-size:11px;font-weight:700">✏️ Editar borrador</button>`
+              height:28px;padding:0 12px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
+              background:#fffbeb;color:#92400e;font-size:12px;font-weight:700">✏️ Editar borrador</button>`
           : ''}
         ${schedTrainBadge}
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:10px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text3)">Split ${split.length||'—'} días · ${diasEntreno} ${diasEntreno===1?'sesión':'sesiones'}</span>
         <input type="file" id="import-ex-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarEjerciciosExcel(this)">
         <button onclick="descargarPlantillaEjercicios()" title="Descargar plantilla Excel con el formato esperado" style="
-          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📄 Plantilla</button>
+          height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📄 Plantilla</button>
         <button onclick="document.getElementById('import-ex-input').click()" title="Importar un Excel/CSV con ejercicios" style="
-          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel</button>
+          height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📂 Importar Excel</button>
         <button onclick="abrirPlantillas()" style="
-          height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📋 Plantillas</button>
+          height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📋 Plantillas</button>
       </div>
     </div>
     ${panelMesocicloHtml(c)}
@@ -12117,10 +12122,10 @@ function seccionPlanEntreno(c){
     ${splitHtml}
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
     <div data-section="ejercicios-por-sesion" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Ejercicios por sesión</div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Ejercicios por sesión</div>
       <button onclick="guardarPlanComoPlantilla()" style="
-        height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-        background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">💾 Guardar plan completo</button>
+        height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
+        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">💾 Guardar plan completo</button>
     </div>
     ${sesionesHtml}
   </div>`;

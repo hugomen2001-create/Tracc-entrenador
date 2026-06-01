@@ -538,6 +538,7 @@ canvas{width:100%!important}
 #help-fab:hover{border-color:var(--green)}
 .reorg-ic:hover .reorg-tip{opacity:1 !important;visibility:visible !important}
 .paso-bar:hover .paso-tip{opacity:1 !important;visibility:visible !important}
+.met-bar:hover .met-bar-tip{opacity:1 !important;visibility:visible !important}
 
 .lg-shell{
   width:900px;max-width:100%;height:580px;
@@ -7061,10 +7062,10 @@ function tarjetaPesoMesociclo(c){
   </div>`;
 }
 
-// Línea limpia para métricas de largo plazo (muchos puntos): sin un círculo
-// por día, solo la línea + punto final. Altura contenida, ancho completo.
+// Línea limpia para métricas de largo plazo (peso). Línea + área + puntos
+// invisibles con tooltip (dato del día + media de su semana).
 function lineaLargoPlazo(puntos, color, sufijo){
-  const W = 700, H = 130, padX = 10, padY = 16;
+  const W = 700, H = 130, padX = 12, padY = 18;
   const vals = puntos.map(p => p.valor).filter(v => v != null);
   if (vals.length < 2){
     return `<div style="height:${H}px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3)">Sin datos suficientes</div>`;
@@ -7074,16 +7075,65 @@ function lineaLargoPlazo(puntos, color, sufijo){
   const n = puntos.length;
   const x = i => padX + (i/(n-1)) * (W - padX*2);
   const y = v => padY + (1 - (v - min)/rango) * (H - padY*2);
-  const conValor = puntos.map((p,i)=>({i,v:p.valor})).filter(o=>o.v!=null);
+  const conValor = puntos.map((p,i)=>({i,v:p.valor,p})).filter(o=>o.v!=null);
   const linePts = conValor.map(o => `${x(o.i).toFixed(1)},${y(o.v).toFixed(1)}`).join(' ');
   const last = conValor[conValor.length-1];
-  // Área suave bajo la línea
   const areaPts = `${x(conValor[0].i).toFixed(1)},${(H-padY).toFixed(1)} ` + linePts + ` ${x(last.i).toFixed(1)},${(H-padY).toFixed(1)}`;
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;overflow:visible" preserveAspectRatio="none">
+  // Puntos invisibles para el tooltip (dato del día + media semana)
+  const dots = conValor.map(o => {
+    const cx = x(o.i).toFixed(1), cy = y(o.v).toFixed(1);
+    const dia = o.p.fechaTxt || '';
+    const val = (sufijo ? o.v + sufijo : o.v) + (o.p.mediaTxt ? ' · sem. ' + o.p.mediaTxt : '');
+    return `<circle cx="${cx}" cy="${cy}" r="9" fill="transparent" class="metric-pt" style="cursor:pointer"
+      data-dia="${escHtml(dia)}" data-val="${escHtml(String(val))}"
+      onmouseover="mostrarTooltipPunto(event)" onmouseout="ocultarTooltipPunto()"></circle>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block;overflow:visible">
     <polygon points="${areaPts}" fill="${color}" opacity="0.07"/>
-    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-    <circle cx="${x(last.i).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5" fill="${color}"/>
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${x(last.i).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5" fill="${color}" style="pointer-events:none"/>
+    ${dots}
   </svg>`;
+}
+
+// Barras semanales para métricas como pasos/sueño (media de cada semana).
+// puntos = [{date:'YYYY-MM-DD', v:Number}] de ~90 días. Agrupa por semana (lunes).
+function barrasSemanales(puntos, color, unidad){
+  if (!puntos.length) return `<div style="height:130px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3)">Sin datos suficientes</div>`;
+  // Agrupar por lunes de la semana
+  const semanas = {};
+  puntos.forEach(o => {
+    const d = new Date(o.date+'T00:00:00');
+    const dow = d.getDay()===0?6:d.getDay()-1;
+    const lunes = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+    const key = `${lunes.getFullYear()}-${String(lunes.getMonth()+1).padStart(2,'0')}-${String(lunes.getDate()).padStart(2,'0')}`;
+    (semanas[key] = semanas[key] || []).push(o.v);
+  });
+  const claves = Object.keys(semanas).sort();
+  const datos = claves.map(k => {
+    const vals = semanas[k];
+    const media = vals.reduce((a,b)=>a+b,0)/vals.length;
+    let etiqueta = k;
+    try { etiqueta = new Date(k+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); } catch(e){}
+    return { key:k, media, etiqueta, n:vals.length };
+  });
+  const maxV = Math.max(...datos.map(d=>d.media), 1);
+  const fmtV = (v) => unidad==='h' ? v.toFixed(1)+'h' : Math.round(v).toLocaleString('es-ES');
+
+  // Barras estrechas centradas
+  const barras = datos.map(d => {
+    const h = Math.max(4, Math.round(d.media/maxV*100));
+    const tip = `Sem. ${d.etiqueta}: ${fmtV(d.media)} media`;
+    return `<div class="met-bar" style="position:relative;width:32px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:default">
+      <div class="met-bar-tip" style="position:absolute;bottom:130px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:600;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:20;opacity:0;visibility:hidden;transition:opacity .12s;pointer-events:none">${escHtml(tip)}<div style="position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#1a1a18"></div></div>
+      <div style="width:100%;height:118px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${h}%;background:${color};border-radius:6px 6px 0 0;transition:height .3s"></div>
+      </div>
+      <span style="font-size:8.5px;color:var(--text3);white-space:nowrap">${d.etiqueta}</span>
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding-top:6px">${barras}</div>`;
 }
 
 function seccionMetricas(c){
@@ -7136,10 +7186,28 @@ function seccionMetricas(c){
     const dias = Math.round((new Date(ultimo.date) - new Date(primero.date))/86400000);
     const periodo = dias < 35 ? 'el último mes' : dias < 75 ? 'los últimos 2 meses' : 'los últimos 3 meses';
 
+    // Media semanal por punto (para el tooltip del peso)
+    const mediaPorSemana = {};
+    puntos.forEach(o => {
+      const d = new Date(o.date+'T00:00:00');
+      const dow = d.getDay()===0?6:d.getDay()-1;
+      const lun = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+      const k = `${lun.getFullYear()}-${lun.getMonth()}-${lun.getDate()}`;
+      (mediaPorSemana[k] = mediaPorSemana[k] || []).push(o.v);
+    });
+    const mediaSemKey = (dateStr) => {
+      const d = new Date(dateStr+'T00:00:00');
+      const dow = d.getDay()===0?6:d.getDay()-1;
+      const lun = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+      return `${lun.getFullYear()}-${lun.getMonth()}-${lun.getDate()}`;
+    };
     const chartPts = puntos.map(o => {
       let fTxt = o.date;
       try{ fTxt = new Date(o.date+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){}
-      return { valor: o.v, fechaTxt: fTxt };
+      const arr = mediaPorSemana[mediaSemKey(o.date)] || [o.v];
+      const med = arr.reduce((a,b)=>a+b,0)/arr.length;
+      const medTxt = cfg.unidad==='kg' ? med.toFixed(1)+' kg' : cfg.campo==='steps' ? Math.round(med).toLocaleString('es-ES') : med.toFixed(1)+'h';
+      return { valor: o.v, fechaTxt: fTxt, mediaTxt: medTxt };
     });
 
     cuerpo = `
@@ -7147,7 +7215,9 @@ function seccionMetricas(c){
         <span style="font-size:24px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text)">${fmtV(ultimo.v)}<span style="font-size:13px;color:var(--text3)">${sufijo}</span></span>
         <span style="font-size:11.5px;font-weight:600;color:${diffColor}">${diffFmt} en ${periodo}</span>
       </div>
-      ${lineaLargoPlazo(chartPts, cfg.color, sufijo)}`;
+      ${segMetrica==='weight'
+        ? lineaLargoPlazo(chartPts, cfg.color, sufijo)
+        : barrasSemanales(puntos, cfg.color, cfg.unidad)}`;
   }
 
   return `<div style="margin-bottom:18px">
@@ -7313,19 +7383,21 @@ function seccionHistorialSesiones(c){
 
   const _histHtml = `<div style="margin-bottom:22px">
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Historial de sesiones</div>
-    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:18px;display:grid;grid-template-columns:minmax(0,0.85fr) minmax(0,1.15fr);gap:24px;align-items:start">
-      <div>
-        <div style="font-size:10.5px;color:var(--text3);margin-bottom:12px">Últimas 12 semanas · pulsa un día</div>
-        <div style="display:grid;grid-template-columns:12px repeat(${SEMANAS}, 1fr);gap:3px;max-width:340px">
-          ${filas}
-        </div>
-        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
-          ${leyenda}
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
-            <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
+    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div style="width:100%;max-width:400px">
+          <div style="font-size:10.5px;color:var(--text3);margin-bottom:12px">Últimas 12 semanas · pulsa un día</div>
+          <div style="display:grid;grid-template-columns:14px repeat(${SEMANAS}, 1fr);gap:4px">
+            ${filas}
+          </div>
+          <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">
+            ${leyenda}
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
+          </div>
         </div>
       </div>
-      <div id="detalle-sesion" style="border-left:1px solid var(--border);padding-left:22px;min-height:200px">
+      <div id="detalle-sesion" style="border-left:1px solid var(--border);padding-left:24px;min-height:200px">
         <div style="font-size:11px;color:var(--text3);padding:20px 0;text-align:center">Cargando último entreno…</div>
       </div>
     </div>

@@ -3414,7 +3414,12 @@ async function recargarTrainingDeCliente(c, planId){
       video_url: ex.video_url || null,
     };
   });
-  c._training = { plan, split: plan.split || [], exercises };
+  const _parseSplitR = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()){ try{ const p=JSON.parse(raw); return Array.isArray(p)?p:[]; }catch(e){ return []; } }
+    return [];
+  };
+  c._training = { plan, split: _parseSplitR(plan.split), exercises };
   return true;
 }
 
@@ -13524,11 +13529,12 @@ function renderChart() {
 loadStorage();
 
 // Seed Hugo demo diet if not in localStorage
-// Seed Hugo's training split if not in localStorage
+// [DESACTIVADO] El seed del split de demo de Hugo se quitó: Hugo ahora es un
+// cliente real en Supabase y su split (["OFF","TORSO",...]) viene de la BD.
+// Este seed en formato antiguo (objetos {day,type,exercises}) machacaba el real.
 const _hugoTs = getTrainState(1);
-// Force reset Hugo's split if version doesn't match (ensures correct split always loads)
 const HUGO_SPLIT_VERSION = 'v3-L_OFF-M_TORSO-X_OFF-J_LEG-V_PUSH-S_PULL-D_OFF';
-if (!_hugoTs.split || !_hugoTs.split.length || _hugoTs.splitVersion !== HUGO_SPLIT_VERSION) {
+if (false) {
   _hugoTs.splitVersion = HUGO_SPLIT_VERSION;
   // Set startDate to Monday of current week so split always starts on Monday
   const _monday = new Date();

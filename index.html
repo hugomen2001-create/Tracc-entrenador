@@ -8064,7 +8064,7 @@ function cardMesociclo(c){
     </div>`;
   }
 
-  return `<div style="${cardStyle}">
+  return `<div style="${cardStyle};display:flex;flex-direction:column;height:100%">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="${secTitle}">Mesociclo actual</div>
     </div>
@@ -8076,7 +8076,7 @@ function cardMesociclo(c){
       <div style="${datoStyle}"><div style="${lblStyle}">Fecha de inicio</div><div style="${valStyle}">${fmtFecha(meso.start_date)}</div></div>
       <div style="${datoStyle}"><div style="${lblStyle}">Fecha de fin</div><div style="${valStyle}">${fmtFecha(meso.end_date)}</div></div>
     </div>
-    <div>
+    <div style="margin-top:auto">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:11px;color:var(--text3)">Progreso del meso</span>
         <span style="font-size:11px;font-weight:700;color:var(--green)">${prog.pct}%</span>
@@ -8149,7 +8149,7 @@ function cardEvolucionPeso(c){
   const barras = visibles.map((k, i) => {
     const m = meses[k];
     const esUltimo = i === visibles.length - 1;
-    const altura = 16 + Math.round(((m.fin - min) / rango) * 22);
+    const altura = 24 + Math.round(((m.fin - min) / rango) * 46);
     const mesNum = parseInt(k.slice(5,7), 10) - 1;
     // datos para el tooltip, serializados en atributos data-
     return `<div class="peso-bar" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:default;position:relative"
@@ -8165,14 +8165,16 @@ function cardEvolucionPeso(c){
   const cambioTxt = (cambio > 0 ? '+' : '') + cambio.toFixed(1) + ' kg';
   const cambioColor = cambio > 0 ? 'var(--green)' : cambio < 0 ? 'var(--red)' : 'var(--text3)';
 
-  return `<div style="${cardStyle}">
+  return `<div style="${cardStyle};display:flex;flex-direction:column;height:100%">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="${secTitle}">Evolución del peso</div>
       <span style="font-size:11px;color:${cambioColor};font-weight:600">${cambioTxt}</span>
     </div>
-    <div style="height:48px;display:flex;align-items:flex-end;gap:5px"
-      onmouseover="mostrarTooltipPeso(event)" onmouseout="ocultarTooltipPeso(event)">
-      ${barras}
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+      <div style="display:flex;align-items:flex-end;gap:5px"
+        onmouseover="mostrarTooltipPeso(event)" onmouseout="ocultarTooltipPeso(event)">
+        ${barras}
+      </div>
     </div>
   </div>`;
 }
@@ -9020,7 +9022,7 @@ function renderPerfil() {
   // ── Ensamblado: ficha de identidad a lo ancho + fila de tarjetas ──
   const gridHtml = `
     ${cardDatos}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;align-items:start">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;align-items:stretch">
       ${cardCuestionario}
       ${cardEvolucionPeso(c)}
       ${cardMesociclo(c)}
@@ -9171,18 +9173,18 @@ function cardCuestionarioCompacto(c){
       <div style="font-size:12.5px;color:var(--text3);line-height:1.6">El cliente aún no ha completado el cuestionario inicial en MyTracc.</div>
     </div>`;
   }
-  const tile = (lbl, valHtml) => `<div style="flex:1;min-width:130px;background:var(--bg);border-radius:11px;padding:9px 12px"><div style="${lblStyle}">${lbl}</div>${valHtml}</div>`;
+  const tile = (lbl, valHtml) => `<div style="flex:1;min-width:130px;background:var(--bg);border-radius:11px;padding:11px 12px;display:flex;flex-direction:column;justify-content:center"><div style="${lblStyle}">${lbl}</div>${valHtml}</div>`;
   const chip = (txt) => `<span style="font-size:12px;font-weight:600;color:var(--green);background:var(--gl);border:1.5px solid rgba(22,163,74,.2);padding:3px 10px;border-radius:7px">${escHtml(txt)}</span>`;
   const objetivoHtml = (c.goal && c.goal!=='—') ? chip(c.goal) : '<span style="color:var(--text3);font-size:12px">Sin datos</span>';
   const diasHtml = q.available_days_per_week ? `<span style="font-size:13.5px;font-weight:600">${escHtml(String(q.available_days_per_week))} días</span>` : '<span style="color:var(--text3);font-size:12px">Sin datos</span>';
   const alergiasHtml = `<div style="font-size:13px;color:var(--text2)">${qVal(q.allergies)}</div>`;
-  return `<div style="${cardStyle}">
+  return `<div style="${cardStyle};display:flex;flex-direction:column;height:100%">
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px">
       ${hdrIcon}
       <div style="font-size:15px;font-weight:600">Cuestionario inicial</div>
       <button onclick="openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border:1.5px solid var(--green);border-radius:8px;background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">👁 Ver cuestionario completo</button>
     </div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap">
+    <div style="display:flex;gap:9px;flex-wrap:wrap;flex:1;align-items:stretch">
       ${tile('Objetivo', '<div style="margin-top:2px">'+objetivoHtml+'</div>')}
       ${tile('Días / semana', '<div style="margin-top:4px">'+diasHtml+'</div>')}
       ${tile('Alergias', '<div style="margin-top:2px">'+alergiasHtml+'</div>')}

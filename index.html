@@ -84,11 +84,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
 /* STAT GRID */
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
-.stat-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:15px;padding:14px 16px;cursor:pointer;transition:border-color .12s;position:relative}
+.stat-card{background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:15px 16px;cursor:pointer;transition:border-color .12s;position:relative}
 .stat-card:hover{border-color:var(--border2)}
-.stat-label{font-size:9px;color:#bbb;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px}
-.stat-value{font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;letter-spacing:-1.5px;line-height:1;color:#111}
-.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+.stat-label{font-size:10px;color:#a3a39e;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:7px}
+.stat-value{font-family:'DM Sans',sans-serif;font-size:27px;font-weight:600;letter-spacing:-0.5px;line-height:1;color:#1a1a18}
+.stat-sub{font-size:10.5px;color:var(--text3);margin-top:6px}
 .stat-hint{font-size:10px;color:#c0c0bc;margin-top:5px;display:flex;align-items:center;gap:3px}
 .sg{color:var(--green)}.sa{color:var(--amber)}.sr{color:var(--red)}
 .prog-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:8px}
@@ -131,12 +131,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
 /* METRICS 2x2 */
 .metrics-2x2{display:grid;grid-template-columns:1fr 1fr;gap:7px;height:100%}
-.metric-tile{background:var(--bg3);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;min-height:72px;transition:background .12s}
-.metric-tile:hover{background:#eeeee8}
-.metric-emoji{font-size:18px;line-height:1;color:var(--text2)}
+.metric-tile{background:var(--bg2);border:1px solid #ebebe7;border-radius:14px;padding:13px 14px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:11px;cursor:pointer;min-height:60px;transition:border-color .12s}
+.metric-tile:hover{border-color:var(--border2)}
+.metric-emoji{font-size:16px;line-height:1;color:var(--text2);width:34px;height:34px;min-width:34px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center}
 .metric-emoji svg{display:block}
-.metric-val{font-family:'DM Serif Display',serif;font-size:24px;font-weight:400;letter-spacing:-.5px;line-height:1;color:#111}
-.metric-lbl{font-size:9px;font-weight:700;color:#bbb;margin-top:1px;text-transform:uppercase;letter-spacing:.07em}
+.metric-val{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.3px;line-height:1.1;color:#1a1a18}
+.metric-lbl{font-size:10px;font-weight:500;color:#a3a39e;margin-top:2px;text-transform:none;letter-spacing:0}
+.metric-tile:nth-child(1) .metric-emoji{background:#fff5e9;color:#d97706}
+.metric-tile:nth-child(2) .metric-emoji{background:#eef2ff;color:#6366f1}
+.metric-tile:nth-child(3) .metric-emoji{background:#f0fdf4;color:#16a34a}
+.metric-tile:nth-child(4) .metric-emoji{background:#fef9ed;color:#d97706}
 
 /* PANEL CARD */
 .panel-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px}

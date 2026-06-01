@@ -4777,10 +4777,23 @@ function switchTab(tab) {
 }
 
 // ── S3: estado del bloque de evolución de cargas ──
-let s3Ejercicio = null;          // nombre del ejercicio seleccionado
+let s3Ejercicio = null;          // (legacy, ya no se usa en el nuevo modelo de pestañas)
 let s3Filtro = 'historico';      // 'historico' | 'tres_meses' | 'mesociclo'
 let s3Busqueda = '';             // texto del buscador
-let s3VerTodos = false;          // mostrar lista completa o solo chips de atajos
+let s3VerTodos = false;          // (legacy)
+let s3TipoTab = null;            // pestaña de tipo de sesión activa (PUSH, PULL, LEG…)
+let s3EjsSel = {};               // por tipo: { 'PUSH': Set(nombres seleccionados) }
+let s3FiltroAbierto = false;     // panel de selección de ejercicios desplegado
+let segMetrica = 'weight';       // métrica largo plazo elegida: 'weight' | 'steps' | 'sleep'
+function segSetMetrica(m){ segMetrica = m; renderClientPanel(); }
+function s3SetTab(tipo){ s3TipoTab = tipo; s3FiltroAbierto = false; renderClientPanel(); }
+function s3ToggleFiltro(){ s3FiltroAbierto = !s3FiltroAbierto; renderClientPanel(); }
+function s3ToggleEj(tipo, nombre){
+  if (!s3EjsSel[tipo]) s3EjsSel[tipo] = new Set();
+  const set = s3EjsSel[tipo];
+  if (set.has(nombre)) set.delete(nombre); else set.add(nombre);
+  renderClientPanel();
+}
 
 // Carga las series (workout_sets) del cliente actual desde Supabase si no están cargadas
 async function cargarSeriesCliente(){
@@ -6939,13 +6952,25 @@ function mostrarTooltipPunto(ev){
     tip = document.createElement('div');
     tip.id = 'metric-tooltip';
     tip.style.cssText = 'position:fixed;z-index:400;background:var(--text);color:#fff;'
-      + 'border-radius:8px;padding:6px 10px;font-size:11px;line-height:1.4;pointer-events:none;'
-      + 'box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap';
+      + 'border-radius:8px;padding:7px 11px;font-size:11px;line-height:1.4;pointer-events:none;'
+      + 'box-shadow:0 6px 20px rgba(0,0,0,.25)';
     document.body.appendChild(tip);
   }
   const dia = c.getAttribute('data-dia');
   const val = c.getAttribute('data-val');
-  tip.innerHTML = `<div style="opacity:.7">${dia}</div><div style="font-weight:700">${val}</div>`;
+  const series = c.getAttribute('data-series');  // "6×60|8×50|8×45" (reps×peso por serie)
+  let cuerpo;
+  if (series){
+    const filas = series.split('|').map((s,i) =>
+      `<div style="display:flex;gap:8px;color:#d4d3cf"><span style="opacity:.6">S${i+1}</span><span style="color:#fff;font-weight:600">${s}</span></div>`
+    ).join('');
+    cuerpo = `<div style="opacity:.65;margin-bottom:4px">${dia}</div>${filas}`;
+    tip.style.whiteSpace = 'normal';
+  } else {
+    cuerpo = `<div style="opacity:.7">${dia}</div><div style="font-weight:700">${val}</div>`;
+    tip.style.whiteSpace = 'nowrap';
+  }
+  tip.innerHTML = cuerpo;
   tip.style.display = 'block';
   const r = c.getBoundingClientRect();
   tip.style.left = (r.left + r.width/2) + 'px';
@@ -7037,80 +7062,74 @@ function tarjetaPesoMesociclo(c){
 }
 
 function seccionMetricas(c){
-  const metrics = c._metrics || [];
-  const lunes = lunesDeSemana(segWeekOffset);
-  const DIAS = ['L','M','X','J','V','S','D'];
-  const DIAS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  const metrics = (c._metrics || []).slice();
 
-  // Construir los 7 días de la semana seleccionada
-  // Usamos fechas locales sin pasar por UTC: toISOString() desplaza el día en zonas
-  // horarias adelantadas (en Barcelona las 00:00 locales son las 22:00 UTC del día anterior).
-  const fechaLocalKey = (dt) => dt.getFullYear() + '-' +
-    String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
-  const dias = [];
-  for (let i=0;i<7;i++){
-    const d = new Date(lunes);
-    d.setDate(d.getDate()+i);
-    const key = fechaLocalKey(d);
-    const reg = metrics.find(m => String(m.date).slice(0,10) === key);
-    const fechaTxt = DIAS_FULL[i] + ' ' + d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
-    dias.push({
-      label: DIAS[i],
-      fechaTxt: fechaTxt,
-      steps: reg && reg.steps != null ? Number(reg.steps) : null,
-      sleep: reg && reg.sleep_hours != null ? Number(reg.sleep_hours) : null,
-      weight: reg && reg.weight_kg != null ? Number(reg.weight_kg) : null,
+  // Configuración de cada métrica de largo plazo
+  const META = {
+    weight: { campo:'weight_kg', label:'Peso',  unidad:'kg',    color:'#16a34a', mejorBaja:true  },
+    steps:  { campo:'steps',     label:'Pasos', unidad:'',      color:'#d97706', mejorBaja:false },
+    sleep:  { campo:'sleep_hours',label:'Sueño',unidad:'h',     color:'#7c3aed', mejorBaja:false },
+  };
+  const cfg = META[segMetrica] || META.weight;
+
+  // Puntos de los últimos ~3 meses (90 días) con la métrica elegida
+  const hoy = new Date();
+  const hace90 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 90);
+  const fechaKey = (s) => String(s).slice(0,10);
+  const puntos = metrics
+    .filter(m => m && m[cfg.campo] != null && Number(m[cfg.campo]) > 0)
+    .map(m => ({ date: fechaKey(m.date), v: Number(m[cfg.campo]) }))
+    .filter(o => { try { return new Date(o.date+'T00:00:00') >= hace90; } catch(e){ return true; } })
+    .sort((a,b) => a.date < b.date ? -1 : 1);
+
+  // Píldoras de filtro
+  const pill = (key) => {
+    const m = META[key]; const sel = segMetrica===key;
+    return `<button onclick="segSetMetrica('${key}')" style="
+      border:none;border-radius:999px;padding:6px 15px;cursor:pointer;font-family:'DM Sans',sans-serif;
+      font-size:11.5px;font-weight:${sel?'600':'500'};
+      background:${sel?'var(--text)':'transparent'};color:${sel?'#fff':'var(--text2)'}">${m.label}</button>`;
+  };
+  const pills = `<div style="display:flex;gap:4px;background:var(--bg3);border-radius:999px;padding:4px;width:fit-content">
+    ${pill('weight')}${pill('steps')}${pill('sleep')}</div>`;
+
+  let cuerpo;
+  if (puntos.length < 2){
+    cuerpo = `<div style="height:120px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);text-align:center;padding:0 16px">
+      No hay suficientes registros de ${cfg.label.toLowerCase()} en los últimos 3 meses para mostrar la evolución.</div>`;
+  } else {
+    const primero = puntos[0], ultimo = puntos[puntos.length-1];
+    const diff = ultimo.v - primero.v;
+    const fmtV = (v) => cfg.unidad==='kg' ? v.toFixed(1) : (cfg.campo==='steps' ? Math.round(v).toLocaleString('es-ES') : v.toFixed(1));
+    const sufijo = cfg.unidad ? ' '+cfg.unidad : '';
+    const diffAbs = Math.abs(diff);
+    const diffFmt = (diff>0?'↑ ':diff<0?'↓ ':'') + (cfg.unidad==='kg'?diffAbs.toFixed(1):cfg.campo==='steps'?Math.round(diffAbs).toLocaleString('es-ES'):diffAbs.toFixed(1)) + sufijo;
+    // Color de la tendencia: para peso bajar es verde; para pasos/sueño subir es verde
+    const bueno = cfg.mejorBaja ? diff<0 : diff>0;
+    const diffColor = diff===0 ? 'var(--text3)' : bueno ? '#16a34a' : '#dc2626';
+    // nº de meses del rango
+    const dias = Math.round((new Date(ultimo.date) - new Date(primero.date))/86400000);
+    const periodo = dias < 35 ? 'el último mes' : dias < 75 ? 'los últimos 2 meses' : 'los últimos 3 meses';
+
+    const chartPts = puntos.map(o => {
+      let fTxt = o.date;
+      try{ fTxt = new Date(o.date+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){}
+      return { valor: o.v, fechaTxt: fTxt };
     });
+
+    cuerpo = `
+      <div style="display:flex;align-items:baseline;gap:10px;margin:14px 0 12px">
+        <span style="font-size:24px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text)">${fmtV(ultimo.v)}<span style="font-size:13px;color:var(--text3)">${sufijo}</span></span>
+        <span style="font-size:11.5px;font-weight:600;color:${diffColor}">${diffFmt} en ${periodo}</span>
+      </div>
+      ${miniLineChart(chartPts, cfg.color, cfg.unidad, sufijo)}`;
   }
 
-  // Medias de la semana (solo días con dato)
-  const media = (arr) => {
-    const v = arr.filter(x => x != null);
-    return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
-  };
-  const mSteps  = media(dias.map(d=>d.steps));
-  const mSleep  = media(dias.map(d=>d.sleep));
-  const mWeight = media(dias.map(d=>d.weight));
-
-  const fmtSteps = mSteps != null ? (mSteps>=1000 ? (mSteps/1000).toFixed(1)+'k' : Math.round(mSteps)) : '—';
-  const fmtSleep = mSleep != null ? mSleep.toFixed(1)+'h' : '—';
-  const fmtWeight = mWeight != null ? mWeight.toFixed(1)+' kg' : '—';
-
-  // Rótulo del rango de la semana
-  const finSemana = new Date(lunes); finSemana.setDate(finSemana.getDate()+6);
-  const fmtCorto = d => d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
-  const rotulo = segWeekOffset === 0 ? 'Esta semana'
-    : segWeekOffset === 1 ? 'Semana pasada'
-    : `Hace ${segWeekOffset} semanas`;
-  const rangoTxt = `${fmtCorto(lunes)} – ${fmtCorto(finSemana)}`;
-
-  const cards =
-    metricaCard('🦶','Pasos · media/día', fmtSteps, 'var(--green)', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.steps})), '#16a34a', '', ' pasos'),
-      'Lun','Dom') +
-    metricaCard('🌙','Sueño · media/noche', fmtSleep, '#7c3aed', '', '',
-      miniLineChart(dias.map(d=>({label:d.label,fechaTxt:d.fechaTxt,valor:d.sleep})), '#7c3aed', 'h', ' h'),
-      'Lun','Dom') +
-    tarjetaPesoMesociclo(c);
-
-  // Navegación de semanas. No se puede ir al futuro (offset 0 es el tope).
-  const btnStyle = 'width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);font-size:13px;display:flex;align-items:center;justify-content:center';
-  const btnDisabled = 'opacity:.35;cursor:not-allowed';
-
   return `<div style="margin-bottom:18px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:13px;font-weight:700;color:var(--text)">Métricas</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="cambiarSemanaSeg(1)" style="${btnStyle}" title="Semana anterior">‹</button>
-        <div style="text-align:center;min-width:130px">
-          <div style="font-size:11.5px;font-weight:700;color:var(--text)">${rotulo}</div>
-          <div style="font-size:10px;color:var(--text3)">${rangoTxt}</div>
-        </div>
-        <button onclick="cambiarSemanaSeg(-1)" style="${btnStyle}${segWeekOffset===0?';'+btnDisabled:''}" title="Semana siguiente" ${segWeekOffset===0?'disabled':''}>›</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr;gap:10px">
-      ${cards}
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Métricas · largo plazo</div>
+    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:16px 18px">
+      ${pills}
+      ${cuerpo}
     </div>
   </div>`;
 }
@@ -7170,14 +7189,14 @@ function seccionResumenActividad(c){
   const totalCompletadas = completadas.length;
 
   const tile = (valor, etiqueta, color) => `
-    <div style="flex:1;min-width:0;background:var(--bg);border-radius:11px;padding:11px 12px;text-align:center">
-      <div style="font-size:20px;font-weight:700;color:${color||'var(--text)'}">${valor}</div>
-      <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-top:2px">${etiqueta}</div>
+    <div style="flex:1;min-width:0;background:var(--bg2);border:1px solid #ebebe7;border-radius:14px;padding:14px 15px">
+      <div style="font-size:22px;font-weight:600;font-family:'DM Sans',sans-serif;color:${color||'var(--text)'};line-height:1">${valor}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:5px">${etiqueta}</div>
     </div>`;
 
-  return `<div style="${cardStyle}">
-    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">📊 Resumen de actividad</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+  return `<div style="margin-bottom:22px">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Resumen de actividad</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
       ${tile(ult4sem.length, 'Sesiones · últ. 4 sem.', 'var(--green)')}
       ${tile(mediaSemana.toFixed(1), 'Media por semana', 'var(--text)')}
       ${tile(textoUltimo, 'Último entreno', 'var(--text)')}
@@ -7190,6 +7209,11 @@ function seccionResumenActividad(c){
 function seccionHistorialSesiones(c){
   const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:18px';
   const sesiones = (c._sessions || []);
+  // Sesiones completadas (no descanso) ordenadas por fecha desc, para el "último entreno" por defecto
+  const _esOff = t => { const x=String(t||'').toUpperCase(); return !x||x==='OFF'||x==='DESCANSO'||x==='DSC'; };
+  const completadas = sesiones
+    .filter(s => s && s.completed && s.session_date && !_esOff(s.session_type))
+    .sort((a,b)=> String(b.session_date).localeCompare(String(a.session_date)));
 
   if (!sesiones.length){
     return `<div style="${cardStyle}">
@@ -7228,7 +7252,8 @@ function seccionHistorialSesiones(c){
   const DIAS = ['L','M','X','J','V','S','D'];
   const hoyStr = fechaLocalStr(hoy);
 
-  // Filas = días de la semana (L..D), columnas = semanas
+  // Filas = días de la semana (L..D), columnas = semanas. Celdas cuadradas iguales.
+  const ultimaSesionId = (completadas[0] && completadas[0].id) || (sesiones[0] && sesiones[0].id) || '';
   let filas = '';
   for (let d = 0; d < 7; d++){
     let celdas = '';
@@ -7237,29 +7262,21 @@ function seccionHistorialSesiones(c){
       const fStr = fechaLocalStr(dia);
       const futuro = fStr > hoyStr;
       const ses = porFecha[fStr];
-      let bg = 'var(--bg3)', borde = '1px solid var(--border)', contenido = '';
+      let bg = 'var(--bg3)', borde = '1px solid var(--border)';
       let titulo = formatearFechaCorta(fStr);
       let onclick = '';
       if (futuro){
         bg = 'transparent'; borde = '1px solid transparent';
       } else if (ses){
         const col = colorTipoSesion(ses.session_type || '');
-        if (ses.completed){
-          bg = col; borde = '1px solid ' + col;
-        } else {
-          // Sin terminar: apagado, con borde del color
-          bg = col + '33'; borde = '1.5px dashed ' + col;
-        }
+        if (ses.completed){ bg = col; borde = '1px solid ' + col; }
+        else { bg = col + '33'; borde = '1.5px dashed ' + col; }
         titulo += ' · ' + (ses.session_type||'') + (ses.completed ? '' : ' (sin terminar)');
-        onclick = ` onclick="abrirDetalleSesion('${ses.id}','${escHtml(fStr)}')" style="cursor:pointer"`;
+        onclick = `onclick="abrirDetalleSesion('${ses.id}','${escHtml(fStr)}')"`;
       }
-      celdas += `<div title="${escHtml(titulo)}"${onclick ? onclick : ' style=""'}
-        ><div style="width:22px;height:22px;border-radius:4px;background:${bg};border:${borde}"></div></div>`;
+      celdas += `<div title="${escHtml(titulo)}" ${onclick} style="aspect-ratio:1;width:100%;border-radius:4px;background:${bg};border:${borde};${onclick?'cursor:pointer':''}"></div>`;
     }
-    filas += `<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
-      <div style="width:16px;font-size:9px;color:var(--text3);font-weight:600;text-align:center">${DIAS[d]}</div>
-      ${celdas}
-    </div>`;
+    filas += `<span style="font-size:9px;color:var(--text3);font-weight:600;display:flex;align-items:center;justify-content:center">${DIAS[d]}</span>${celdas}`;
   }
 
   // Leyenda de colores por tipo de sesión presente
@@ -7269,26 +7286,43 @@ function seccionHistorialSesiones(c){
       <span style="width:10px;height:10px;border-radius:2px;background:${colorTipoSesion(t)}"></span>${escHtml(t)}</span>`
   ).join('');
 
-  return `<div style="${cardStyle}">
-    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">🗓️ Historial de sesiones</div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Últimas 12 semanas · pulsa un día para ver el detalle</div>
-    <div style="overflow-x:auto">
-      ${filas}
-    </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
-      ${leyenda}
-      <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
-        <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
+  const _histHtml = `<div style="margin-bottom:22px">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Historial de sesiones</div>
+    <div style="background:var(--bg2);border:1px solid #ebebe7;border-radius:16px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+      <div>
+        <div style="font-size:10.5px;color:var(--text3);margin-bottom:12px">Últimas 12 semanas · pulsa un día</div>
+        <div style="display:grid;grid-template-columns:14px repeat(${SEMANAS}, 1fr);gap:4px">
+          ${filas}
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          ${leyenda}
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text3)">
+            <span style="width:10px;height:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border)"></span>Sin entreno</span>
+        </div>
+      </div>
+      <div id="detalle-sesion" style="border-left:1px solid var(--border);padding-left:22px;min-height:200px">
+        <div style="font-size:11px;color:var(--text3);padding:20px 0;text-align:center">Cargando último entreno…</div>
+      </div>
     </div>
   </div>`;
+  // Auto-cargar el último entreno en el panel derecho tras pintar el DOM
+  if (ultimaSesionId){
+    setTimeout(() => { try{ abrirDetalleSesion(ultimaSesionId, '', true); }catch(e){ console.warn('detalle inicial:', e); } }, 30);
+  }
+  return _histHtml;
 }
 
-// Abre el detalle de una sesión: carga sus series desde workout_sets
-async function abrirDetalleSesion(sessionId, fechaStr){
+// Abre el detalle de una sesión en el panel derecho del historial.
+// esUltimo = true muestra la etiqueta "Último" (entreno por defecto).
+async function abrirDetalleSesion(sessionId, fechaStr, esUltimo){
   const cont = document.getElementById('detalle-sesion');
   if (!cont) return;
-  cont.innerHTML = `<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:11px;
-    font-size:11px;color:var(--text3);text-align:center">Cargando detalle…</div>`;
+  cont.innerHTML = `<div style="font-size:11px;color:var(--text3);padding:20px 0;text-align:center">Cargando detalle…</div>`;
+
+  const c = currentClient;
+  const ses = (c._sessions || []).find(s => s.id === sessionId);
+  // Si no se pasó fecha, la tomamos de la propia sesión
+  if (!fechaStr && ses) fechaStr = String(ses.session_date).slice(0,10);
 
   const { data: sets, error } = await sb
     .from('workout_sets')
@@ -7299,13 +7333,10 @@ async function abrirDetalleSesion(sessionId, fechaStr){
 
   if (error){
     console.error('abrirDetalleSesion error:', error);
-    cont.innerHTML = `<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:11px;
-      font-size:11px;color:var(--red)">No se pudo cargar el detalle de la sesión.</div>`;
+    cont.innerHTML = `<div style="font-size:11px;color:var(--red);padding:20px 0;text-align:center">No se pudo cargar el detalle de la sesión.</div>`;
     return;
   }
 
-  const c = currentClient;
-  const ses = (c._sessions || []).find(s => s.id === sessionId);
   const tipo = ses ? (ses.session_type || '') : '';
   const col = colorTipoSesion(tipo);
 
@@ -7317,33 +7348,31 @@ async function abrirDetalleSesion(sessionId, fechaStr){
     // Agrupar por ejercicio
     const porEj = {};
     sets.forEach(s => { (porEj[s.exercise_name] = porEj[s.exercise_name] || []).push(s); });
-    cuerpo = Object.keys(porEj).map(nombre => {
+    cuerpo = `<div style="display:flex;flex-direction:column;gap:10px">` + Object.keys(porEj).map(nombre => {
       const series = porEj[nombre].sort((a,b)=>(a.set_number||0)-(b.set_number||0));
       const seriesTxt = series.map(s =>
-        `<span style="font-size:10.5px;color:var(--text2);background:var(--bg3);border-radius:5px;padding:2px 7px">
-          ${s.reps_done != null ? s.reps_done : '—'}${s.weight_kg != null ? ' × ' + s.weight_kg + 'kg' : ''}</span>`
+        `<span style="font-size:10px;color:var(--text2);background:var(--bg3);border-radius:5px;padding:2px 7px">
+          ${s.reps_done != null ? s.reps_done : '—'}${s.weight_kg != null ? '×' + s.weight_kg + 'kg' : ''}</span>`
       ).join(' ');
-      return `<div style="padding:7px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:4px">${escHtml(nombre)}</div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap">${seriesTxt}</div>
+      return `<div>
+        <div style="font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:4px">${escHtml(nombre)}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${seriesTxt}</div>
       </div>`;
-    }).join('');
+    }).join('') + `</div>`;
   }
 
-  cont.innerHTML = `<div style="margin-top:12px;padding:12px 14px;background:var(--bg);border-radius:11px;border:1.5px solid ${col}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:11px;font-weight:700;color:#fff;background:${col};padding:2px 9px;border-radius:6px">${escHtml(tipo)}</span>
-        <span style="font-size:11px;color:var(--text3)">${escHtml(formatearFechaCorta(fechaStr))}</span>
-        ${ses && !ses.completed ? '<span style="font-size:9.5px;font-weight:700;color:var(--text3)">Sin terminar</span>' : ''}
-      </div>
-      <button onclick="cerrarDetalleSesion()" style="
-        height:22px;padding:0 9px;border:1.5px solid var(--border);border-radius:6px;cursor:pointer;
-        background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600">Cerrar</button>
+  let fechaFmt = fechaStr;
+  try { fechaFmt = new Date(fechaStr+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}); } catch(e){}
+
+  cont.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span style="font-size:11px;font-weight:700;color:#fff;background:${col};padding:3px 11px;border-radius:6px">${escHtml(tipo||'—')}</span>
+      <span style="font-size:11px;color:var(--text3)">${escHtml(fechaFmt)}</span>
+      ${esUltimo ? '<span style="margin-left:auto;font-size:9.5px;color:var(--green);font-weight:600;background:var(--gl);padding:2px 8px;border-radius:999px">Último</span>' : ''}
+      ${ses && !ses.completed ? '<span style="font-size:9.5px;font-weight:700;color:var(--text3)">Sin terminar</span>' : ''}
     </div>
-    ${ses && ses.notes ? `<div style="font-size:10.5px;color:var(--text3);margin-bottom:6px">${escHtml(ses.notes)}</div>` : ''}
-    ${cuerpo}
-  </div>`;
+    ${ses && ses.notes ? `<div style="font-size:10.5px;color:var(--text3);margin-bottom:10px">${escHtml(ses.notes)}</div>` : '<div style="margin-bottom:10px"></div>'}
+    ${cuerpo}`;
 }
 
 function cerrarDetalleSesion(){
@@ -7411,9 +7440,10 @@ function agruparSeriesPorEjercicio(c){
         totalSeries: ps.series.length,
         repsMax: repsEnMax,                 // reps al peso máximo
         todasReps: ps.series.map(s => s.reps).filter(r => r != null),
+        series: ps.series.slice(),          // todas las series {peso, reps} para el tooltip detallado
       };
     });
-    return { nombre: etiqueta, totalSeries: grupo.totalSeries, sesiones };
+    return { nombre: etiqueta, tipo: grupo.tipo || '', totalSeries: grupo.totalSeries, sesiones };
   }).sort((a,b) => b.totalSeries - a.totalSeries);
 }
 
@@ -7491,9 +7521,13 @@ function graficaEvolucionCargas(sesiones){
       : '';
     const valTxt = s.pesoMax + ' kg' + repsTxt + ' · ' + s.totalSeries + (s.totalSeries===1?' serie':' series');
     const diaTxt = formatearFechaCorta(s.fecha);
+    // Desglose por serie para el tooltip: "6×60kg|8×50kg|8×45kg" (reps × peso)
+    const seriesTxt = (s.series && s.series.length)
+      ? s.series.map(se => `${se.reps!=null?se.reps:'—'}×${se.peso!=null?se.peso+'kg':'—'}`).join('|')
+      : '';
     // círculo transparente grande = área fácil de apuntar; mismo sistema de tooltip que las métricas
     return `<circle cx="${cx}" cy="${cy}" r="11" fill="transparent" style="cursor:pointer"
-        class="metric-pt" data-dia="${escHtml(diaTxt)}" data-val="${escHtml(valTxt)}"
+        class="metric-pt" data-dia="${escHtml(diaTxt)}" data-val="${escHtml(valTxt)}" data-series="${escHtml(seriesTxt)}"
         onmouseover="mostrarTooltipPunto(event)" onmouseout="ocultarTooltipPunto()"></circle>
       <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--green)" stroke="#fff" stroke-width="2" style="pointer-events:none"/>`;
   }).join('');
@@ -7557,7 +7591,7 @@ function seccionEvolucionCargas(c){
   // Sin datos en absoluto
   if (!ejercicios.length){
     return `<div style="${cardStyle}">
-      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">📈 Evolución de cargas</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Evolución de cargas</div>
       <div style="font-size:12px;color:var(--text3);padding:8px 0">
         Este cliente todavía no tiene series de entreno registradas. Cuando registre sus entrenos
         en MyTracc, aquí verás la evolución de los pesos en cada ejercicio.
@@ -7565,92 +7599,96 @@ function seccionEvolucionCargas(c){
     </div>`;
   }
 
-  // Buscador
-  const buscadorHtml = `<div style="display:flex;gap:6px;margin-bottom:10px">
-    <input id="s3-buscar" value="${escHtml(s3Busqueda)}" placeholder="🔍 Buscar ejercicio..." oninput="s3SetBusqueda(this.value)" style="
-      flex:1;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;
-      background:var(--bg);color:var(--text);font-size:12px"/>
-    <button onclick="s3ToggleVerTodos()" style="
-      height:32px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-      background:var(--bg);color:var(--text2);font-size:11px;font-weight:600">${s3VerTodos?'Ocultar':'Ver todos ('+ejercicios.length+')'}</button>
-  </div>`;
+  // ── Agrupar ejercicios por TIPO de sesión (pestañas) ──
+  const porTipo = {};
+  ejercicios.forEach(e => {
+    const t = (e.tipo || 'OTROS').toUpperCase();
+    (porTipo[t] = porTipo[t] || []).push(e);
+  });
+  const tipos = Object.keys(porTipo);
+  // Pestaña activa: la guardada si sigue existiendo, si no la primera
+  const tabActivo = (s3TipoTab && porTipo[s3TipoTab]) ? s3TipoTab : tipos[0];
+  const ejerciciosTab = porTipo[tabActivo] || [];
 
-  // Chips de los 4-5 más entrenados (atajos rápidos)
-  const top = ejercicios.slice(0, 5);
-  const chipsHtml = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-    ${top.map(e => {
-      const sel = s3Ejercicio === e.nombre;
-      return `<button onclick="s3SetEjercicio('${escHtml(e.nombre)}')" style="
-        height:30px;padding:0 12px;border:1.5px solid ${sel?'var(--green)':'var(--border)'};
-        border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;
-        background:${sel?'var(--green)':'var(--bg)'};color:${sel?'#fff':'var(--text2)'}">
-        ${escHtml(e.nombre)} <span style="opacity:.7;font-weight:500">· ${e.totalSeries}</span></button>`;
+  // Selección de ejercicios de esta pestaña. Por defecto: el primero (más entrenado).
+  if (!s3EjsSel[tabActivo]){
+    s3EjsSel[tabActivo] = new Set(ejerciciosTab.length ? [ejerciciosTab[0].nombre] : []);
+  }
+  const seleccionados = s3EjsSel[tabActivo];
+
+  // Pestañas por tipo
+  const tabsHtml = `<div style="display:flex;gap:7px;background:var(--bg3);border-radius:999px;padding:5px;width:fit-content;flex-wrap:wrap">
+    ${tipos.map(t => {
+      const sel = t === tabActivo;
+      const col = colorTipoSesion(t);
+      return `<button onclick="s3SetTab('${escHtml(t)}')" style="
+        border:none;border-radius:999px;padding:6px 15px;cursor:pointer;font-family:'DM Sans',sans-serif;
+        font-size:11.5px;font-weight:${sel?'600':'500'};
+        background:${sel?'var(--text)':'transparent'};color:${sel?'#fff':'var(--text2)'}">${escHtml(t)}</button>`;
     }).join('')}
   </div>`;
 
-  // Lista completa (filtrada por el buscador) en grid
-  let listaCompletaHtml = '';
-  if (s3VerTodos){
-    const q = normalizarNombre(s3Busqueda);
-    const filtrados = q ? ejercicios.filter(e => normalizarNombre(e.nombre).includes(q)) : ejercicios;
-    if (!filtrados.length){
-      listaCompletaHtml = `<div style="font-size:11px;color:var(--text3);padding:6px 0;text-align:center">
-        Sin ejercicios que coincidan con "${escHtml(s3Busqueda)}".</div>`;
-    } else {
-      listaCompletaHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:5px;margin-bottom:10px;max-height:180px;overflow-y:auto;padding:2px">
-        ${filtrados.map(e => {
-          const sel = s3Ejercicio === e.nombre;
-          return `<div onclick="s3SetEjercicio('${escHtml(e.nombre)}')" style="
-            display:flex;justify-content:space-between;align-items:center;
-            padding:6px 10px;border-radius:7px;cursor:pointer;
-            background:${sel?'var(--green)':'var(--bg)'};color:${sel?'#fff':'var(--text)'};
-            border:1.5px solid ${sel?'var(--green)':'var(--border)'};font-size:11px">
-            <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.nombre)}</span>
-            <span style="opacity:${sel?.85:.6};font-size:10px;margin-left:8px;flex-shrink:0">${e.sesiones.length} ${e.sesiones.length===1?'ses':'ses'}</span>
-          </div>`;
+  // Botón de filtro de ejercicios
+  const filtroBtn = `<button onclick="s3ToggleFiltro()" style="
+    display:flex;align-items:center;gap:7px;border:1.5px solid var(--border);border-radius:10px;
+    padding:7px 12px;background:var(--bg);cursor:pointer;font-family:'DM Sans',sans-serif">
+    <span style="font-size:11.5px;color:var(--text);font-weight:500">${seleccionados.size} de ${ejerciciosTab.length} ejercicios</span>
+    <span style="font-size:11px;color:var(--text3)">${s3FiltroAbierto?'▲':'▼'}</span>
+  </button>`;
+
+  // Panel de selección (chips de todos los ejercicios de la pestaña)
+  let panelFiltro = '';
+  if (s3FiltroAbierto){
+    panelFiltro = `<div style="background:var(--bg3);border-radius:10px;padding:11px 13px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:9px">Mostrar ejercicios</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${ejerciciosTab.map(e => {
+          const sel = seleccionados.has(e.nombre);
+          return `<button onclick="s3ToggleEj('${escHtml(tabActivo)}','${escHtml(e.nombre).replace(/'/g,"\\'")}')" style="
+            border:1.5px solid ${sel?'var(--text)':'var(--border)'};border-radius:999px;padding:5px 11px;cursor:pointer;
+            font-size:11px;font-family:'DM Sans',sans-serif;
+            background:${sel?'var(--text)':'var(--bg)'};color:${sel?'#fff':'var(--text2)'}">
+            ${sel?'✓ ':''}${escHtml(e.nombre)}</button>`;
         }).join('')}
-      </div>`;
-    }
-  }
-
-  // Ejercicio seleccionado (por defecto, el primero del top)
-  const elegido = s3Ejercicio
-    ? ejercicios.find(e => e.nombre === s3Ejercicio)
-    : ejercicios[0];
-
-  let cuerpo = '';
-  if (elegido){
-    const sesionesFiltradas = filtrarSesionesS3(elegido.sesiones, s3Filtro, c._mesocycle);
-    const noMeso = s3Filtro === 'mesociclo' && (!c._mesocycle || !c._mesocycle.start_date);
-
-    const btnFiltro = (key, label) => `<button onclick="s3SetFiltro('${key}')" style="
-      height:28px;padding:0 11px;border:1.5px solid ${s3Filtro===key?'var(--green)':'var(--border)'};
-      border-radius:7px;cursor:pointer;font-size:10.5px;font-weight:600;
-      background:${s3Filtro===key?'var(--green)':'var(--bg)'};color:${s3Filtro===key?'#fff':'var(--text2)'}">${label}</button>`;
-
-    cuerpo = `<div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin-top:4px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(elegido.nombre)}</div>
-        <div style="display:flex;gap:5px">
-          ${btnFiltro('historico', 'Todo')}
-          ${btnFiltro('tres_meses', 'Últimos 3 meses')}
-          ${btnFiltro('mesociclo', 'Mesociclo')}
-        </div>
       </div>
-      ${noMeso
-        ? `<div style="height:160px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);background:var(--bg2);border-radius:10px;text-align:center;padding:0 16px">Este cliente no tiene un mesociclo activo. Asigna uno desde "Editar plan" para filtrar por mesociclo.</div>`
-        : graficaEvolucionCargas(sesionesFiltradas)}
-      ${!noMeso ? resumenEvolucionCargas(sesionesFiltradas) : ''}
     </div>`;
   }
 
+  // Una gráfica por cada ejercicio seleccionado
+  const elegidos = ejerciciosTab.filter(e => seleccionados.has(e.nombre));
+  let graficasHtml;
+  if (!elegidos.length){
+    graficasHtml = `<div style="font-size:11.5px;color:var(--text3);text-align:center;padding:24px 0">
+      Selecciona al menos un ejercicio en el filtro para ver su evolución.</div>`;
+  } else {
+    graficasHtml = elegidos.map((e,idx) => {
+      const sesionesFiltradas = filtrarSesionesS3(e.sesiones, 'historico', c._mesocycle);
+      // Tendencia (primera vs última sesión)
+      let trendChip = '';
+      if (sesionesFiltradas.length >= 2){
+        const diff = sesionesFiltradas[sesionesFiltradas.length-1].pesoMax - sesionesFiltradas[0].pesoMax;
+        if (diff > 0) trendChip = `<span style="font-size:11px;color:#16a34a;font-weight:600;background:var(--gl);padding:2px 9px;border-radius:999px">↑ +${diff.toFixed(1)} kg</span>`;
+        else if (diff < 0) trendChip = `<span style="font-size:11px;color:#dc2626;font-weight:600;background:#fef2f2;padding:2px 9px;border-radius:999px">↓ ${diff.toFixed(1)} kg</span>`;
+        else trendChip = `<span style="font-size:11px;color:var(--text3);font-weight:600;background:var(--bg3);padding:2px 9px;border-radius:999px">= igual</span>`;
+      }
+      return `<div style="${idx>0?'border-top:1px solid var(--border);padding-top:14px;margin-top:14px':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12.5px;font-weight:600;color:var(--text)">${escHtml(e.nombre)}</span>
+          ${trendChip}
+        </div>
+        ${graficaEvolucionCargas(sesionesFiltradas)}
+      </div>`;
+    }).join('');
+  }
+
   return `<div style="${cardStyle}">
-    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">📈 Evolución de cargas</div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Progresión de los pesos en cada ejercicio del cliente</div>
-    ${buscadorHtml}
-    ${chipsHtml}
-    ${listaCompletaHtml}
-    ${cuerpo}
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px">Evolución de cargas</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      ${tabsHtml}
+      ${filtroBtn}
+    </div>
+    ${panelFiltro}
+    ${graficasHtml}
   </div>`;
 }
 
@@ -7660,13 +7698,8 @@ function renderSeguimiento() {
   return `
     ${seccionResumenActividad(c)}
     ${seccionEvolucionCargas(c)}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:18px">
-      <div>
-        ${seccionHistorialSesiones(c)}
-        <div id="detalle-sesion"></div>
-      </div>
-      <div>${seccionMetricas(c)}</div>
-    </div>
+    ${seccionHistorialSesiones(c)}
+    ${seccionMetricas(c)}
   `;
 }
 

@@ -1987,7 +1987,7 @@ const TOUR_STEPS = [
   {t:'Crear un cliente nuevo', b:'Con el botón “Nuevo” das de alta a un cliente desde cero, sin datos previos. Rellenas sus datos básicos y ya puedes montarle su plan.', sel:'#pending-btn', place:'right', nav:()=>{}},
   {t:'Importar con Excel', b:'¿Vienes de otra herramienta? Trae todos tus clientes de golpe con una plantilla de Excel: datos, métricas, entrenos y dietas. O nos lo pasas y lo hacemos por ti.', sel:'#import-btn', place:'right', nav:()=>openVgMode('import')},
   {t:'Pestaña Resumen', b:'Dentro de cada cliente, Resumen es su día a día: entrenos de la semana, métricas de hoy, dieta y próximas citas.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('resumen')},
-  {t:'Pestaña Seguimiento', b:'En Seguimiento ves su progreso: evolución de las cargas por ejercicio, historial de sesiones y métricas (peso, pasos, sueño).', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('seguimiento')},
+  {t:'Pestaña Seguimiento', b:'En Seguimiento ves su progreso como una hoja de cálculo: filtras por tipo de entreno (push/pull/leg) y ves la matriz de cargas por sesión, más el historial de sesiones.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('seguimiento')},
   {t:'Editar plan: rutina y dieta', b:'Aquí montas su entrenamiento (el split y los ejercicios de cada sesión) y su plan nutricional con varias opciones de dieta.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('editar')},
   {t:'Pestaña Perfil', b:'Los datos del cliente, su cuota (lo que paga), las fotos de progreso y el estado de su cuenta.', sel:'.view-tabs .vtab.active', place:'bottom', nav:()=>_tourOpenClient('perfil')},
   {t:'Tu código y MyTracc', b:()=>`Tus clientes usan la app <b>MyTracc</b> y se conectan contigo con tu código${(coachData&&coachData.code)?(': <b>'+coachData.code+'</b>'):''}. Desde MyTracc registran sus entrenos, métricas y fotos, y tú lo ves al instante aquí.`, sel:null, place:'center', nav:()=>{}},
@@ -2117,11 +2117,17 @@ const HELP_CONTENT = {
     <p>El <b>día a día</b> del cliente: sus entrenos de la semana, métricas de hoy (pasos, sueño, peso), su dieta y las próximas citas.</p>
     <div class="help-tip">Lo que el cliente registra en MyTracc aparece aquí al instante.</div>` },
   seguimiento: { t:'Seguimiento del cliente', h:`
-    <p>El <b>progreso</b> del cliente a lo largo del tiempo.</p>
-    <p>Verás la <b>evolución de las cargas</b> en cada ejercicio, el historial de sesiones y las métricas (peso, pasos, sueño) por semana.</p>` },
+    <p>El <b>progreso</b> del cliente a lo largo del tiempo, en formato de tabla tipo hoja de cálculo.</p>
+    <h4>Registro de entrenos</h4>
+    <p>Filtra por tipo (<b>Push / Pull / Leg</b>…) y elige entre dos vistas:</p>
+    <p><b>Vista completa:</b> una matriz con los ejercicios en filas y cada entreno en columnas (1, 2, 3…), para ver la progresión de cargas de un vistazo. En verde, las mejoras de peso.</p>
+    <p><b>Por sesión:</b> eliges una sesión concreta y ves sus ejercicios con cada serie.</p>
+    <div class="help-tip">Arriba se mantiene el resumen de actividad, y abajo el historial de sesiones completadas.</div>` },
   perfil: { t:'Perfil del cliente', h:`
     <p>Los <b>datos</b> del cliente y su gestión.</p>
-    <p>Aquí editas sus datos básicos, configuras su <b>cuota</b> (lo que paga y cada cuánto), subes <b>fotos de progreso</b> y puedes darlo de baja o eliminarlo.</p>
+    <p>Editas sus datos básicos, ves su <b>cuestionario inicial</b> (botón arriba, junto al nombre) y gestionas su <b>cuota</b> (resumen con botón "Ver / editar" que abre el detalle de pagos).</p>
+    <p>Junto al nombre tienes también un <b>botón de calendario</b>: abre el calendario de ese cliente con sus citas y las notas que te ha compartido.</p>
+    <p>Más abajo subes <b>fotos de progreso</b> y puedes darlo de baja o eliminarlo.</p>
     <div class="help-tip">La cuota que pongas aquí es la que se ve luego en la sección <b>Pagos</b>.</div>` },
   agenda: { t:'Agenda', h:`<p>Tu <b>calendario de citas</b> y sesiones con los clientes. Crea citas con “Nueva cita” para organizarte.</p>` },
   plan: { t:'Mi plan', h:`<p>Eliges tu <b>plan de Tracc</b> y tus <b>extras</b> según cuántos clientes tengas. Marca el plan y los extras y abajo verás el total.</p>` },
@@ -2157,7 +2163,8 @@ function openHelp(key){
         <div onclick="closeHelp()" style="width:28px;height:28px;min-width:28px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:15px;cursor:pointer">✕</div>
       </div>
       <div class="help-body" style="padding:16px 18px;overflow-y:auto;font-size:13px;color:var(--text2);line-height:1.65">${c.h}
-        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">¿Sigues con dudas? Escríbenos a <b>tracc.support@gmail.com</b> y te ayudamos.</div>
+        <button onclick="closeHelp();openGuiaCompleta()" style="width:100%;margin-top:16px;height:42px;border-radius:11px;background:var(--gl);border:1.5px solid var(--gm);color:#15803d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px">📚 Ver guía completa</button>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">¿Sigues con dudas? Escríbenos a <b>tracc.support@gmail.com</b> y te ayudamos.</div>
       </div>
     </div>`;
   requestAnimationFrame(()=>{ const p=document.getElementById('help-panel'); if(p) p.style.transform='translateX(0)'; });
@@ -2166,6 +2173,106 @@ function closeHelp(){
   const p=document.getElementById('help-panel');
   if(p){ p.style.transform='translateX(100%)'; setTimeout(()=>{ const r=document.getElementById('help-root'); if(r) r.remove(); },220); }
   else { const r=document.getElementById('help-root'); if(r) r.remove(); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GUÍA COMPLETA DE TRACC — centro de ayuda con secciones plegables.
+// Cubre: primeros pasos, día a día, editar plan, seguimiento, agenda/citas,
+// calendario del cliente, cuota/pagos y cómo usa MyTracc el cliente.
+// ══════════════════════════════════════════════════════════════════════════
+const GUIA_SECCIONES = [
+  { icon:'🚀', t:'Primeros pasos', h:`
+    <p>Tienes <b>dos formas</b> de empezar a trabajar con tus clientes en Tracc:</p>
+    <h4>Crear un cliente desde cero</h4>
+    <p>En la barra lateral, pulsa <b>"+ Nuevo cliente"</b>. Rellenas su nombre (lo único obligatorio) y, si quieres, su email. El <b>email es clave</b>: es lo que vincula la ficha con la cuenta de MyTracc cuando el cliente se registre con ese mismo correo.</p>
+    <h4>Importar con Excel</h4>
+    <p>Si vienes de otra herramienta, en la barra lateral entra en <b>"Importar"</b>. Descarga la plantilla <code>.xlsx</code> (trae pestañas: Clientes, Métricas, Entrenos, Rutina y Nutrición), rellénala y súbela. Verás un resumen antes de confirmar.</p>
+    <div class="help-tip">¿No quieres montarlo tú? Con el extra de puesta en marcha nos pasas tus archivos y te lo dejamos listo.</div>` },
+  { icon:'📊', t:'El día a día', h:`
+    <p>Tu punto de partida cada día es la <b>Vista general</b>: ves de un vistazo cómo van todos tus clientes (al día, los que necesitan atención y la adherencia general), con alertas de quien lleva días sin registrar.</p>
+    <p>Pulsa cualquier cliente para abrir su <b>ficha</b>, que tiene cuatro pestañas: Resumen, Seguimiento, Editar plan y Perfil.</p>
+    <p>En <b>Resumen</b> ves su día a día: entrenos de la semana, métricas de hoy (pasos, sueño, peso), dieta y próximas citas. Todo lo que el cliente registra en MyTracc aparece aquí al instante.</p>
+    <div class="help-tip">Si en el Resumen ves el icono de nota junto a un ejercicio del último entreno, el cliente te dejó un comentario ahí. Púlsalo para leerlo.</div>` },
+  { icon:'✏️', t:'Editar el plan', h:`
+    <p>En <b>Editar plan</b> montas el entrenamiento y la dieta del cliente. Lo que guardes se sincroniza con su MyTracc.</p>
+    <h4>🏋️ Entrenamiento</h4>
+    <p>Eliges el <b>split</b> (qué toca cada día) y añades los <b>ejercicios por sesión</b> con series, reps y descansos. Con "Programar cambio" dejas listo un plan que entra en una fecha futura.</p>
+    <h4>🍎 Nutrición</h4>
+    <p>Defines los <b>objetivos diarios</b> (kcal y macros) y creas varias <b>opciones de dieta</b> intercambiables. Usa la biblioteca de alimentos: creas un alimento una vez con sus macros y lo reutilizas.</p>
+    <div class="help-tip">Pulsa "Guardar plan completo" al terminar para que el cliente lo reciba.</div>` },
+  { icon:'📈', t:'Seguimiento', h:`
+    <p>El progreso del cliente en formato de <b>hoja de cálculo</b>.</p>
+    <p>Filtras por tipo de entreno (Push / Pull / Leg…) y eliges entre dos vistas:</p>
+    <p><b>Vista completa:</b> matriz con ejercicios en filas y cada entreno en columnas (1, 2, 3…). Ves la progresión de cargas de un vistazo; en verde, las mejoras.</p>
+    <p><b>Por sesión:</b> eliges una sesión y ves cada ejercicio con sus series.</p>
+    <p>Arriba se mantiene el resumen de actividad y abajo el historial de sesiones completadas.</p>` },
+  { icon:'📅', t:'Agenda y citas', h:`
+    <p>En <b>Agenda</b> (barra lateral) tienes tu calendario de citas con todos los clientes, en vista mes o lista, con filtros por cliente y tipo.</p>
+    <h4>Crear y proponer</h4>
+    <p>Con <b>"Nueva cita"</b> propones una cita a un cliente (revisión, llamada, sesión…). Puedes hacerla recurrente (cada semana o cada dos). Al cliente le llega para aceptar, rechazar o proponer otra hora.</p>
+    <h4>Cuando el cliente propone</h4>
+    <p>El cliente también puede proponerte citas desde MyTracc. Te llegan a la agenda: ábrelas y verás botones para <b>aceptar, rechazar o proponer otra hora</b>.</p>
+    <p>En cada cita puedes marcar <b>asistencia</b> (realizada / no asistió) y dejar una <b>nota privada</b> que el cliente no ve.</p>` },
+  { icon:'🗓️', t:'Calendario del cliente', h:`
+    <p>Dentro de la ficha de un cliente, junto a su nombre, hay un <b>botón de calendario</b>.</p>
+    <p>Abre un calendario solo de ese cliente, donde ves sus <b>citas</b> contigo (punto ámbar = por confirmar, verde = confirmada) y las <b>notas que te ha compartido</b> desde su MyTracc (punto morado).</p>
+    <p>Es vuestro espacio común, aparte de la agenda general. Toca un día para ver el detalle. Las notas privadas del cliente nunca aparecen aquí.</p>` },
+  { icon:'💶', t:'Cuota y pagos', h:`
+    <p>La <b>cuota</b> de cada cliente se configura en su <b>Perfil</b>: un resumen con botón "Ver / editar" que abre el detalle (importe, número de pagos, cada cuánto, enlace de pago y calendario de cobros).</p>
+    <p>En <b>Pagos</b> (barra lateral) tienes tu resumen de negocio: ingresos al mes, cobrado, pendiente y precio medio, con la lista de clientes y su estado.</p>
+    <div class="help-tip">Marca cada pago como cobrado desde el detalle de la cuota para que el resumen de Pagos cuadre.</div>` },
+  { icon:'📱', t:'Cómo usa MyTracc tu cliente', h:`
+    <p>Tu cliente tiene su propia app (MyTracc) con cuatro pestañas: <b>Inicio, Entreno, Dieta y Progreso</b>.</p>
+    <p>Registra sus <b>entrenos</b> serie a serie con un temporizador de descanso; lo que apunta te llega a ti al instante. Puede dejar <b>notas en cada ejercicio</b> (las ves en su Resumen).</p>
+    <p>Sigue su <b>dieta</b> con las opciones que le pusiste y registra <b>cheats</b>. Cada semana te manda un <b>check-in</b> (sueño, energía, hambre, cumplimiento), que tú ves en su Resumen toda la semana siguiente.</p>
+    <p>Tiene una <b>racha</b> de días cumpliendo, ve su <b>progreso</b> (peso y cargas), gestiona su <b>agenda</b> (acepta o propone citas) y puede apuntar <b>notas en días concretos</b>, decidiendo si te las comparte.</p>
+    <div class="help-tip">Cuanto más registre el cliente en MyTracc, más completo es tu seguimiento en Tracc.</div>` },
+];
+
+function openGuiaCompleta(){
+  let root=document.getElementById('guia-root');
+  if(!root){ root=document.createElement('div'); root.id='guia-root'; document.body.appendChild(root); }
+  const secciones=GUIA_SECCIONES.map((s,i)=>`
+    <div style="border:1.5px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;background:var(--bg)">
+      <div onclick="_guiaToggle(${i})" style="display:flex;align-items:center;gap:11px;padding:14px 16px;cursor:pointer;user-select:none">
+        <span style="font-size:20px;flex-shrink:0">${s.icon}</span>
+        <span style="flex:1;font-size:14px;font-weight:700;color:var(--text)">${s.t}</span>
+        <span id="guia-arrow-${i}" style="color:var(--text3);transition:transform .18s;font-size:13px">▾</span>
+      </div>
+      <div id="guia-body-${i}" style="display:none;padding:0 16px 16px;font-size:13px;color:var(--text2);line-height:1.65">${s.h}</div>
+    </div>`).join('');
+  root.innerHTML=`
+    <div onclick="closeGuiaCompleta()" style="position:fixed;inset:0;background:rgba(26,26,24,.45);z-index:610;backdrop-filter:blur(3px)"></div>
+    <div id="guia-panel" style="position:fixed;top:0;right:0;width:min(460px,94vw);height:100%;background:var(--bg2);border-left:1px solid var(--border);z-index:611;box-shadow:-8px 0 30px rgba(0,0,0,.15);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .24s ease">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-shrink:0">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">📚 Guía de uso</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:21px;color:var(--text)">Todo sobre Tracc</div>
+        </div>
+        <div onclick="closeGuiaCompleta()" style="width:30px;height:30px;min-width:30px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:15px;cursor:pointer">✕</div>
+      </div>
+      <div style="padding:16px 18px;overflow-y:auto;flex:1">
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin:0 0 16px">Toca cada sección para abrirla. Aquí tienes todo lo que puedes hacer en Tracc y cómo lo usa tu cliente desde MyTracc.</p>
+        ${secciones}
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button onclick="closeGuiaCompleta();startTour()" style="flex:1;height:42px;border-radius:11px;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Ver tour guiado</button>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">¿Sigues con dudas? Escríbenos a <b>tracc.support@gmail.com</b>.</div>
+      </div>
+    </div>`;
+  requestAnimationFrame(()=>{ const p=document.getElementById('guia-panel'); if(p) p.style.transform='translateX(0)'; });
+}
+function _guiaToggle(i){
+  const b=document.getElementById('guia-body-'+i), a=document.getElementById('guia-arrow-'+i);
+  if(!b)return;
+  const abierto=b.style.display!=='none';
+  b.style.display=abierto?'none':'block';
+  if(a)a.style.transform=abierto?'rotate(0)':'rotate(180deg)';
+}
+function closeGuiaCompleta(){
+  const p=document.getElementById('guia-panel');
+  if(p){ p.style.transform='translateX(100%)'; setTimeout(()=>{ const r=document.getElementById('guia-root'); if(r) r.remove(); },240); }
+  else { const r=document.getElementById('guia-root'); if(r) r.remove(); }
 }
 
 // Vuelca el nombre real del coach en la tarjeta del sidebar

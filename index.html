@@ -2716,26 +2716,42 @@ function openGeminiKeyModal(){
   const modal=document.createElement('div');
   modal.id='gemini-key-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px';
+  const yaHay = !!GEMINI_API_KEY;
+  const keyMask = yaHay ? (GEMINI_API_KEY.slice(0,6)+'••••••••'+GEMINI_API_KEY.slice(-4)) : '';
   modal.innerHTML=`
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;padding:26px">
-      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">✨ Activar la IA</div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Para generar planes con IA necesitas una API key de Google Gemini (gratis, sin tarjeta).</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.5">Consíguela en <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> → "Create API key". Se guarda solo en tu navegador.</div>
-      <input id="gemini-key-input" type="password" placeholder="AIza..." style="width:100%;margin-bottom:16px;font-family:monospace;border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--text);background:var(--bg);box-sizing:border-box;outline:none">
+      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">✨ ${yaHay?'IA configurada':'Activar la IA'}</div>
+      ${yaHay
+        ? `<div style="font-size:13px;color:var(--text3);margin-bottom:14px;line-height:1.5">Ya tienes una API key guardada en este navegador. No hace falta volver a meterla.</div>
+           <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+             <span style="font-size:13px;color:#15803d;font-weight:700">✓</span>
+             <span style="font-family:monospace;font-size:13px;color:var(--text2);flex:1">${keyMask}</span>
+           </div>
+           <div style="font-size:12px;color:var(--text3);margin-bottom:8px">¿Quieres cambiarla por otra?</div>`
+        : `<div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Para generar planes con IA necesitas una API key de Google Gemini (gratis, sin tarjeta).</div>
+           <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.5">Consíguela en <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> → "Create API key". Se guarda solo en tu navegador.</div>`}
+      <input id="gemini-key-input" type="password" placeholder="${yaHay?'Pega una key nueva (opcional)':'AIza...'}" style="width:100%;margin-bottom:16px;font-family:monospace;border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--text);background:var(--bg);box-sizing:border-box;outline:none">
       <div style="display:flex;gap:10px">
-        <button onclick="document.getElementById('gemini-key-modal').remove()" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Cancelar</button>
-        <button id="gemini-key-save" style="flex:1;background:var(--accent);border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Guardar y activar</button>
+        ${yaHay?`<button onclick="borrarGeminiKey()" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--red);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Borrar key</button>`:`<button onclick="document.getElementById('gemini-key-modal').remove()" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Cancelar</button>`}
+        <button id="gemini-key-save" style="flex:1;background:var(--accent);border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">${yaHay?'Guardar nueva':'Guardar y activar'}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
   setTimeout(()=>document.getElementById('gemini-key-input')?.focus(),100);
   document.getElementById('gemini-key-save').onclick=()=>{
     const key=document.getElementById('gemini-key-input')?.value?.trim();
-    if(!key || key.length<20){ showToast('Pega una API key válida de Google AI Studio'); return; }
-    GEMINI_API_KEY=key; localStorage.setItem('tracc_gemini_key',key);
+    if(!key){ if(yaHay){ modal.remove(); return; } showToast('Pega tu API key'); return; }
+    if(key.length<20){ showToast('Pega una API key válida de Google AI Studio'); return; }
+    GEMINI_API_KEY=key;
+    try{ localStorage.setItem('tracc_gemini_key',key); }catch(e){ showToast('Tu navegador no permite guardar la key'); }
     modal.remove(); showToast('✓ IA activada');
   };
   document.getElementById('gemini-key-input').addEventListener('keydown',e=>{ if(e.key==='Enter')document.getElementById('gemini-key-save').click(); });
+}
+function borrarGeminiKey(){
+  GEMINI_API_KEY=''; try{ localStorage.removeItem('tracc_gemini_key'); }catch(e){}
+  const m=document.getElementById('gemini-key-modal'); if(m) m.remove();
+  showToast('Key borrada');
 }
 
 // ── DATA ─────────────────────────────────────────────────────────────────
@@ -13064,7 +13080,7 @@ function abrirPlantillas(){
 // HTML del panel de plantillas guardadas
 function panelPlantillasHtml(c){
   if (!mostrandoPlantillas) return '';
-  const tpls = TRAINING_TEMPLATES || [];
+  const tpls = (TRAINING_TEMPLATES || []).filter(t => !_iaEsPlantillaConfig(t));
   let lista;
   if (!tpls.length){
     lista = `<div style="font-size:11px;color:var(--text3);padding:10px;text-align:center">
@@ -13594,6 +13610,13 @@ function colorSesion(tipo){
   };
   if (mapa[t]) return mapa[t];
   if (!t || t === 'OFF') return '#aaa';
+  // Tipo custom creado en el generador de IA: usar su color guardado
+  try{
+    if(typeof IA_TIPOS_CUSTOM!=='undefined'){
+      const k = Object.keys(IA_TIPOS_CUSTOM).find(c=>c===tipo || (IA_TIPOS_CUSTOM[c].lbl||'').toUpperCase()===t);
+      if(k && IA_TIPOS_CUSTOM[k].col && IA_TIPOS_CUSTOM[k].col.startsWith('#')) return IA_TIPOS_CUSTOM[k].col;
+    }
+  }catch(e){}
   // Tipo a mano sin color asignado: color neutro de marca
   return '#0f766e';
 }
@@ -13898,7 +13921,7 @@ let IA = {
   modo:'ambos',          // 'ambos' | 'entreno' | 'nutricion'
   fuente:'biblioteca',   // 'biblioteca' | 'ia'
   indicaciones:'',
-  splitDraft:null,       // array de tipos por día para la generación, p.ej. ['PUSH','PULL',...]
+  splitDraft:null,       // [{tipo:'PUSH', grupos:[{nombre:'Pecho',n:3},...]}, {tipo:'OFF',grupos:[]}, ...]
   generando:false,
   propEntreno:null,      // {dias:[{dia,tipo,ejercicios:[{nombre,sets,reps,restSec,fuente}]}]}
   propDieta:null,        // {opciones:[{n,comidas:[{tipo,texto,marca,kcal,alimentos:[...]}],kcal}], compra:[{cat,nombre,cant}]}
@@ -13908,9 +13931,34 @@ let IA = {
   dietaAplicado:false
 };
 
-const IA_TIPOS = ['PUSH','PULL','LEG','TORSO','BRAZO','FULL','CARDIO','OFF'];
+// Tipos de día base + los que el coach añada (persistidos en localStorage)
+const IA_TIPOS_BASE = ['PUSH','PULL','LEG','TORSO','BRAZO','FULL','CARDIO'];
 const IA_TIPO_LBL = {PUSH:'Push',PULL:'Pull',LEG:'Pierna',TORSO:'Torso',BRAZO:'Brazo',FULL:'Full body',CARDIO:'Cardio',OFF:'Descanso'};
 const IA_TIPO_COL = {PUSH:'var(--blue)',PULL:'var(--accent)',LEG:'var(--green)',TORSO:'#0891b2',BRAZO:'#db2777',FULL:'#ca8a04',CARDIO:'#ea580c',OFF:'var(--text3)'};
+// Grupos musculares por defecto de cada tipo (los define Hugo; el coach puede editarlos)
+const IA_GRUPOS_DEF = {
+  PUSH:['Pecho','Hombro','Tríceps','Abs'],
+  PULL:['Dorsales','Espalda alta','Amplitud','Densidad','Bíceps','Trapecio','Abs'],
+  LEG:['Cuádriceps','Femoral','Glúteo','Abductores','Gemelo','Abs'],
+  TORSO:['Pecho','Espalda','Hombro','Bíceps','Tríceps','Abs'],
+  BRAZO:['Hombro','Bíceps','Tríceps','Antebrazo'],
+  FULL:['Pecho','Espalda','Pierna','Hombro','Brazo'],
+  CARDIO:[]
+};
+// Tipos personalizados del coach: { CLAVE: {lbl, col, grupos:[...]} }
+let IA_TIPOS_CUSTOM = {};
+try{ IA_TIPOS_CUSTOM = JSON.parse(localStorage.getItem('tracc_ia_tipos_custom')||'{}'); }catch(e){ IA_TIPOS_CUSTOM={}; }
+function _iaGuardarCustom(){ try{ localStorage.setItem('tracc_ia_tipos_custom', JSON.stringify(IA_TIPOS_CUSTOM)); }catch(e){} }
+// Lista completa de tipos disponibles (base + custom)
+function iaTiposDisponibles(){ return [...IA_TIPOS_BASE, ...Object.keys(IA_TIPOS_CUSTOM)]; }
+function iaTipoLbl(t){ return IA_TIPO_LBL[t] || (IA_TIPOS_CUSTOM[t]&&IA_TIPOS_CUSTOM[t].lbl) || t; }
+function iaTipoCol(t){ return IA_TIPO_COL[t] || (IA_TIPOS_CUSTOM[t]&&IA_TIPOS_CUSTOM[t].col) || 'var(--text2)'; }
+function iaGruposDe(t){
+  if(t==='OFF') return [];
+  if(IA_GRUPOS_DEF[t]) return IA_GRUPOS_DEF[t].slice();
+  if(IA_TIPOS_CUSTOM[t]&&IA_TIPOS_CUSTOM[t].grupos) return IA_TIPOS_CUSTOM[t].grupos.slice();
+  return [];
+}
 
 // Banner morado (cerrado) o generador completo (abierto)
 function iaBannerHtml(c){
@@ -13952,23 +14000,57 @@ function iaGeneradorHtml(c){
   // selector de modo
   const modoBtn=(val,lbl)=>`<span onclick="iaSetModo('${val}')" style="font-size:12.5px;font-weight:${IA.modo===val?'700':'600'};padding:8px 15px;border-radius:9px;cursor:pointer;background:${IA.modo===val?'var(--text)':'var(--bg)'};color:${IA.modo===val?'#fff':'var(--text2)'};border:1.5px solid ${IA.modo===val?'var(--text)':'var(--border)'}">${lbl}</span>`;
 
-  // selector de split (solo si genera entreno) — filas D1, D2... con cuadrados
+  // selector de split (solo si genera entreno) — filas D1, D2... con tipo + grupos
   let splitHtml='';
   if(IA.modo!=='nutricion'){
     if(!IA.splitDraft) IA.splitDraft = _iaSplitInicial(c);
-    const filas = IA.splitDraft.map((tipo,i)=>{
-      const cuadros = IA_TIPOS.map(t=>{
-        const on=tipo===t;
-        const col=IA_TIPO_COL[t];
-        return `<span onclick="iaSetSplitDia(${i},'${t}')" style="font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?(t==='OFF'?'var(--bg3)':col+'1a'):'var(--bg)'};color:${on?col:'var(--text3)'};border:1.5px solid ${on?col:'var(--border)'}">${IA_TIPO_LBL[t]}</span>`;
-      }).join('');
-      return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:var(--text2);width:30px;flex-shrink:0">D${i+1}</span><div style="display:flex;gap:5px;flex-wrap:wrap">${cuadros}</div></div>`;
+    const tiposBtns = (dia,i)=>{
+      const todos = [...iaTiposDisponibles(),'OFF'];
+      return todos.map(t=>{
+        const on=dia.tipo===t; const col=iaTipoCol(t);
+        return `<span onclick="iaSetSplitDia(${i},'${t}')" style="font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?(t==='OFF'?'var(--bg3)':col+'1a'):'var(--bg)'};color:${on?col:'var(--text3)'};border:1.5px solid ${on?col:'var(--border)'}">${iaTipoLbl(t)}</span>`;
+      }).join('') + `<span onclick="iaNuevoTipo(${i})" title="Crear tipo de día propio" style="font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer;font-weight:700;background:var(--bg);color:var(--accent);border:1.5px dashed var(--accent)">+ tipo</span>`;
+    };
+    const gruposBox = (dia,i)=>{
+      if(dia.tipo==='OFF') return '';
+      const grupos = dia.grupos||[];
+      const filasG = grupos.map((g,gi)=>`<div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12.5px;flex:1;color:var(--text)">${escHtml(g.nombre)}</span>
+        <div style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px">
+          <span onclick="iaGrupoN(${i},${gi},-1)" style="width:23px;height:23px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:var(--text2)">−</span>
+          <span style="font-family:'Geist Mono';font-size:13px;width:16px;text-align:center;font-weight:600;color:var(--text)">${g.n}</span>
+          <span onclick="iaGrupoN(${i},${gi},1)" style="width:23px;height:23px;border-radius:6px;background:var(--text);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:#fff">+</span>
+          <span onclick="iaQuitarGrupo(${i},${gi})" title="Quitar grupo" style="width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text3)">✕</span>
+        </div></div>`).join('');
+      const totalEj = grupos.reduce((s,g)=>s+(g.n||0),0);
+      return `<div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-top:8px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:9px">Ejercicios por grupo ${totalEj?'· '+totalEj+' en total':'(la IA decide si lo dejas vacío)'}</div>
+        <div style="display:flex;flex-direction:column;gap:7px">${filasG||'<div style="font-size:12px;color:var(--text3)">Sin grupos. Añade uno o deja que la IA decida.</div>'}</div>
+        <div style="margin-top:9px"><span onclick="iaNuevoGrupo(${i})" style="font-size:11.5px;color:var(--accent);cursor:pointer;font-weight:600">+ Añadir grupo</span></div>
+      </div>`;
+    };
+    const filas = IA.splitDraft.map((dia,i)=>{
+      const col = iaTipoCol(dia.tipo);
+      return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:12px 13px;background:var(--bg2)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:700;color:var(--text2);width:30px;flex-shrink:0">D${i+1}</span>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${tiposBtns(dia,i)}</div>
+        </div>
+        ${gruposBox(dia,i)}
+      </div>`;
     }).join('');
-    const nEntreno = IA.splitDraft.filter(t=>t!=='OFF').length;
+    const nEntreno = IA.splitDraft.filter(d=>d.tipo!=='OFF').length;
+    const nPlantillas = (TRAINING_TEMPLATES||[]).filter(_iaEsPlantillaConfig).length;
     splitHtml = `<div style="margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px">Split — elige el tipo de cada día (la IA rellena los ejercicios)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Split — elige el tipo y los grupos de cada día</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="iaCargarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">📂 Cargar plantilla${nPlantillas?' ('+nPlantillas+')':''}</button>
+          <button onclick="iaGuardarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--accent);background:#f3f0ff;color:var(--accent);cursor:pointer">💾 Guardar plantilla</button>
+        </div>
+      </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${nEntreno} días de entreno · ${IA.splitDraft.length-nEntreno} de descanso · <span onclick="iaSetDias()" style="color:var(--accent);cursor:pointer;font-weight:600">cambiar nº de días</span></div>
-      <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">${filas}</div>
     </div>`;
   }
 
@@ -13996,47 +14078,160 @@ function iaGeneradorHtml(c){
   `;
 }
 
-// split inicial para el generador: a partir del split actual del cliente, o 7 OFF
+// split inicial para el generador: a partir del split del cliente, o uno por defecto
 function _iaSplitInicial(c){
+  const mkDia = (tipo)=>({ tipo, grupos: iaGruposDe(tipo).map(nombre=>({nombre, n:0})) });
   try{
     const ts = getTrainState(c.id);
-    if(ts && ts.split && ts.split.length) return ts.split.map(d=>d.type||'OFF');
+    if(ts && ts.split && ts.split.length) return ts.split.map(d=>mkDia(d.type||'OFF'));
   }catch(e){}
-  return ['PUSH','PULL','LEG','OFF','PUSH','PULL','OFF'];
+  return ['PUSH','PULL','LEG','OFF','PUSH','PULL','OFF'].map(mkDia);
 }
 
 function iaToggle(){ IA.open=!IA.open; renderClientPanel(); }
 function iaSetModo(m){ IA.modo=m; renderClientPanel(); }
 function iaSetFuente(f){ IA.fuente=f; renderClientPanel(); }
-function iaSetSplitDia(i,t){ if(IA.splitDraft) IA.splitDraft[i]=t; renderClientPanel(); }
+
+// cambiar el tipo de un día → recarga sus grupos por defecto
+function iaSetSplitDia(i,t){
+  if(!IA.splitDraft||!IA.splitDraft[i]) return;
+  IA.splitDraft[i] = { tipo:t, grupos: iaGruposDe(t).map(nombre=>({nombre, n:0})) };
+  renderClientPanel();
+}
 function iaSetDias(){
   const n=parseInt(prompt('¿Cuántos días tiene el ciclo? (1-7)', String((IA.splitDraft||[]).length||7)),10);
   if(!n||n<1||n>7) return;
   const old=IA.splitDraft||[];
-  IA.splitDraft=Array.from({length:n},(_,i)=>old[i]||'OFF');
+  IA.splitDraft=Array.from({length:n},(_,i)=>old[i]||{tipo:'OFF',grupos:[]});
   renderClientPanel();
+}
+// + / − en el contador de un grupo
+function iaGrupoN(i,gi,delta){
+  const g = IA.splitDraft?.[i]?.grupos?.[gi]; if(!g) return;
+  g.n = Math.max(0, (g.n||0)+delta);
+  renderClientPanel();
+}
+function iaQuitarGrupo(i,gi){
+  const dia = IA.splitDraft?.[i]; if(!dia||!dia.grupos) return;
+  dia.grupos.splice(gi,1); renderClientPanel();
+}
+function iaNuevoGrupo(i){
+  const dia = IA.splitDraft?.[i]; if(!dia) return;
+  const nombre = prompt('Nombre del grupo muscular (ej: Amplitud, Lumbar, Core):',''); if(nombre===null) return;
+  const limpio = nombre.trim(); if(!limpio) return;
+  if(!dia.grupos) dia.grupos=[];
+  dia.grupos.push({nombre:limpio, n:1}); renderClientPanel();
+}
+// crear un tipo de día propio (Glúteo, Cadena posterior...) y asignarlo al día i
+function iaNuevoTipo(i){
+  const nombre = prompt('Nombre del tipo de día (ej: Glúteo, Cadena posterior):',''); if(nombre===null) return;
+  const limpio = nombre.trim(); if(!limpio) return;
+  const clave = limpio.toUpperCase().replace(/[^A-Z0-9ÑÁÉÍÓÚ]/g,'_').slice(0,24);
+  const cols=['#0d9488','#c026d3','#ea580c','#0284c7','#65a30d','#9333ea','#dc2626'];
+  const col = cols[Object.keys(IA_TIPOS_CUSTOM).length % cols.length];
+  IA_TIPOS_CUSTOM[clave] = { lbl:limpio, col, grupos:[] };
+  _iaGuardarCustom();
+  if(IA.splitDraft && IA.splitDraft[i]) IA.splitDraft[i] = { tipo:clave, grupos:[] };
+  showToast('✓ Tipo "'+limpio+'" creado — añádele grupos abajo');
+  renderClientPanel();
+}
+
+// ── PLANTILLAS DE CONFIGURACIÓN DEL GENERADOR ──────────────────────────────
+// Se guardan en training_templates con split = {__iaConfig:true, dias:[...], tiposCustom:{...}}
+function _iaEsPlantillaConfig(t){
+  return t && t.split && typeof t.split==='object' && !Array.isArray(t.split) && t.split.__iaConfig===true;
+}
+async function iaGuardarPlantilla(){
+  if(!coachData){ showToast('No hay coach activo'); return; }
+  if(!IA.splitDraft || !IA.splitDraft.some(d=>d.tipo!=='OFF')){ showToast('Configura el split antes de guardar'); return; }
+  const nombre = prompt('Nombre de la plantilla (ej: Hipertrofia 5 días, PPL clásico):','');
+  if(nombre===null) return;
+  const limpio = nombre.trim(); if(!limpio){ showToast('La plantilla necesita un nombre'); return; }
+  // guardar solo los tipos custom que use esta config
+  const usados = {};
+  IA.splitDraft.forEach(d=>{ if(IA_TIPOS_CUSTOM[d.tipo]) usados[d.tipo]=IA_TIPOS_CUSTOM[d.tipo]; });
+  const config = { __iaConfig:true, dias: JSON.parse(JSON.stringify(IA.splitDraft)), tiposCustom: usados };
+  try{
+    const { data, error } = await sb.from('training_templates')
+      .insert({ coach_id:coachData.id, name:limpio, split:config, split_days:IA.splitDraft.length, exercises:null })
+      .select().single();
+    if(error||!data){ console.error('iaGuardarPlantilla:',error); showToast('No se pudo guardar: '+(error?.message||'')); return; }
+    TRAINING_TEMPLATES.unshift(data);
+    showToast('✓ Plantilla "'+limpio+'" guardada');
+    renderClientPanel();
+  }catch(e){ console.error(e); showToast('No se pudo guardar la plantilla'); }
+}
+function iaCargarPlantilla(){
+  const plantillas = (TRAINING_TEMPLATES||[]).filter(_iaEsPlantillaConfig);
+  let ov=document.getElementById('ia-tpl-modal');
+  if(!ov){ ov=document.createElement('div'); ov.id='ia-tpl-modal'; ov.className='modal-overlay';
+    ov.onclick=(e)=>{ if(e.target===ov) ov.style.display='none'; };
+    document.body.appendChild(ov);
+  }
+  const items = plantillas.length ? plantillas.map(t=>{
+    const dias = (t.split&&t.split.dias)||[];
+    const resumen = dias.filter(d=>d.tipo!=='OFF').map(d=>iaTipoLbl(d.tipo)).join(' · ')||'—';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--border);border-radius:11px;margin-bottom:8px">
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:700;color:var(--text)">${escHtml(t.name||'')}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${dias.length} días · ${escHtml(resumen)}</div></div>
+      <button onclick="iaAplicarPlantilla('${escHtml(t.id)}')" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:9px;border:none;background:var(--accent);color:#fff;cursor:pointer">Cargar</button>
+      <button onclick="iaBorrarPlantilla('${escHtml(t.id)}')" title="Borrar" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text3);cursor:pointer;font-size:13px">✕</button>
+    </div>`;
+  }).join('') : `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Aún no tienes plantillas guardadas.<br>Configura un split y pulsa "💾 Guardar plantilla".</div>`;
+  ov.innerHTML=`<div class="modal-box" style="width:480px" onclick="event.stopPropagation()">
+    <div class="modal-hdr"><div><div class="modal-title">Plantillas de configuración</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px">Cargan el split, los grupos y las cantidades</div></div>
+    <button class="modal-close" onclick="document.getElementById('ia-tpl-modal').style.display='none'">✕</button></div>
+    <div class="modal-body">${items}</div></div>`;
+  ov.style.display='flex';
+}
+function iaAplicarPlantilla(id){
+  const t = (TRAINING_TEMPLATES||[]).find(x=>String(x.id)===String(id));
+  if(!t||!t.split||!t.split.dias){ showToast('Plantilla no válida'); return; }
+  // restaurar tipos custom que use la plantilla
+  if(t.split.tiposCustom){ Object.assign(IA_TIPOS_CUSTOM, t.split.tiposCustom); _iaGuardarCustom(); }
+  IA.splitDraft = JSON.parse(JSON.stringify(t.split.dias));
+  const m=document.getElementById('ia-tpl-modal'); if(m) m.style.display='none';
+  showToast('✓ Plantilla "'+(t.name||'')+'" cargada');
+  renderClientPanel();
+}
+async function iaBorrarPlantilla(id){
+  const t=(TRAINING_TEMPLATES||[]).find(x=>String(x.id)===String(id)); if(!t) return;
+  if(!confirm('¿Borrar la plantilla "'+(t.name||'')+'"?')) return;
+  try{
+    const {error}=await sb.from('training_templates').delete().eq('id', id);
+    if(error){ showToast('No se pudo borrar'); return; }
+    TRAINING_TEMPLATES = TRAINING_TEMPLATES.filter(x=>String(x.id)!==String(id));
+    iaCargarPlantilla(); // re-render del modal
+  }catch(e){ console.error(e); showToast('No se pudo borrar'); }
 }
 
 // ── Generación ────────────────────────────────────────────────────────────
 async function iaGenerar(){
   const c = currentClient; if(!c) return;
-  if(IA.modo!=='nutricion' && (!IA.splitDraft || !IA.splitDraft.some(t=>t!=='OFF'))){
+  if(IA.modo!=='nutricion' && (!IA.splitDraft || !IA.splitDraft.some(d=>d.tipo!=='OFF'))){
     showToast('Marca al menos un día de entreno en el split'); return;
   }
   IA.generando=true; IA.propEntreno=null; IA.propDieta=null;
   IA.entrenoAplicado=false; IA.dietaAplicado=false;
   renderClientPanel();
-  try{
-    const ctx = _iaContexto(c);
-    if(IA.modo!=='nutricion'){ IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos'; renderClientPanel(); }
-    if(IA.modo!=='entreno'){ IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1; }
-    showToast('✓ Propuesta lista — revísala antes de aplicar');
-  }catch(e){
-    console.error('iaGenerar:', e);
-    showToast('Error IA: '+(e.message||'inténtalo de nuevo'));
-  }finally{
-    IA.generando=false; renderClientPanel();
+  const ctx = _iaContexto(c);
+  let errEntreno=null, errDieta=null;
+  if(IA.modo!=='nutricion'){
+    try{ IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos'; }
+    catch(e){ console.error('IA entreno:',e); errEntreno=e.message||'error'; }
+    renderClientPanel();
   }
+  if(IA.modo!=='entreno'){
+    try{ IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1; }
+    catch(e){ console.error('IA dieta:',e); errDieta=e.message||'error'; }
+  }
+  IA.generando=false; renderClientPanel();
+  // Mensajes según qué salió
+  if(errEntreno && errDieta){ showToast('Error IA: '+errDieta); }
+  else if(errEntreno){ showToast('El entreno falló: '+errEntreno); }
+  else if(errDieta){ showToast('La dieta falló: '+errDieta+' (el entreno sí se generó)'); }
+  else { showToast('✓ Propuesta lista — revísala antes de aplicar'); }
 }
 
 function _iaContexto(c){
@@ -14061,27 +14256,34 @@ function _iaContexto(c){
 }
 
 async function _iaGenerarEntreno(c, ctx){
-  const dias = IA.splitDraft.map((t,i)=>({dia:i+1,tipo:t})).filter(d=>d.tipo!=='OFF');
-  let bibTxt='';
+  const dias = IA.splitDraft.map((d,i)=>({dia:i+1,tipo:d.tipo,lbl:iaTipoLbl(d.tipo),grupos:(d.grupos||[]).filter(g=>g.n>0)})).filter(d=>d.tipo!=='OFF');
+  // biblioteca de ejercicios del coach (toda, para que la IA use el máximo posible)
+  let bibTxt='', bibNames=new Set();
   if(ctx.usarBiblioteca){
     try{
       const ts=getTrainState(c.id); const db=ts.exerciseDB||{}; const lineas=[];
-      Object.keys(db).forEach(tipo=>{ const arr=db[tipo]||[]; if(arr.length) lineas.push(`${tipo}: ${arr.map(e=>e.nombre||e.name).filter(Boolean).join(', ')}`); });
-      if(lineas.length) bibTxt='\n\nUSA PREFERENTEMENTE estos ejercicios de la biblioteca del entrenador (puedes añadir alguno nuevo si falta variedad):\n'+lineas.join('\n');
+      Object.keys(db).forEach(tipo=>{ const arr=db[tipo]||[]; arr.forEach(e=>{ const nm=e.nombre||e.name; if(nm) bibNames.add(nm.toLowerCase()); }); if(arr.length) lineas.push(`${tipo}: ${arr.map(e=>e.nombre||e.name).filter(Boolean).join(', ')}`); });
+      if(lineas.length) bibTxt=`\n\nBIBLIOTECA DE EJERCICIOS DEL ENTRENADOR (úsala AL MÁXIMO: prioriza estos ejercicios; si no hay suficientes para cubrir las cantidades pedidas, complétalo tú con ejercicios lógicos):\n${lineas.join('\n')}`;
+      else bibTxt='\n\n(La biblioteca del entrenador está vacía: genera ejercicios lógicos tú.)';
     }catch(e){}
   }
-  const sys = `Eres un entrenador experto. Generas planes de entrenamiento de gimnasio coherentes y seguros. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
-  const tiposTxt = dias.map(d=>`Día ${d.dia}: ${IA_TIPO_LBL[d.tipo]} (${d.tipo})`).join('; ');
+  // descripción del split con grupos y cantidades
+  const tiposTxt = dias.map(d=>{
+    if(d.grupos.length){
+      const gr = d.grupos.map(g=>`${g.n} de ${g.nombre}`).join(', ');
+      return `Día ${d.dia} (${d.lbl}): ${gr}`;
+    }
+    return `Día ${d.dia} (${d.lbl}): 4-6 ejercicios coherentes con el tipo (tú decides el reparto)`;
+  }).join('. ');
+  const sys = `Eres un entrenador experto. Generas planes de entrenamiento de gimnasio coherentes y seguros. Cada ejercicio debe corresponder al grupo muscular indicado. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
   const usr = `Genera los ejercicios para este split. Cliente: objetivo ${ctx.objetivo}.
 ${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
-Split FIJO (no lo cambies, respeta el tipo de cada día): ${tiposTxt}.
-Reglas: cada día debe tener 4-6 ejercicios COHERENTES con su tipo (PUSH solo empuje pecho/hombro/tríceps; PULL solo tirón espalda/bíceps; LEG solo pierna; etc.). Series 3-4, reps en rango (ej "8-10","12","15").${bibTxt}
-Responde EXACTAMENTE este JSON:
-{"dias":[{"dia":1,"tipo":"PUSH","ejercicios":[{"nombre":"Press banca plano","sets":4,"reps":"8-10","restSec":120}]}]}`;
-  const data = parseIAJson(await callIA(sys, usr, 4000));
-  let bibNames = new Set();
-  if(ctx.usarBiblioteca){ try{ const db=getTrainState(c.id).exerciseDB||{}; Object.values(db).forEach(arr=>(arr||[]).forEach(e=>bibNames.add((e.nombre||e.name||'').toLowerCase()))); }catch(e){} }
+Split FIJO — respeta el tipo, los grupos y EXACTAMENTE las cantidades de ejercicios indicadas por grupo: ${tiposTxt}.
+Reglas: cada ejercicio debe ser coherente con su grupo muscular (ej: "Pecho"→press banca, aperturas; "Bíceps"→curl; "Femoral"→curl femoral). Series 3-4, reps en rango (ej "8-10","12","15"). Si un grupo pide N ejercicios, genera exactamente N.${bibTxt}
+Responde EXACTAMENTE este JSON (incluye el grupo de cada ejercicio):
+{"dias":[{"dia":1,"tipo":"PUSH","ejercicios":[{"nombre":"Press banca plano","grupo":"Pecho","sets":4,"reps":"8-10","restSec":120}]}]}`;
+  const data = parseIAJson(await callIA(sys, usr, 6000));
   (data.dias||[]).forEach(d=>{ (d.ejercicios||[]).forEach(e=>{ e.fuente = bibNames.has((e.nombre||'').toLowerCase())?'biblioteca':'nueva'; }); });
   return data;
 }
@@ -14104,7 +14306,7 @@ REGLAS:
 - Para cada comida añade "marca": sugerencia orientativa de marca/supermercado español (ej "Hacendado","SOS") como TEXTO; no afecta a macros.${bibTxt}
 Responde EXACTAMENTE este JSON:
 {"opciones":[{"n":1,"kcal":2400,"comidas":[{"tipo":"Desayuno","texto":"Avena con plátano y claras","marca":"Avena Hacendado","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g"}]}]}],"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg"}]}`;
-  return parseIAJson(await callIA(sys, usr, 7000));
+  return parseIAJson(await callIA(sys, usr, 16000));
 }
 
 // ── Propuesta de ENTRENO (burbujitas de día + editable + aplicar) ─────────
@@ -14117,8 +14319,8 @@ function iaPropEntrenoHtml(){
     </div>`;
   }
   const burbujas = '<span onclick="iaFiltroDia(\'todos\')" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:700;background:'+(IA.filtroDia==='todos'?'var(--text)':'var(--bg)')+';color:'+(IA.filtroDia==='todos'?'#fff':'var(--text2)')+';border:1px solid '+(IA.filtroDia==='todos'?'var(--text)':'var(--border)')+'">Todos</span>'+
-    p.dias.map(d=>{ const col=IA_TIPO_COL[d.tipo]||'var(--text2)'; const on=IA.filtroDia===String(d.dia);
-      return `<span onclick="iaFiltroDia('${d.dia}')" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:700;background:${on?col+'1a':'var(--bg)'};color:${on?col:'var(--text2)'};border:1px solid ${on?col:'var(--border)'}">D${d.dia} ${IA_TIPO_LBL[d.tipo]}</span>`;
+    p.dias.map(d=>{ const col=iaTipoCol(d.tipo); const on=IA.filtroDia===String(d.dia);
+      return `<span onclick="iaFiltroDia('${d.dia}')" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:700;background:${on?col+'1a':'var(--bg)'};color:${on?col:'var(--text2)'};border:1px solid ${on?col:'var(--border)'}">D${d.dia} ${iaTipoLbl(d.tipo)}</span>`;
     }).join('');
   const diasMostrar = IA.filtroDia==='todos'?p.dias:p.dias.filter(d=>String(d.dia)===IA.filtroDia);
   const tablas = diasMostrar.map(d=>{
@@ -14127,12 +14329,12 @@ function iaPropEntrenoHtml(){
         ? '<span style="font-size:10px;color:#15803d;background:var(--gl);padding:1px 6px;border-radius:5px;margin-left:5px">biblioteca</span>'
         : '<span style="font-size:10px;color:#a16207;background:#fef9c3;padding:1px 6px;border-radius:5px;margin-left:5px">nueva</span>';
       return `<tr style="border-top:1px solid var(--border)${idx%2?';background:var(--bg)':''}">
-        <td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(e.nombre||'')}${badge}</td>
+        <td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(e.nombre||'')}${e.grupo?`<span style="font-size:10px;color:var(--text3);margin-left:6px">· ${escHtml(e.grupo)}</span>`:''}${badge}</td>
         <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:90px">${e.sets||'?'} × ${escHtml(String(e.reps||'?'))}</td>
         <td style="text-align:center;width:38px;cursor:pointer;color:var(--text3)" onclick="iaEditarEj(${d.dia},${idx})" title="Editar">✏️</td>
       </tr>`;
     }).join('');
-    return `<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">D${d.dia} · ${IA_TIPO_LBL[d.tipo]}</div>
+    return `<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">D${d.dia} · ${iaTipoLbl(d.tipo)}</div>
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>${filas}</tbody></table></div></div>`;
   }).join('');
   return `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
@@ -14210,11 +14412,13 @@ function iaAplicarEntreno(){
     const ndias=IA.splitDraft.length;
     initSplit(c.id, ndias);
     const ts2=getTrainState(c.id);
-    IA.splitDraft.forEach((t,i)=>{ if(ts2.split[i]) ts2.split[i].type=t; });
+    // Para tipos custom, usar su etiqueta (con espacios) como identidad, igual que el split normal
+    const tipoReal = (t)=> (typeof IA_TIPOS_CUSTOM!=='undefined' && IA_TIPOS_CUSTOM[t]) ? (IA_TIPOS_CUSTOM[t].lbl||t).toUpperCase() : t;
+    IA.splitDraft.forEach((d,i)=>{ if(ts2.split[i]) ts2.split[i].type=tipoReal(d.tipo); });
     (IA.propEntreno.dias||[]).forEach(d=>{
       const slot=ts2.split[d.dia-1]; if(!slot) return;
       slot.exercises=(d.ejercicios||[]).map(e=>({
-        nombre:e.nombre, tipo:d.tipo, sets:e.sets||3, reps:String(e.reps||'10'),
+        nombre:e.nombre, tipo:tipoReal(d.tipo), sets:e.sets||3, reps:String(e.reps||'10'),
         rest_sec:e.restSec||90, restSec:e.restSec||90, approx:'', aprox:'', video:''
       }));
     });

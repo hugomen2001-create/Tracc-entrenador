@@ -7911,10 +7911,191 @@ function renderSeguimiento() {
   const c = currentClient;
   return `
     ${seccionResumenActividad(c)}
-    ${seccionEvolucionCargas(c)}
+    ${seccionTablaRegistros(c)}
     ${seccionHistorialSesiones(c)}
-    ${seccionMetricas(c)}
   `;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TABLA DE REGISTROS tipo Excel (dos vistas). Filtra por tipo (push/pull/leg).
+//  · Vista completa: filas = ejercicios, columnas = cada entreno de ese tipo (1,2,3…)
+//  · Vista por sesión: eliges una sesión y ves sus ejercicios con cada serie
+// ══════════════════════════════════════════════════════════════════════════
+let _segVista = 'completa';   // 'completa' | 'sesion'
+let _segTipo = null;          // tipo seleccionado (PUSH/PULL/LEG…) — se autollena
+let _segSesionId = null;      // sesión elegida en vista por-sesión
+
+function _segNormTipo(t){
+  const x=String(t||'').toUpperCase().trim();
+  if(x==='PIERNA'||x==='LEG'||x==='PIERNAS') return 'LEG';
+  if(x==='PULL'||x==='TIRON'||x==='TIRÓN') return 'PULL';
+  if(x==='PUSH'||x==='EMPUJE') return 'PUSH';
+  if(x==='TORSO') return 'TORSO';
+  return x||'OTRO';
+}
+function _segColorTipo(t){
+  return {PUSH:'#2563eb',PULL:'#7c3aed',LEG:'#16a34a',TORSO:'#d97706'}[t]||'#6b6b66';
+}
+function _segBgTipo(t){
+  return {PUSH:'#dbeafe',PULL:'#f3f0ff',LEG:'#dcfce7',TORSO:'#fef3c7'}[t]||'#ececec';
+}
+// Sesiones completadas reales (no descanso), con sus series, ordenadas por fecha asc
+function _segSesiones(c){
+  const ses=(c&&c._sessions)||[];
+  const sets=(c&&c._workoutSets)||[];
+  const esOff=t=>{const x=String(t||'').toUpperCase();return !x||x==='OFF'||x==='DESCANSO'||x==='DSC';};
+  const comp=ses.filter(s=>s&&s.completed&&s.session_date&&!esOff(s.session_type))
+    .sort((a,b)=>String(a.session_date).localeCompare(String(b.session_date)));
+  return comp.map(s=>{
+    const setsS=sets.filter(ws=>ws&&ws.session_id===s.id);
+    return {id:s.id, date:String(s.session_date).slice(0,10), tipo:_segNormTipo(s.session_type), rawTipo:s.session_type, sets:setsS};
+  });
+}
+
+function s2SetVista(v){ _segVista=v; renderClientPanel(); }
+function s2SetTipo(t){ _segTipo=t; _segSesionId=null; renderClientPanel(); }
+function s2SetSesion(id){ _segSesionId=id; renderClientPanel(); }
+
+function seccionTablaRegistros(c){
+  const cardStyle='background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:18px';
+  const sesiones=_segSesiones(c);
+
+  if(c._workoutSets==null){
+    return `<div style="${cardStyle};margin-bottom:16px"><div style="font-size:13px;color:var(--text3);text-align:center;padding:20px">Cargando registros…</div></div>`;
+  }
+  if(!sesiones.length){
+    return `<div style="${cardStyle};margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px">Registro de entrenos</div>
+      <div style="font-size:13px;color:var(--text3);text-align:center;padding:24px">Este cliente aún no tiene entrenos completados con series registradas.</div>
+    </div>`;
+  }
+
+  // Tipos disponibles (orden por frecuencia/aparición)
+  const tiposSet=[];
+  sesiones.forEach(s=>{ if(s.tipo&&!tiposSet.includes(s.tipo)) tiposSet.push(s.tipo); });
+  // Tipo activo: el guardado si sigue disponible, si no el primero
+  let tipo = _segTipo && tiposSet.includes(_segTipo) ? _segTipo : tiposSet[0];
+
+  // Botones de filtro de tipo
+  const tipoBtns=tiposSet.map(t=>{
+    const on=t===tipo;
+    return `<span onclick="s2SetTipo('${t}')" style="font-size:12px;font-weight:${on?'700':'600'};padding:6px 13px;border-radius:8px;background:${on?_segColorTipo(t):'transparent'};color:${on?'#fff':'var(--text2)'};cursor:pointer">${t}</span>`;
+  }).join('');
+
+  // Selector de vista
+  const vistaBtn=(v,lbl)=>`<span onclick="s2SetVista('${v}')" style="font-size:13px;font-weight:${_segVista===v?'700':'600'};padding:7px 16px;border-radius:8px;background:${_segVista===v?'var(--accent)':'transparent'};color:${_segVista===v?'#fff':'var(--text2)'};cursor:pointer">${lbl}</span>`;
+
+  const controles=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:inline-flex;background:var(--bg);border:1.5px solid var(--border);border-radius:11px;padding:3px;gap:2px">${vistaBtn('completa','Vista completa')}${vistaBtn('sesion','Por sesión')}</div>
+    <div style="display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap">${tipoBtns}</div>
+  </div>`;
+
+  const cuerpo = _segVista==='completa' ? _segMatriz(sesiones, tipo) : _segPorSesion(sesiones, tipo);
+
+  return `<div style="${cardStyle};margin-bottom:16px">
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px">Registro de entrenos</div>
+    <div style="font-size:11.5px;color:var(--text3);margin-bottom:14px">Series registradas por el cliente, sin duplicados</div>
+    ${controles}
+    ${cuerpo}
+  </div>`;
+}
+
+// Vista matriz: filas=ejercicios, columnas=cada entreno de ese tipo (1,2,3…)
+function _segMatriz(sesiones, tipo){
+  const delTipo=sesiones.filter(s=>s.tipo===tipo);
+  if(!delTipo.length) return `<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px">Sin entrenos de tipo ${tipo}.</div>`;
+  // Ejercicios (filas) en orden de primera aparición
+  const ejOrden=[];
+  delTipo.forEach(s=>{ s.sets.forEach(ws=>{ const n=ws.exercise_name||'—'; if(!ejOrden.includes(n)) ejOrden.push(n); }); });
+  // Para cada ejercicio y sesión, sus series ordenadas
+  const seriesDe=(s,ejNombre)=>{
+    return s.sets.filter(ws=>(ws.exercise_name||'—')===ejNombre)
+      .sort((a,b)=>(a.set_number||0)-(b.set_number||0))
+      .map(ws=>({reps:ws.reps_done,peso:ws.weight_kg}));
+  };
+  // peso máximo de un ejercicio en una sesión (para comparar mejora)
+  const maxPeso=(s,ejNombre)=>{ const ps=s.sets.filter(ws=>(ws.exercise_name||'—')===ejNombre).map(ws=>ws.weight_kg).filter(v=>v!=null); return ps.length?Math.max(...ps):null; };
+
+  const headCols=delTipo.map((s,i)=>{
+    const f=new Date(s.date+'T00:00:00');
+    const fTxt=f.getDate()+'/'+String(f.getMonth()+1).padStart(2,'0');
+    return `<th style="text-align:center;padding:12px 8px;min-width:72px"><div style="font-size:14px;font-weight:700;color:var(--text)">${i+1}</div><div style="font-size:10px;color:var(--text3);font-weight:500">${fTxt}</div></th>`;
+  }).join('');
+
+  const rows=ejOrden.map((ej,idx)=>{
+    const celdas=delTipo.map((s,i)=>{
+      const series=seriesDe(s,ej);
+      if(!series.length) return `<td style="text-align:center;padding:6px;color:var(--text3)">·</td>`;
+      const prev = i>0 ? maxPeso(delTipo[i-1],ej) : null;
+      const cur = maxPeso(s,ej);
+      const mejora = (prev!=null&&cur!=null&&cur>prev);
+      const cellBg = mejora?'#e8f6ec':'var(--bg)';
+      const cellCol = mejora?'#15803d':'var(--text)';
+      const cellWt = mejora?'600':'400';
+      const chips=series.map(se=>`<div style="background:${cellBg};border-radius:6px;padding:3px 0;margin:2px 4px;font-size:11.5px;color:${cellCol};font-weight:${cellWt};font-family:'Geist Mono',monospace">${se.reps??'?'}<span style="color:#16a34a">×</span>${se.peso??'?'}</div>`).join('');
+      return `<td style="text-align:center;padding:6px 2px;vertical-align:top">${chips}</td>`;
+    }).join('');
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:11px 12px;position:sticky;left:0;background:var(--bg2);min-width:150px">
+        <div style="font-size:10px;color:var(--green);font-weight:700;font-family:'Geist Mono',monospace">${idx+1}</div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--text);line-height:1.3">${escHtml(ej)}</div>
+      </td>${celdas}</tr>`;
+  }).join('');
+
+  return `<div style="border:1px solid var(--border);border-radius:12px;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;min-width:${150+delTipo.length*72}px">
+      <thead><tr>
+        <th style="text-align:left;padding:12px;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700;position:sticky;left:0;background:var(--bg2);min-width:150px">Ejercicio</th>
+        ${headCols}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  <div style="font-size:10.5px;color:var(--text3);margin-top:10px">Columnas = cada entreno de ${tipo} (1 = el más antiguo). Celda = reps × kg por serie. Verde = mejora de peso máx vs el entreno anterior.</div>`;
+}
+
+// Vista por sesión: selector + tabla de series de la sesión elegida
+function _segPorSesion(sesiones, tipo){
+  const delTipo=sesiones.filter(s=>s.tipo===tipo).slice().reverse(); // más reciente primero
+  if(!delTipo.length) return `<div style="font-size:13px;color:var(--text3);text-align:center;padding:20px">Sin entrenos de tipo ${tipo}.</div>`;
+  let sel = _segSesionId && delTipo.find(s=>s.id===_segSesionId) ? _segSesionId : delTipo[0].id;
+  const sesion=delTipo.find(s=>s.id===sel);
+  const opts=delTipo.map((s,i)=>{
+    const f=new Date(s.date+'T00:00:00');
+    const fTxt=f.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+    const num=delTipo.length-i; // nº de entreno (el más reciente tiene el número más alto)
+    return `<option value="${s.id}" ${s.id===sel?'selected':''}>#${num} · ${fTxt}</option>`;
+  }).join('');
+
+  // Agrupar series por ejercicio
+  const porEj={};
+  sesion.sets.forEach(ws=>{ const n=ws.exercise_name||'—'; (porEj[n]=porEj[n]||[]).push(ws); });
+  const maxSeries=Math.max(1,...Object.values(porEj).map(arr=>arr.length));
+  const headSeries=Array.from({length:maxSeries},(_,i)=>`<th style="text-align:center;padding:10px 12px">Serie ${i+1}</th>`).join('');
+  const filas=Object.keys(porEj).map((ej,idx)=>{
+    const arr=porEj[ej].slice().sort((a,b)=>(a.set_number||0)-(b.set_number||0));
+    let celdas='';
+    for(let i=0;i<maxSeries;i++){
+      const s=arr[i];
+      celdas+=`<td style="text-align:center;padding:10px;color:${s?'var(--text2)':'var(--text3)'};font-family:'Geist Mono',monospace">${s?((s.reps_done??'?')+'×'+(s.weight_kg??'?')):'—'}</td>`;
+    }
+    return `<tr style="border-top:1px solid var(--border);${idx%2?'background:var(--bg)':''}"><td style="padding:10px 12px;font-weight:600;color:var(--text)">${escHtml(ej)}</td>${celdas}</tr>`;
+  }).join('');
+
+  const f=new Date(sesion.date+'T00:00:00');
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700;color:var(--text)">Sesión:</span>
+      <select onchange="s2SetSesion(this.value)" style="height:34px;border:1.5px solid var(--border);border-radius:9px;background:var(--bg);font-size:13px;padding:0 12px;color:var(--text);font-family:inherit;font-weight:600;cursor:pointer">${opts}</select>
+      <span style="font-size:11.5px;color:var(--text3)">${Object.keys(porEj).length} ejercicios · ${sesion.sets.length} series</span>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:12px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:480px;font-size:12.5px">
+        <thead><tr style="background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:700">
+          <th style="text-align:left;padding:10px 12px">Ejercicio</th>${headSeries}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderWeekAccordion(c, ds, todayIdx) {

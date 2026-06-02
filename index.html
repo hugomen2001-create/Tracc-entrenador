@@ -14715,6 +14715,8 @@ function abrirDetalleCita(id){
   if(!ov){ov=document.createElement('div');ov.id='cita-det-ov';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:265;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';ov.onclick=(e)=>{if(e.target===ov)cerrarDetalleCita();};document.body.appendChild(ov);}
   const row=(lbl,val)=>val?`<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text3)">${lbl}</span><span style="font-size:12.5px;color:var(--text);font-weight:600;text-align:right">${val}</span></div>`:'';
   const cp=a.status==='contrapropuesta'?`<button onclick="aceptarContrapropuesta('${a.id}');cerrarDetalleCita()" style="flex:1;height:40px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Aceptar su hora</button>`:'';
+  // Cita propuesta por el cliente (pendiente): el coach puede aceptar o rechazar
+  const propCliente = a.status==='pendiente' && a.proposed_by==='cliente';
   // ¿La cita ya pasó? → mostrar control de asistencia
   const ahora=new Date();
   const yaPaso=apptDateObj(a).getTime() < ahora.getTime();
@@ -14749,14 +14751,19 @@ function abrirDetalleCita(id){
     ${row('Lugar', a.location?escHtml(a.location):'')}
     ${a.notes?`<div style="margin-top:10px;background:var(--bg);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:9px 11px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Nota para el cliente</div><div style="font-size:12.5px;color:var(--text);line-height:1.5">${escHtml(a.notes)}</div></div>`:''}
     ${recBlock}
+    ${propCliente?`<div style="display:flex;align-items:center;gap:6px;margin-top:12px;background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:9px 11px;font-size:12px;color:#a16207;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>El cliente propone esta cita. Acéptala, recházala o proponle otra hora.</div>`:''}
     ${attBlock}
     ${coachNoteBlock}
-    <div style="display:flex;gap:8px;margin-top:18px">
+    ${propCliente?`<div style="display:flex;gap:8px;margin-top:18px">
+      <button onclick="aceptarCitaCliente('${a.id}')" style="flex:1;height:42px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Aceptar</button>
+      <button onclick="rechazarCitaCliente('${a.id}')" style="flex:1;height:42px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--red);font-size:13px;font-weight:700;cursor:pointer">Rechazar</button>
+    </div>`:''}
+    <div style="display:flex;gap:8px;margin-top:${propCliente?'8px':'18px'}">
       <button onclick="irAClientePerfil('${a.client_id}')" style="flex:1;height:40px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Ver perfil</button>
       ${cp}
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button onclick="abrirReprogramar('${a.id}')" style="flex:1;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:12.5px;font-weight:600;cursor:pointer">Reprogramar</button>
+      <button onclick="abrirReprogramar('${a.id}')" style="flex:1;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:12.5px;font-weight:600;cursor:pointer">${propCliente?'Proponer otra hora':'Reprogramar'}</button>
       <button onclick="cancelarCita('${a.id}');cerrarDetalleCita()" style="flex:1;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer">Cancelar cita</button>
     </div>
   </div>`;
@@ -15024,6 +15031,18 @@ async function aceptarContrapropuesta(id){
   const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
   try{ await sb.from('appointments').update({starts_at:a.client_proposed_at||a.starts_at,status:'aceptada',proposed_by:'coach',seen_by_client:false}).eq('id',id); }catch(e){}
   await cargarAppointments(); _agRerender(); showToast('✓ Hora confirmada');
+}
+// El coach acepta una cita que el cliente propuso (status pendiente, proposed_by cliente)
+async function aceptarCitaCliente(id){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  try{ await sb.from('appointments').update({status:'aceptada',seen_by_client:false}).eq('id',id); }catch(e){}
+  await cargarAppointments(); _agRerender(); cerrarDetalleCita(); showToast('✓ Cita aceptada');
+}
+// El coach rechaza una cita que el cliente propuso
+async function rechazarCitaCliente(id){
+  if(!confirm('¿Rechazar la cita que propuso el cliente?')) return;
+  try{ await sb.from('appointments').update({status:'rechazada',seen_by_client:false}).eq('id',id); }catch(e){}
+  await cargarAppointments(); _agRerender(); cerrarDetalleCita(); showToast('Cita rechazada');
 }
 
 // ══════════════════════════════════════════════════════════════════════════

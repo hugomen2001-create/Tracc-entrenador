@@ -1059,7 +1059,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       <div><div class="coach-name">Pol De Blas</div><div class="coach-role">Entrenador personal</div></div>
       <div style="margin-left:auto;display:flex;gap:5px">
         <button onclick="startTour()" title="Ver el tour de bienvenida" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:13px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">?</button>
-        <button onclick="openGroqKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
+        <button onclick="openGeminiKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
         <button onclick="lgLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);display:flex;align-items:center;transition:all .15s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
@@ -1435,6 +1435,13 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
         <div style="font-size:11px;color:var(--text3);margin-top:2px">Clientes que se han registrado en Tracc y esperan vinculación</div>
       </div>
       <button class="modal-close" onclick="closePendingModal()">✕</button>
+    </div>
+    <div style="padding:0 20px 14px">
+      <button onclick="abrirNuevoClienteManual()" style="width:100%;height:44px;border-radius:11px;background:var(--green);border:none;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Crear cliente desde cero
+      </button>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">O vincula una solicitud de abajo (clientes que se registraron por la app)</div>
     </div>
     <div class="modal-body" id="pending-modal-body"></div>
   </div>
@@ -2661,17 +2668,20 @@ const IA_CFG = {
 let GEMINI_API_KEY = localStorage.getItem('tracc_gemini_key') || '';
 
 // Llama a la IA con un system prompt + user prompt. Devuelve el texto.
-async function callIA(system, user, maxTokens=4000){
+// jsonMode=true fuerza respuesta JSON (para generación de planes).
+async function callIA(system, user, maxTokens=4000, jsonMode=true){
   if(IA_CFG.provider==='gemini'){
     if(!GEMINI_API_KEY){ openGeminiKeyModal(); throw new Error('Configura tu API key de Gemini'); }
     const url = `${IA_CFG.geminiBase}/${IA_CFG.model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+    const genCfg = { temperature:0.7, maxOutputTokens:maxTokens };
+    if(jsonMode) genCfg.responseMimeType='application/json';
     const res = await fetch(url, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         system_instruction:{ parts:[{ text: system }] },
         contents:[{ role:'user', parts:[{ text: user }] }],
-        generationConfig:{ temperature:0.7, maxOutputTokens:maxTokens, responseMimeType:'application/json' }
+        generationConfig: genCfg
       })
     });
     const data = await res.json();
@@ -4551,13 +4561,13 @@ async function sendAiMessage() {
   input.value = '';
   aiMessages.push({role:'user', content:msg});
   renderAiOptions();
-  const res  = await fetch(GROQ_URL, {
-    method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_API_KEY},
-    body: JSON.stringify({model:GROQ_MODEL, max_tokens:1000,
-      messages: aiMessages})
-  });
-  const data = await res.json();
-  const reply = data.choices?.[0]?.message?.content || data.content?.map(b=>b.text||'').join('') || '';
+  let reply='';
+  try{
+    // Convertir el historial a system (contexto) + último mensaje del usuario
+    const sys = aiMessages.filter(m=>m.role!=='user').map(m=>m.content).join('\n') || 'Eres un asistente útil para un entrenador personal.';
+    const hist = aiMessages.map(m=>(m.role==='user'?'Usuario: ':'Asistente: ')+m.content).join('\n');
+    reply = await callIA(sys, hist+'\nAsistente:', 1000, false);
+  }catch(e){ reply = 'No se pudo conectar con la IA. '+(e.message||''); }
   aiMessages.push({role:'assistant', content:reply});
   renderAiOptions();
 }
@@ -4584,6 +4594,68 @@ function openPendingModal() {
 
 function closePendingModal() {
   document.getElementById('pending-modal').style.display = 'none';
+}
+
+// ── Crear cliente desde cero (manual) ──────────────────────────────────────
+function abrirNuevoClienteManual(){
+  let ov=document.getElementById('nuevo-cliente-modal');
+  if(!ov){ ov=document.createElement('div'); ov.id='nuevo-cliente-modal'; ov.className='modal-overlay';
+    ov.onclick=(e)=>{ if(e.target===ov) cerrarNuevoClienteManual(); };
+    document.body.appendChild(ov);
+  }
+  const lbl='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;display:block';
+  const inp='width:100%;height:42px;border:1.5px solid var(--border);border-radius:10px;padding:0 12px;font-size:14px;color:var(--text);box-sizing:border-box;font-family:inherit;outline:none;background:var(--bg)';
+  ov.innerHTML=`<div class="modal-box" style="width:460px" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <div><div class="modal-title">Nuevo cliente</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">Solo el nombre es obligatorio. Podrás completar el resto después.</div></div>
+      <button class="modal-close" onclick="cerrarNuevoClienteManual()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:13px"><label style="${lbl}">Nombre *</label><input id="nc-name" type="text" placeholder="Nombre y apellidos" style="${inp}"></div>
+      <div style="margin-bottom:13px"><label style="${lbl}">Email <span style="color:var(--text3);font-weight:500;text-transform:none;letter-spacing:0">(para vincular su app MyTracc)</span></label><input id="nc-email" type="email" placeholder="cliente@email.com" style="${inp}"></div>
+      <div style="display:flex;gap:10px;margin-bottom:13px">
+        <div style="flex:1"><label style="${lbl}">Teléfono</label><input id="nc-phone" type="tel" placeholder="Opcional" style="${inp}"></div>
+        <div style="flex:1"><label style="${lbl}">Objetivo</label><input id="nc-goal" type="text" placeholder="Ej: volumen" style="${inp}"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:18px">
+        <div style="flex:1"><label style="${lbl}">Peso (kg)</label><input id="nc-weight" type="number" step="0.1" placeholder="Opcional" style="${inp}"></div>
+        <div style="flex:1"><label style="${lbl}">Altura (cm)</label><input id="nc-height" type="number" placeholder="Opcional" style="${inp}"></div>
+      </div>
+      <button id="nc-save" onclick="guardarNuevoClienteManual()" style="width:100%;height:46px;border-radius:11px;background:var(--green);border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Crear cliente</button>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+  setTimeout(()=>document.getElementById('nc-name')?.focus(),100);
+}
+function cerrarNuevoClienteManual(){ const ov=document.getElementById('nuevo-cliente-modal'); if(ov) ov.style.display='none'; }
+
+async function guardarNuevoClienteManual(){
+  if(!coachData){ showToast('No hay coach activo'); return; }
+  const name=(document.getElementById('nc-name').value||'').trim();
+  if(!name){ showToast('El nombre es obligatorio'); document.getElementById('nc-name').focus(); return; }
+  const email=(document.getElementById('nc-email').value||'').trim().toLowerCase()||null;
+  const phone=(document.getElementById('nc-phone').value||'').trim()||null;
+  const goal=(document.getElementById('nc-goal').value||'').trim()||null;
+  const weight=parseFloat(document.getElementById('nc-weight').value)||null;
+  const height=parseInt(document.getElementById('nc-height').value,10)||null;
+  const btn=document.getElementById('nc-save'); if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
+  const fila={
+    coach_id:coachData.id, name, email, phone, goal,
+    weight_kg:weight, height_cm:height,
+    member_since:new Date().toISOString().slice(0,10), active:true, status:'active'
+  };
+  try{
+    const {data,error}=await sb.from('clients').insert(fila).select('*').single();
+    if(error){ console.error('crear cliente:',error); showToast('No se pudo crear el cliente','error',error.message||''); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} return; }
+    cerrarNuevoClienteManual();
+    closePendingModal();
+    await loadRealClients();
+    renderClientList();
+    showToast('✓ Cliente creado');
+    // abrir su ficha directamente
+    if(data && typeof selectClient==='function'){ selectClient(data.id); }
+  }catch(e){ console.error(e); showToast('No se pudo crear el cliente','error'); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} }
 }
 
 function renderPendingModal() {
@@ -9891,10 +9963,13 @@ function cardCuestionarioCompacto(c){
   </div>`;
 }
 
-// Modal con TODAS las preguntas del cuestionario
+// Modal con TODAS las preguntas del cuestionario (vista + edición)
+let _cuestEdit = false;
 function openCuestionarioModal(){
-  const c = currentClient; const q = c && c._questionnaire;
-  if(!q){ showToast('Este cliente aún no ha completado el cuestionario'); return; }
+  const c = currentClient;
+  const q = (c && c._questionnaire) ? c._questionnaire : {};
+  // Si no hay cuestionario, abrimos directamente en modo edición para crearlo.
+  if(!c._questionnaire) _cuestEdit = true;
   let ov = document.getElementById('cuest-overlay');
   if(!ov){
     ov = document.createElement('div'); ov.id = 'cuest-overlay';
@@ -9902,55 +9977,145 @@ function openCuestionarioModal(){
     ov.onclick = (e)=>{ if(e.target===ov) cerrarCuestionarioModal(); };
     document.body.appendChild(ov);
   }
-  const firstTime = q.first_time_coach === true ? 'Sí, primera vez'
-                  : q.first_time_coach === false ? 'No, ya había trabajado con uno'
-                  : 'Sin datos';
   const lbl = 'font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px';
   const sec = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin:16px 0 8px';
-  const row = (l, v) => `<div style="background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-size:13.5px;color:var(--text);line-height:1.5">${v}</div></div>`;
-  const big = (l, v, u) => `<div style="flex:1;background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${v}<span style="font-size:12px;color:var(--text3)">${u||''}</span></div></div>`;
+  const inp = 'width:100%;border:1.5px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--text);box-sizing:border-box;font-family:inherit;outline:none;background:var(--bg)';
+
+  let cuerpo;
+  if(_cuestEdit){
+    // ── MODO EDICIÓN ──
+    const ta = (id,l,v) => `<div style="background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><textarea id="cq-${id}" style="${inp};min-height:46px;resize:vertical">${escHtml(v||'')}</textarea></div>`;
+    const num = (id,l,v,u) => `<div style="flex:1;background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}${u?' ('+u+')':''}</div><input id="cq-${id}" type="number" value="${v!=null?v:''}" style="${inp}"></div>`;
+    cuerpo = `
+      <div style="${sec}">Objetivo y experiencia</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${ta('goal','Objetivo principal', q.goal || c.goal)}
+        <div style="background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">¿Primera vez con entrenador?</div>
+          <select id="cq-first_time_coach" style="${inp}">
+            <option value="">Sin datos</option>
+            <option value="true" ${q.first_time_coach===true?'selected':''}>Sí, primera vez</option>
+            <option value="false" ${q.first_time_coach===false?'selected':''}>No, ya había trabajado con uno</option>
+          </select></div>
+        ${ta('split_preference','Split preferido', q.split_preference)}
+        ${ta('experience_description','Experiencia previa', q.experience_description)}
+      </div>
+      <div style="${sec}">Salud y alimentación</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${ta('allergies','Alergias o intolerancias', q.allergies)}
+        ${ta('diseases','Enfermedades relevantes / lesiones', q.diseases)}
+        ${ta('disliked_foods','Alimentos que NO le gustan', q.disliked_foods)}
+        <div style="display:flex;gap:8px">
+          ${num('meals_per_day','Comidas al día', q.meals_per_day)}
+          ${ta('supplements','Suplementación', q.supplements)}
+        </div>
+      </div>
+      <div style="${sec}">Entreno y descanso</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${ta('previous_training','Entrenamiento previo', q.previous_training)}
+        ${num('available_days_per_week','Días disponibles por semana', q.available_days_per_week)}
+        <div style="display:flex;gap:8px">
+          ${num('sleep_hours','Horas de sueño', q.sleep_hours, 'h')}
+          ${num('sleep_quality','Calidad del sueño', q.sleep_quality, '/10')}
+        </div>
+      </div>
+      <div style="display:flex;gap:9px;margin-top:18px">
+        <button onclick="_cuestEdit=false;openCuestionarioModal()" style="flex:1;height:44px;border-radius:11px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
+        <button id="cq-save" onclick="guardarCuestionario()" style="flex:1;height:44px;border-radius:11px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Guardar cuestionario</button>
+      </div>`;
+  } else {
+    // ── MODO VISTA ──
+    const firstTime = q.first_time_coach === true ? 'Sí, primera vez'
+                    : q.first_time_coach === false ? 'No, ya había trabajado con uno' : 'Sin datos';
+    const row = (l, v) => `<div style="background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-size:13.5px;color:var(--text);line-height:1.5">${v}</div></div>`;
+    const big = (l, v, u) => `<div style="flex:1;background:var(--bg);border-radius:10px;padding:9px 12px"><div style="${lbl}">${l}</div><div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--text)">${v}<span style="font-size:12px;color:var(--text3)">${u||''}</span></div></div>`;
+    cuerpo = `
+      <div style="${sec}">Objetivo y experiencia</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${row('Objetivo principal', (q.goal||c.goal) ? escHtml(q.goal||c.goal) : '<span style="color:var(--text3)">Sin datos</span>')}
+        ${row('Primera vez con entrenador', firstTime)}
+        ${row('Split preferido', q.split_preference ? escHtml(String(q.split_preference)) : '<span style="color:var(--text3)">Sin datos</span>')}
+        ${row('Experiencia previa', qVal(q.experience_description))}
+      </div>
+      <div style="${sec}">Salud y alimentación</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${row('Alergias o intolerancias', qVal(q.allergies))}
+        ${row('Enfermedades relevantes', qVal(q.diseases))}
+        ${row('Alimentos que no le gustan', qVal(q.disliked_foods))}
+        <div style="display:flex;gap:8px">
+          ${big('Comidas al día', q.meals_per_day || '—', '')}
+          ${row('Suplementación', qVal(q.supplements))}
+        </div>
+      </div>
+      <div style="${sec}">Entreno y descanso</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${row('Entrenamiento previo', qVal(q.previous_training))}
+        ${row('Días disponibles por semana', q.available_days_per_week ? escHtml(String(q.available_days_per_week))+' días' : '<span style="color:var(--text3)">Sin datos</span>')}
+        <div style="display:flex;gap:8px">
+          ${big('Horas de sueño', q.sleep_hours != null ? q.sleep_hours : '—', ' h')}
+          ${big('Calidad del sueño', q.sleep_quality != null ? q.sleep_quality : '—', '/10')}
+        </div>
+      </div>`;
+  }
+
+  const tituloSub = _cuestEdit ? 'editando' : (c._questionnaire ? 'completado en MyTracc' : 'sin completar');
+  const btnEditar = _cuestEdit ? '' : `<button onclick="_cuestEdit=true;openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border-radius:8px;border:1.5px solid var(--green);background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer">✎ Editar</button>`;
   ov.innerHTML = `<div style="width:100%;max-width:580px;background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:20px 22px">
     <div style="display:flex;align-items:center;gap:11px;margin-bottom:4px">
       <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📋</div>
       <div>
         <div style="font-family:'DM Serif Display',serif;font-size:19px;line-height:1.1;color:var(--text)">Cuestionario inicial</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:1px">${escHtml(c.name)} · completado en MyTracc</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${escHtml(c.name)} · ${tituloSub}</div>
       </div>
-      <button onclick="cerrarCuestionarioModal()" style="margin-left:auto;width:30px;height:30px;border:none;background:var(--bg);border-radius:8px;color:var(--text2);cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+      ${btnEditar}
+      <button onclick="cerrarCuestionarioModal()" style="${_cuestEdit?'':'margin-left:10px;'}width:30px;height:30px;border:none;background:var(--bg);border-radius:8px;color:var(--text2);cursor:pointer;font-size:16px;line-height:1;flex-shrink:0">&#10005;</button>
     </div>
-
-    <div style="${sec}">Objetivo y experiencia</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      ${row('Objetivo principal', (c.goal && c.goal!=='—') ? escHtml(c.goal) : '<span style="color:var(--text3)">Sin datos</span>')}
-      ${row('Primera vez con entrenador', firstTime)}
-      ${row('Split preferido', q.split_preference ? 'Split '+escHtml(String(q.split_preference)) : '<span style="color:var(--text3)">Sin datos</span>')}
-      ${row('Experiencia previa', qVal(q.experience_description))}
-    </div>
-
-    <div style="${sec}">Salud y alimentación</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      ${row('Alergias o intolerancias', qVal(q.allergies))}
-      ${row('Enfermedades relevantes', qVal(q.diseases))}
-      ${row('Alimentos que no le gustan', qVal(q.disliked_foods))}
-      <div style="display:flex;gap:8px">
-        ${big('Comidas al día', q.meals_per_day || '—', '')}
-        ${row('Suplementación', qVal(q.supplements))}
-      </div>
-    </div>
-
-    <div style="${sec}">Entreno y descanso</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      ${row('Entrenamiento previo', qVal(q.previous_training))}
-      ${row('Días disponibles por semana', q.available_days_per_week ? escHtml(String(q.available_days_per_week))+' días' : '<span style="color:var(--text3)">Sin datos</span>')}
-      <div style="display:flex;gap:8px">
-        ${big('Horas de sueño', q.sleep_hours != null ? q.sleep_hours : '—', ' h')}
-        ${big('Calidad del sueño', q.sleep_quality != null ? q.sleep_quality : '—', '/10')}
-      </div>
-    </div>
+    ${cuerpo}
   </div>`;
   ov.style.display = 'flex';
 }
-function cerrarCuestionarioModal(){ const ov = document.getElementById('cuest-overlay'); if(ov) ov.remove(); }
+function cerrarCuestionarioModal(){ _cuestEdit=false; const ov = document.getElementById('cuest-overlay'); if(ov) ov.remove(); }
+
+// Guardar el cuestionario (crea la fila si no existe, o actualiza)
+async function guardarCuestionario(){
+  const c = currentClient; if(!c){ return; }
+  const val = id => { const el=document.getElementById('cq-'+id); return el?el.value.trim():''; };
+  const numv = id => { const v=val(id); return v===''?null:(parseFloat(v)); };
+  const ft = val('first_time_coach');
+  const fila = {
+    client_id: c.id,
+    goal: val('goal')||null,
+    first_time_coach: ft===''?null:(ft==='true'),
+    split_preference: val('split_preference')||null,
+    experience_description: val('experience_description')||null,
+    allergies: val('allergies')||null,
+    diseases: val('diseases')||null,
+    disliked_foods: val('disliked_foods')||null,
+    meals_per_day: numv('meals_per_day'),
+    supplements: val('supplements')||null,
+    previous_training: val('previous_training')||null,
+    available_days_per_week: numv('available_days_per_week'),
+    sleep_hours: numv('sleep_hours'),
+    sleep_quality: numv('sleep_quality')
+  };
+  const btn=document.getElementById('cq-save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    // upsert por client_id
+    let res;
+    if(c._questionnaire && c._questionnaire.id){
+      res = await sb.from('client_questionnaire').update(fila).eq('id', c._questionnaire.id).select('*').single();
+    } else {
+      res = await sb.from('client_questionnaire').insert(fila).select('*').single();
+    }
+    if(res.error){ console.error('guardarCuestionario:',res.error); showToast('No se pudo guardar','error',res.error.message||''); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} return; }
+    c._questionnaire = res.data;
+    // si el objetivo cambió, reflejarlo también en el cliente (campo goal)
+    if(fila.goal && fila.goal!==c.goal){ try{ await sb.from('clients').update({goal:fila.goal}).eq('id',c.id); c.goal=fila.goal; }catch(e){} }
+    _cuestEdit=false;
+    openCuestionarioModal();
+    renderClientPanel();
+    showToast('✓ Cuestionario guardado');
+  }catch(e){ console.error(e); showToast('No se pudo guardar','error'); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} }
+}
 
 
 // ── QUESTIONNAIRE ────────────────────────────────────────────────────────
@@ -10131,9 +10296,8 @@ REGLAS ESTRICTAS:
 Genera la Opción ${n} usando ${protein} como proteína principal y ${carb} como carbohidrato principal en almuerzo/cena.
 Esta opción debe ser COMPLETAMENTE DIFERENTE a las otras 6 opciones — distintos alimentos, distintas preparaciones.
 Mismas kcal totales (${ds.params.kcal} ±30 kcal).`;
-    const text = await callAI(sys, usr, 1500);
-    const raw = text.replace(/```json|```/g,'').trim();
-    const op = JSON.parse(raw);
+    const text = await callIA(sys, usr, 1500);
+    const op = parseIAJson(text);
     op.nombre = 'Opción '+n;
     return op;
   }
@@ -10764,7 +10928,6 @@ function renderEntrenoSection() {
         <div style="display:flex;gap:8px;align-items:center">
           ${dbTotal>0?`<span style="font-size:11px;color:var(--green);font-weight:500">✓ ${dbTotal} ejercicios importados</span>`:''}
           <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="openImportModal()">📋 Importar lista</button>
-          <button class="ai-btn" style="font-size:11px;padding:5px 10px" onclick="generateAllDaysAI()">✦ Generar todo con IA</button>
         </div>
       </div>
       <div class="diet-setup" style="margin-bottom:14px">
@@ -13771,14 +13934,15 @@ function iaBannerHtml(c){
 
 function iaGeneradorHtml(c){
   // chips del cuestionario (si hay)
-  const q = c._questionnaire || c.questionnaire || null;
+  const q = c._questionnaire || null;
   let chips='';
   if(q){
     const pares=[];
-    if(q.goal||q.objetivo) pares.push(['Objetivo: '+(q.goal||q.objetivo),'var(--green)','var(--gl)']);
-    if(q.days||q.dias_entreno) pares.push([(q.days||q.dias_entreno)+' días/semana','var(--accent)','#f3f0ff']);
-    if(q.kcal||q.calorias) pares.push([(q.kcal||q.calorias)+' kcal','var(--blue)','var(--bl)']);
-    if(q.allergies||q.alergias) pares.push(['Alergias: '+(q.allergies||q.alergias),'var(--amber)','#fef9c3']);
+    if(q.goal) pares.push(['Objetivo: '+q.goal,'var(--green)','var(--gl)']);
+    if(q.available_days_per_week) pares.push([q.available_days_per_week+' días/semana','var(--accent)','#f3f0ff']);
+    if(c._nutrition&&c._nutrition.plan&&(c._nutrition.plan.kcal_goal||c._nutrition.plan.kcal_target)) pares.push([(c._nutrition.plan.kcal_goal||c._nutrition.plan.kcal_target)+' kcal','var(--blue)','var(--bl)']);
+    if(q.allergies) pares.push(['Alergias: '+q.allergies,'var(--amber)','#fef9c3']);
+    if(q.disliked_foods) pares.push(['No le gusta: '+(q.disliked_foods.length>40?q.disliked_foods.slice(0,40)+'…':q.disliked_foods),'var(--text2)','var(--bg3)']);
     chips = pares.map(([t,col,bg])=>`<span style="font-size:11.5px;background:${bg};color:${col};padding:3px 10px;border-radius:6px;font-weight:600">${escHtml(t)}</span>`).join('');
   }
   const chipsBox = chips
@@ -13876,12 +14040,24 @@ async function iaGenerar(){
 }
 
 function _iaContexto(c){
-  const q = c._questionnaire || c.questionnaire || {};
-  const objetivo = q.goal||q.objetivo||'no especificado';
-  const kcal = q.kcal||q.calorias||(c._nutrition&&c._nutrition.plan&&c._nutrition.plan.kcal_target)||'no especificado';
-  const alergias = q.allergies||q.alergias||'ninguna indicada';
-  const macros = (c._nutrition&&c._nutrition.plan)?`Proteína ${c._nutrition.plan.protein_target||'?'}g, Carbos ${c._nutrition.plan.carbs_target||'?'}g, Grasas ${c._nutrition.plan.fat_target||'?'}g`:'no especificados';
-  return { objetivo, kcal, alergias, macros, indicaciones: IA.indicaciones||'ninguna', usarBiblioteca: IA.fuente==='biblioteca' };
+  const q = c._questionnaire || {};
+  const objetivo = q.goal || (c.goal) || 'no especificado';
+  const dias = q.available_days_per_week || null;
+  const kcal = (c._nutrition&&c._nutrition.plan&&(c._nutrition.plan.kcal_goal||c._nutrition.plan.kcal_target)) || 'no especificado';
+  const alergias = q.allergies || 'ninguna indicada';
+  const enfermedades = q.diseases || 'ninguna';
+  const noGusta = q.disliked_foods || '';
+  const comidasDia = q.meals_per_day || '';
+  const suplementos = q.supplements || '';
+  const macros = (c._nutrition&&c._nutrition.plan)?`Proteína ${c._nutrition.plan.protein_g||'?'}g, Carbos ${c._nutrition.plan.carbs_g||'?'}g, Grasas ${c._nutrition.plan.fat_g||'?'}g`:'no especificados';
+  // texto extra de contexto para los prompts
+  const extra = [
+    enfermedades&&enfermedades!=='ninguna'?`Enfermedades/lesiones: ${enfermedades}.`:'',
+    noGusta?`Alimentos que NO le gustan (evítalos): ${noGusta}.`:'',
+    comidasDia?`Comidas al día: ${comidasDia}.`:'',
+    suplementos?`Suplementos: ${suplementos}.`:''
+  ].filter(Boolean).join(' ');
+  return { objetivo, dias, kcal, alergias, macros, extra, indicaciones: IA.indicaciones||'ninguna', usarBiblioteca: IA.fuente==='biblioteca' };
 }
 
 async function _iaGenerarEntreno(c, ctx){
@@ -13897,6 +14073,7 @@ async function _iaGenerarEntreno(c, ctx){
   const sys = `Eres un entrenador experto. Generas planes de entrenamiento de gimnasio coherentes y seguros. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
   const tiposTxt = dias.map(d=>`Día ${d.dia}: ${IA_TIPO_LBL[d.tipo]} (${d.tipo})`).join('; ');
   const usr = `Genera los ejercicios para este split. Cliente: objetivo ${ctx.objetivo}.
+${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
 Split FIJO (no lo cambies, respeta el tipo de cada día): ${tiposTxt}.
 Reglas: cada día debe tener 4-6 ejercicios COHERENTES con su tipo (PUSH solo empuje pecho/hombro/tríceps; PULL solo tirón espalda/bíceps; LEG solo pierna; etc.). Series 3-4, reps en rango (ej "8-10","12","15").${bibTxt}
@@ -13916,7 +14093,9 @@ async function _iaGenerarDieta(c, ctx){
     bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca del entrenador (con sus macros exactos):\n'+lineas.join('; ');
   }
   const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
-  const usr = `Genera 7 OPCIONES de menú diario. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}. Indicaciones del entrenador: ${ctx.indicaciones}.
+  const usr = `Genera 7 OPCIONES de menú diario. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
+${ctx.extra}
+Indicaciones del entrenador: ${ctx.indicaciones}.
 REGLAS:
 - Cada opción es un día completo: desayuno, comida, merienda, cena.
 - COHERENCIA: desayuno con comida de desayuno (avena, huevos, tostadas, fruta, yogur...); comida y cena con platos principales (proteína + guarnición + verdura); merienda ligera. NUNCA pongas pasta o arroz como desayuno o merienda.
@@ -14239,7 +14418,6 @@ function renderDayDetail(ts, c) {
       <div class="day-detail-badge" style="background:${color}">D${d.day}</div>
       <div class="day-detail-title">Día ${d.day} — <span style="color:${color}">${d.type}</span></div>
       <div style="display:flex;gap:7px;margin-left:auto">
-        <button class="ai-btn" style="font-size:11px;padding:5px 10px" onclick="generateDayAI(${i})">✦ Generar con IA</button>
         <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="closeDayDetail()">✓ Cerrar día</button>
       </div>
     </div>
@@ -14452,13 +14630,8 @@ CARDIO = carrera, bici, elíptica, HIIT, plancha, abdominales.
 Si un ejercicio puede ir en varias, elige la más específica.`;
 
   try {
-    const res = await fetch(GROQ_URL, {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_API_KEY},
-      body: JSON.stringify({model:GROQ_MODEL, max_tokens:2000, messages:[{role:'system',content:sys},{role:'user',content:'Clasifica estos ejercicios:\n'+cleanText}]})
-    });
-    const data = await res.json();
-    const raw  = data.choices?.[0]?.message?.content||'';
-    const classified = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const raw = await callIA(sys, 'Clasifica estos ejercicios:\n'+cleanText, 2000);
+    const classified = parseIAJson(raw);
 
     // Store in trainState with links
     const ts = getTrainState(currentClient.id);
@@ -14544,13 +14717,8 @@ Tipo de sesión: ${d.type}.
 ${db.length>0?'Ejercicios disponibles en el listado de '+((coachData&&coachData.name)?coachData.name.split(' ')[0]:'tu entrenador')+' (usa preferentemente estos): '+db.join(', ')+'.\n':''}Genera un entrenamiento completo y equilibrado.`;
 
   try {
-    const res = await fetch(GROQ_URL, {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_API_KEY},
-      body: JSON.stringify({model:GROQ_MODEL, max_tokens:800, messages:[{role:'system',content:sys},{role:'user',content:usr}]})
-    });
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content||'';
-    const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const text = await callIA(sys, usr, 800);
+    const parsed = parseIAJson(text);
     if (parsed.ejercicios?.length) {
       ts.split[dayIdx].exercises = parsed.ejercicios;
       saveTrainStorage();

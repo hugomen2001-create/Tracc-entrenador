@@ -14054,6 +14054,9 @@ setTimeout(()=>{
 // ══════════════════════════════════════════════════════════════════════════
 let APPOINTMENTS = [];
 let _agCal = new Date(); _agCal.setDate(1);
+let _agView = 'mes';        // 'mes' | 'lista'
+let _agFilterCli = '';      // '' = todos
+let _agFilterTipo = '';     // '' = todos
 const APPT_TYPES = {
   revision:{label:'Revisión',color:'#16a34a',bg:'#dcfce7',icon:'📋'},
   llamada:{label:'Llamada',color:'#a16207',bg:'#fef9c3',icon:'📞'},
@@ -14126,14 +14129,78 @@ function citasClienteCardHtml(c){
 // ── Vista calendario global (modo 'agenda') ──
 function renderAgendaPanel(){
   const panel=document.getElementById('main-panel'); if(!panel) return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  // Citas visibles según filtros (no canceladas/rechazadas)
+  const visibles=APPOINTMENTS.filter(a=>{
+    if(a.status==='rechazada'||a.status==='cancelada')return false;
+    if(_agFilterCli&&String(a.client_id)!==String(_agFilterCli))return false;
+    if(_agFilterTipo&&a.type!==_agFilterTipo)return false;
+    return true;
+  });
+
+  // ── Resumen de HOY (timeline) ──
+  const hoyCitas=visibles.filter(a=>{const d=apptDateObj(a);d.setHours(0,0,0,0);return d.getTime()===today.getTime();})
+    .sort((a,b)=>apptDateObj(a)-apptDateObj(b));
+  let resumenHoy='';
+  if(hoyCitas.length){
+    const items=hoyCitas.map(a=>{const T=_apptType(a.type),d=apptDateObj(a);
+      return `<div onclick="abrirDetalleCita('${a.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--text);font-family:'Geist Mono',monospace;flex-shrink:0">${apptFmtHora(d)}</div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${T.color};flex-shrink:0"></div>
+        <div style="min-width:0;overflow:hidden"><div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(apptClientName(a.client_id))}</div>
+        <div style="font-size:10.5px;color:var(--text3)">${T.label}${a.location?' · '+escHtml(a.location):''}</div></div>
+      </div>`;}).join('');
+    resumenHoy=`<div style="background:linear-gradient(135deg,var(--green),#15803d);border-radius:14px;padding:14px 15px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Hoy · ${hoyCitas.length} cita${hoyCitas.length!==1?'s':''}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">${items}</div>
+    </div>`;
+  } else {
+    resumenHoy=`<div style="background:var(--bg2);border:1.5px dashed var(--border);border-radius:14px;padding:13px 15px;margin-bottom:16px;font-size:12.5px;color:var(--text3)">Hoy no tienes citas.</div>`;
+  }
+
+  // ── Selectores de filtro ──
+  const cliOpts=`<option value="">Todos los clientes</option>`+CLIENTS.map(c=>`<option value="${c.id}"${String(_agFilterCli)===String(c.id)?' selected':''}>${escHtml(c.name)}</option>`).join('');
+  const tipoOpts=`<option value="">Todos los tipos</option>`+Object.keys(APPT_TYPES).map(k=>`<option value="${k}"${_agFilterTipo===k?' selected':''}>${APPT_TYPES[k].label}</option>`).join('');
+  const selStyle=`height:32px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-size:12px;padding:0 8px;cursor:pointer;font-family:inherit`;
+  const filtros=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+    <select onchange="_agSetFilterCli(this.value)" style="${selStyle}">${cliOpts}</select>
+    <select onchange="_agSetFilterTipo(this.value)" style="${selStyle}">${tipoOpts}</select>
+    ${(_agFilterCli||_agFilterTipo)?`<button onclick="_agClearFilters()" style="height:32px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text3);font-size:12px;padding:0 10px;cursor:pointer">✕ Quitar filtros</button>`:''}
+  </div>`;
+
+  // ── Toggle de vista ──
+  const tabBtn=(v,lbl)=>`<button onclick="_agSetView('${v}')" style="height:30px;padding:0 14px;border-radius:8px;border:none;background:${_agView===v?'var(--green)':'transparent'};color:${_agView===v?'#fff':'var(--text2)'};font-size:12.5px;font-weight:600;cursor:pointer">${lbl}</button>`;
+  const viewToggle=`<div style="display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px">${tabBtn('mes','Mes')}${tabBtn('lista','Lista')}</div>`;
+
+  // ── Cuerpo según vista ──
+  let body='';
+  if(_agView==='mes'){
+    body=_agRenderMes(visibles, today);
+  } else {
+    body=_agRenderLista(visibles, today);
+  }
+
+  panel.innerHTML=`
+    <div class="vg-header"><div><div class="vg-title">Agenda</div><div class="vg-date">Tus citas con clientes</div></div>
+      <button onclick="abrirNuevaCita()" style="height:36px;padding:0 15px;border-radius:9px;background:var(--green);border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer">+ Nueva cita</button></div>
+    <div class="vg-body">
+      ${resumenHoy}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        ${viewToggle}
+        ${filtros}
+      </div>
+      ${body}
+    </div>`;
+}
+
+// Vista MES (calendario)
+function _agRenderMes(visibles, today){
   const y=_agCal.getFullYear(), m=_agCal.getMonth();
   const monthName=_agCal.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   let lead=new Date(y,m,1).getDay(); lead=(lead===0?6:lead-1);
   const daysInMonth=new Date(y,m+1,0).getDate();
-  const today=new Date(); today.setHours(0,0,0,0);
   const byDay={};
-  APPOINTMENTS.forEach(a=>{
-    if(a.status==='rechazada'||a.status==='cancelada') return;
+  visibles.forEach(a=>{
     const d=apptDateObj(a);
     if(d.getFullYear()===y&&d.getMonth()===m){ (byDay[d.getDate()]=byDay[d.getDate()]||[]).push(a); }
   });
@@ -14149,23 +14216,64 @@ function renderAgendaPanel(){
       <div style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--green)':'var(--text2)'}">${dn}</div>${pills}${more}</div>`;
   }
   const legend=Object.keys(APPT_TYPES).map(k=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)"><span style="width:7px;height:7px;border-radius:50%;background:${APPT_TYPES[k].color}"></span>${APPT_TYPES[k].label}</span>`).join('');
-  panel.innerHTML=`
-    <div class="vg-header"><div><div class="vg-title">Agenda</div><div class="vg-date">Todas tus citas</div></div>
-      <button onclick="abrirNuevaCita()" style="height:36px;padding:0 15px;border-radius:9px;background:var(--green);border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer">+ Nueva cita</button></div>
-    <div class="vg-body">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <button onclick="agMes(-1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">‹</button>
-          <div style="font-size:16px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">${monthName}</div>
-          <button onclick="agMes(1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">›</button>
-          <button onclick="agHoy()" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;height:30px;padding:0 12px;cursor:pointer;color:var(--text2);font-size:12px">Hoy</button>
-        </div>
-        <div style="display:flex;gap:14px;flex-wrap:wrap">${legend}</div>
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="agMes(-1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">‹</button>
+        <div style="font-size:16px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">${monthName}</div>
+        <button onclick="agMes(1)" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">›</button>
+        <button onclick="agHoy()" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;height:30px;padding:0 12px;cursor:pointer;color:var(--text2);font-size:12px">Hoy</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">${d}</div>`).join('')}</div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
-    </div>`;
+      <div style="display:flex;gap:14px;flex-wrap:wrap">${legend}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">${d}</div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>`;
 }
+
+// Vista LISTA (próximas citas agrupadas)
+function _agRenderLista(visibles, today){
+  const futuras=visibles.filter(a=>{const d=apptDateObj(a);return d.getTime()>=today.getTime();})
+    .sort((a,b)=>apptDateObj(a)-apptDateObj(b));
+  if(!futuras.length){
+    return `<div style="text-align:center;padding:40px 20px;color:var(--text3);font-size:13px">No hay citas próximas${(_agFilterCli||_agFilterTipo)?' con estos filtros':''}.</div>`;
+  }
+  // Agrupar por fecha
+  const grupos={};
+  futuras.forEach(a=>{const d=apptDateObj(a);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');(grupos[key]=grupos[key]||[]).push(a);});
+  const estadoBadge={pendiente:['Pendiente','#a16207','#fef9c3'],aceptada:['Aceptada','#16a34a','#dcfce7'],contrapropuesta:['Propone otra hora','#a16207','#fef9c3']};
+  let html='<div style="display:flex;flex-direction:column;gap:18px">';
+  Object.keys(grupos).sort().forEach(key=>{
+    const d0=new Date(key+'T00:00:00');
+    const esHoy=d0.getTime()===today.getTime();
+    const manana=new Date(today);manana.setDate(manana.getDate()+1);
+    const esManana=d0.getTime()===manana.getTime();
+    const titulo=esHoy?'Hoy':(esManana?'Mañana':d0.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}));
+    const filas=grupos[key].map(a=>{
+      const T=_apptType(a.type),d=apptDateObj(a);
+      const st=estadoBadge[a.status]||['','',''];
+      return `<div onclick="abrirDetalleCita('${a.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;cursor:pointer">
+        <div style="font-size:14px;font-weight:700;color:var(--text);font-family:'Geist Mono',monospace;min-width:46px">${apptFmtHora(d)}</div>
+        <div style="width:38px;height:38px;border-radius:10px;background:${T.bg};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${T.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(apptClientName(a.client_id))}</div>
+          <div style="font-size:11px;color:var(--text3)">${T.label}${a.duration_minutes?' · '+a.duration_minutes+' min':''}${a.location?' · '+escHtml(a.location):''}</div>
+        </div>
+        ${st[0]?`<span style="font-size:10px;font-weight:700;color:${st[1]};background:${st[2]};padding:2px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0">${st[0]}</span>`:''}
+      </div>`;
+    }).join('');
+    html+=`<div>
+      <div style="font-size:12px;font-weight:700;color:${esHoy?'var(--green)':'var(--text3)'};text-transform:capitalize;margin-bottom:8px">${titulo}</div>
+      <div style="display:flex;flex-direction:column;gap:7px">${filas}</div>
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+function _agSetView(v){ _agView=v; renderAgendaPanel(); }
+function _agSetFilterCli(v){ _agFilterCli=v; renderAgendaPanel(); }
+function _agSetFilterTipo(v){ _agFilterTipo=v; renderAgendaPanel(); }
+function _agClearFilters(){ _agFilterCli=''; _agFilterTipo=''; renderAgendaPanel(); }
 function agMes(delta){ _agCal.setMonth(_agCal.getMonth()+delta); renderAgendaPanel(); }
 function agHoy(){ _agCal=new Date(); _agCal.setDate(1); renderAgendaPanel(); }
 function abrirDiaAgenda(y,m,dn){
@@ -14183,11 +14291,31 @@ function abrirDetalleCita(id){
   if(!ov){ov=document.createElement('div');ov.id='cita-det-ov';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:265;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';ov.onclick=(e)=>{if(e.target===ov)cerrarDetalleCita();};document.body.appendChild(ov);}
   const row=(lbl,val)=>val?`<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text3)">${lbl}</span><span style="font-size:12.5px;color:var(--text);font-weight:600;text-align:right">${val}</span></div>`:'';
   const cp=a.status==='contrapropuesta'?`<button onclick="aceptarContrapropuesta('${a.id}');cerrarDetalleCita()" style="flex:1;height:40px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Aceptar su hora</button>`:'';
-  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:400px;padding:20px 22px">
+  // ¿La cita ya pasó? → mostrar control de asistencia
+  const ahora=new Date();
+  const yaPaso=apptDateObj(a).getTime() < ahora.getTime();
+  const att=a.attendance||null;
+  const attBadge=att==='realizada'?`<span style="display:inline-block;margin-top:5px;margin-left:6px;font-size:10.5px;font-weight:600;color:#16a34a;background:#dcfce7;padding:2px 9px;border-radius:6px">✓ Realizada</span>`
+    :att==='no_asistio'?`<span style="display:inline-block;margin-top:5px;margin-left:6px;font-size:10.5px;font-weight:600;color:#dc2626;background:#fee2e2;padding:2px 9px;border-radius:6px">✕ No asistió</span>`:'';
+  // Bloque de asistencia (para citas aceptadas o ya pasadas)
+  const attBlock=(a.status==='aceptada'||yaPaso)&&a.status!=='cancelada'&&a.status!=='rechazada'
+    ? `<div style="margin-top:14px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Asistencia</div>
+        <div style="display:flex;gap:7px">
+          <button onclick="marcarAsistencia('${a.id}','realizada')" style="flex:1;height:36px;border-radius:9px;border:1.5px solid ${att==='realizada'?'var(--green)':'var(--border)'};background:${att==='realizada'?'#dcfce7':'var(--bg)'};color:${att==='realizada'?'#16a34a':'var(--text2)'};font-size:12px;font-weight:600;cursor:pointer">✓ Realizada</button>
+          <button onclick="marcarAsistencia('${a.id}','no_asistio')" style="flex:1;height:36px;border-radius:9px;border:1.5px solid ${att==='no_asistio'?'var(--red)':'var(--border)'};background:${att==='no_asistio'?'#fee2e2':'var(--bg)'};color:${att==='no_asistio'?'#dc2626':'var(--text2)'};font-size:12px;font-weight:600;cursor:pointer">✕ No asistió</button>
+        </div></div>`
+    : '';
+  // Nota post-cita del entrenador
+  const coachNoteBlock=`<div style="margin-top:14px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Nota privada del entrenador</div>
+    <textarea id="cita-coachnote" placeholder="Resultado de la cita, observaciones…" style="width:100%;min-height:54px;box-sizing:border-box;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:12.5px;padding:9px 11px;font-family:inherit;resize:vertical;outline:none" onblur="guardarNotaCoach('${a.id}',this.value)">${escHtml(a.coach_note||'')}</textarea></div>`;
+  // Aviso de recurrencia
+  const recLabel={weekly:'Se repite cada semana',biweekly:'Se repite cada 2 semanas'}[a.recurrence];
+  const recBlock=recLabel?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--text3)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.95v-1a4 4 0 0 1 4-4h14"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.05v1a4 4 0 0 1-4 4H3"/></svg>${recLabel}</div>`:'';
+  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:400px;padding:20px 22px;max-height:90vh;overflow-y:auto">
     <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
       <div style="width:42px;height:42px;border-radius:11px;background:${T.bg};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${T.icon}</div>
       <div style="flex:1;min-width:0"><div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text);line-height:1">${T.label}</div>
-        <span style="display:inline-block;margin-top:5px;font-size:10.5px;font-weight:600;color:${estado[1]};background:${estado[2]};padding:2px 9px;border-radius:6px">${estado[0]}</span></div>
+        <span style="display:inline-block;margin-top:5px;font-size:10.5px;font-weight:600;color:${estado[1]};background:${estado[2]};padding:2px 9px;border-radius:6px">${estado[0]}</span>${attBadge}</div>
       <button onclick="cerrarDetalleCita()" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;flex-shrink:0">✕</button>
     </div>
     ${row('Cliente', cli?escHtml(cli.name):'—')}
@@ -14195,14 +14323,89 @@ function abrirDetalleCita(id){
     ${row('Hora', apptFmtHora(d))}
     ${row('Duración', a.duration_minutes?a.duration_minutes+' min':'')}
     ${row('Lugar', a.location?escHtml(a.location):'')}
-    ${a.notes?`<div style="margin-top:10px;background:var(--bg);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:9px 11px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Nota</div><div style="font-size:12.5px;color:var(--text);line-height:1.5">${escHtml(a.notes)}</div></div>`:''}
+    ${a.notes?`<div style="margin-top:10px;background:var(--bg);border-left:3px solid var(--green);border-radius:0 8px 8px 0;padding:9px 11px"><div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Nota para el cliente</div><div style="font-size:12.5px;color:var(--text);line-height:1.5">${escHtml(a.notes)}</div></div>`:''}
+    ${recBlock}
+    ${attBlock}
+    ${coachNoteBlock}
     <div style="display:flex;gap:8px;margin-top:18px">
-      <button onclick="irAClientePerfil('${a.client_id}')" style="flex:1;height:40px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Ver perfil del cliente</button>
+      <button onclick="irAClientePerfil('${a.client_id}')" style="flex:1;height:40px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Ver perfil</button>
       ${cp}
     </div>
-    <button onclick="cancelarCita('${a.id}');cerrarDetalleCita()" style="width:100%;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer;margin-top:8px">Cancelar cita</button>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="abrirReprogramar('${a.id}')" style="flex:1;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:12.5px;font-weight:600;cursor:pointer">Reprogramar</button>
+      <button onclick="cancelarCita('${a.id}');cerrarDetalleCita()" style="flex:1;height:36px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer">Cancelar cita</button>
+    </div>
   </div>`;
   ov.style.display='flex';
+}
+
+// Marcar asistencia (realizada / no_asistio). Toggle: volver a pulsar lo quita.
+async function marcarAsistencia(id, valor){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  const nuevo=(a.attendance===valor)?null:valor;
+  a.attendance=nuevo;
+  try{ await sb.from('appointments').update({attendance:nuevo}).eq('id',id); }catch(e){ console.error(e); }
+  abrirDetalleCita(id); _agRerender();
+}
+
+// Guardar nota privada del entrenador
+async function guardarNotaCoach(id, texto){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  const val=(texto||'').trim()||null;
+  if(val===(a.coach_note||null)) return;
+  a.coach_note=val;
+  try{ await sb.from('appointments').update({coach_note:val}).eq('id',id); }catch(e){ console.error(e); }
+}
+
+// Reprogramar: cambia fecha/hora de una cita existente y la deja pendiente de nuevo
+function abrirReprogramar(id){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  const d=apptDateObj(a);
+  const fechaVal=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const horaVal=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  let ov=document.getElementById('repro-ov');
+  if(!ov){ov=document.createElement('div');ov.id='repro-ov';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:270;display:flex;align-items:center;justify-content:center;padding:20px';ov.onclick=(e)=>{if(e.target===ov)ov.style.display='none';};document.body.appendChild(ov);}
+  const inp=`width:100%;box-sizing:border-box;height:42px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:14px;padding:0 12px;font-family:inherit;outline:none`;
+  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;width:100%;max-width:360px;padding:20px 22px">
+    <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);margin-bottom:16px">Reprogramar cita</div>
+    <div style="display:flex;gap:10px;margin-bottom:18px">
+      <div style="flex:1.4"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Fecha</div><input type="date" id="repro-fecha" value="${fechaVal}" style="${inp}"></div>
+      <div style="flex:1"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Hora</div><input type="time" id="repro-hora" value="${horaVal}" style="${inp}"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('repro-ov').style.display='none'" style="flex:1;height:40px;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+      <button onclick="guardarReprogramar('${id}')" style="flex:1;height:40px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Guardar</button>
+    </div>
+  </div>`;
+  ov.style.display='flex';
+}
+async function guardarReprogramar(id){
+  const a=APPOINTMENTS.find(x=>x.id===id); if(!a) return;
+  const fecha=document.getElementById('repro-fecha').value;
+  const hora=document.getElementById('repro-hora').value;
+  if(!fecha||!hora){ showToast('Completa fecha y hora'); return; }
+  const nuevo=new Date(fecha+'T'+hora);
+  if(isNaN(nuevo.getTime())){ showToast('Fecha u hora no válida'); return; }
+  // Aviso de solape con otra cita del mismo coach
+  const solape=_agDetectarSolape(nuevo, a.duration_minutes, id);
+  if(solape && !confirm('Esa franja se solapa con otra cita ('+apptClientName(solape.client_id)+', '+apptFmtHora(apptDateObj(solape))+'). ¿Reprogramar de todos modos?')) return;
+  a.starts_at=nuevo.toISOString(); a.status='pendiente'; a.proposed_by='coach'; a.seen_by_client=false; a.client_proposed_at=null;
+  try{ await sb.from('appointments').update({starts_at:nuevo.toISOString(),status:'pendiente',proposed_by:'coach',seen_by_client:false,client_proposed_at:null}).eq('id',id); }catch(e){ console.error(e); showToast('Error al reprogramar'); return; }
+  document.getElementById('repro-ov').style.display='none';
+  cerrarDetalleCita(); _agRerender(); showToast('✓ Cita reprogramada — el cliente debe confirmar');
+}
+
+// Detecta si una franja (inicio+duración) se solapa con otra cita viva del coach.
+function _agDetectarSolape(inicio, durMin, excluirId){
+  const dur=(durMin||45)*60000;
+  const fin=inicio.getTime()+dur;
+  return APPOINTMENTS.find(a=>{
+    if(a.id===excluirId) return false;
+    if(a.status==='rechazada'||a.status==='cancelada') return false;
+    const ai=apptDateObj(a).getTime();
+    const af=ai+((a.duration_minutes||45)*60000);
+    return inicio.getTime()<af && fin>ai; // hay intersección
+  });
 }
 function cerrarDetalleCita(){const ov=document.getElementById('cita-det-ov');if(ov)ov.style.display='none';}
 function irAClientePerfil(id){
@@ -14317,6 +14520,15 @@ function abrirNuevaCita(clientId, dateStr){
       <input type="text" id="cita-lugar" placeholder="Gimnasio, dirección o enlace de videollamada" style="${inp}"></div>
     <div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Nota (opcional)</div>
       <input type="text" id="cita-nota" placeholder="Trae ropa cómoda, medimos pliegues…" style="${inp}"></div>
+    <div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">Repetir</div>
+      <select id="cita-recur" onchange="_citaRecurChange(this.value)" style="${inp}">
+        <option value="">No repetir</option>
+        <option value="weekly">Cada semana</option>
+        <option value="biweekly">Cada 2 semanas</option>
+      </select>
+      <div id="cita-recur-count" style="display:none;margin-top:8px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">¿Cuántas citas crear?</div>
+        <input type="number" id="cita-recur-n" value="8" min="2" max="26" style="${inp}"></div>
+    </div>
     <button onclick="guardarNuevaCita()" style="width:100%;height:42px;border-radius:10px;background:var(--green);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Proponer cita al cliente</button>
     <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">El cliente recibirá un aviso y podrá aceptarla, rechazarla o proponer otra hora</div>
   </div>`;
@@ -14331,6 +14543,10 @@ function citaSetTipo(k){ _citaTipo=k;
   });
 }
 function cerrarCitaModal(){ const ov=document.getElementById('cita-overlay'); if(ov) ov.style.display='none'; }
+function _citaRecurChange(v){
+  const box=document.getElementById('cita-recur-count');
+  if(box) box.style.display=v?'block':'none';
+}
 
 async function guardarNuevaCita(){
   const cli=document.getElementById('cita-cli').value;
@@ -14339,20 +14555,40 @@ async function guardarNuevaCita(){
   const dur=document.getElementById('cita-dur').value.trim();
   const lugar=document.getElementById('cita-lugar').value.trim();
   const nota=document.getElementById('cita-nota').value.trim();
+  const recur=(document.getElementById('cita-recur')||{}).value||'';
   if(!cli||!fecha||!hora){ showToast('Completa cliente, fecha y hora'); return; }
   const starts=new Date(fecha+'T'+hora);
+  if(isNaN(starts.getTime())){ showToast('Fecha u hora no válida'); return; }
   const durNum=parseInt((dur.match(/\d+/)||[])[0])||null;
-  const fila={ coach_id:coachData.id, client_id:cli, type:_citaTipo, starts_at:starts.toISOString(),
+
+  // Aviso de solape (solo para la primera cita)
+  const solape=_agDetectarSolape(starts, durNum, null);
+  if(solape && !confirm('Esa franja se solapa con otra cita ('+apptClientName(solape.client_id)+', '+apptFmtHora(apptDateObj(solape))+'). ¿Crear de todos modos?')) return;
+
+  // Construir las filas (1 si no hay recurrencia; varias si la hay)
+  const base={ coach_id:coachData.id, client_id:cli, type:_citaTipo,
     duration_minutes:durNum, location:lugar||null, notes:nota||null,
     status:'pendiente', proposed_by:'coach', seen_by_client:false, seen_by_coach:true };
+  let filas=[];
+  if(recur){
+    const n=Math.min(26,Math.max(2,parseInt((document.getElementById('cita-recur-n')||{}).value)||8));
+    const stepDias=recur==='biweekly'?14:7;
+    const grupo=(crypto&&crypto.randomUUID)?crypto.randomUUID():('grp-'+Date.now());
+    for(let i=0;i<n;i++){
+      const d=new Date(starts.getTime()); d.setDate(d.getDate()+stepDias*i);
+      filas.push({...base, starts_at:d.toISOString(), recurrence:recur, recurrence_group:grupo});
+    }
+  } else {
+    filas=[{...base, starts_at:starts.toISOString()}];
+  }
   try{
-    const {error}=await sb.from('appointments').insert(fila);
+    const {error}=await sb.from('appointments').insert(filas);
     if(error){ console.error('guardarNuevaCita:',error); showToast('Error al guardar la cita'); return; }
   }catch(e){ console.error(e); showToast('Error al guardar la cita'); return; }
   cerrarCitaModal();
   await cargarAppointments();
   _agRerender();
-  showToast('✓ Cita propuesta al cliente');
+  showToast(filas.length>1?('✓ '+filas.length+' citas propuestas al cliente'):'✓ Cita propuesta al cliente');
 }
 
 async function cancelarCita(id){

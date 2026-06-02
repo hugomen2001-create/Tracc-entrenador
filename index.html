@@ -13956,7 +13956,8 @@ let IA = {
   filtroDia:'todos',     // burbuja activa en propuesta de entreno
   opcionActiva:1,        // burbuja activa en propuesta de dieta
   entrenoAplicado:false,
-  dietaAplicado:false
+  dietaAplicado:false,
+  compraAbierta:false
 };
 
 // Tipos de día base + los que el coach añada (persistidos en localStorage)
@@ -14024,14 +14025,17 @@ function iaGeneradorHtml(c){
     <div style="font-size:9.5px;color:var(--text3);font-weight:700;text-transform:uppercase">${lbl}</div>
     <input id="${id}" type="number" value="${val||0}" style="width:100%;border:none;background:transparent;font-family:'Geist Mono';font-size:15px;font-weight:600;color:var(--text);outline:none;padding:0">
   </div>`;
-  // desplegable de preferencias (alergias, no le gusta, etc.) editables y sincronizadas con el cuestionario
-  const nPrefs = [q.allergies,q.disliked_foods,q.diseases,q.supplements].filter(Boolean).length;
+  // desplegable de preferencias (editables y sincronizadas con el cuestionario)
+  const nPrefs = [q.allergies,q.disliked_foods,q.liked_foods,q.supplements,q.supermarket].filter(Boolean).length;
   const prefsHtml = IA.prefsAbierto ? `<div style="padding:12px 13px;border-top:1px solid var(--border)">
-    ${_iaPrefField('Alergias / intolerancias','cq2-allergies',q.allergies)}
-    ${_iaPrefField('Alimentos que NO le gustan','cq2-disliked_foods',q.disliked_foods)}
-    ${_iaPrefField('Enfermedades / lesiones','cq2-diseases',q.diseases)}
-    ${_iaPrefField('Suplementación','cq2-supplements',q.supplements)}
-    <button onclick="iaGuardarPrefs()" style="margin-top:8px;height:36px;padding:0 14px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar preferencias</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${_iaPrefField('Alergias / intolerancias','cq2-allergies',q.allergies)}
+      ${_iaPrefField('Alimentos que NO le gustan','cq2-disliked_foods',q.disliked_foods)}
+      ${_iaPrefField('Preferencias (lo que le gusta)','cq2-liked_foods',q.liked_foods)}
+      ${_iaPrefField('Suplementación','cq2-supplements',q.supplements)}
+    </div>
+    <div style="margin-top:4px">${_iaPrefField('Supermercado donde compra (para sugerir marcas)','cq2-supermarket',q.supermarket)}</div>
+    <button onclick="iaGuardarPrefs()" style="margin-top:4px;height:36px;padding:0 14px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar preferencias</button>
   </div>` : '';
   const bloqueDietaBody = IA.bloqueDieta ? `<div style="padding:15px">
     <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px">Objetivos ${plan?'(sincronizado con el plan nutricional)':'· se creará el plan al generar'}</div>
@@ -14165,8 +14169,9 @@ async function iaGuardarPrefs(){
     client_id:c.id,
     allergies:val('cq2-allergies')||null,
     disliked_foods:val('cq2-disliked_foods')||null,
-    diseases:val('cq2-diseases')||null,
-    supplements:val('cq2-supplements')||null
+    liked_foods:val('cq2-liked_foods')||null,
+    supplements:val('cq2-supplements')||null,
+    supermarket:val('cq2-supermarket')||null
   };
   try{
     let res;
@@ -14356,18 +14361,21 @@ function _iaContexto(c, cual){
   const alergias = q.allergies || 'ninguna indicada';
   const enfermedades = q.diseases || 'ninguna';
   const noGusta = q.disliked_foods || '';
+  const leGusta = q.liked_foods || '';
   const comidasDia = q.meals_per_day || '';
   const suplementos = q.supplements || '';
+  const supermercado = q.supermarket || '';
   const macros = (c._nutrition&&c._nutrition.plan)?`Proteína ${c._nutrition.plan.protein_g||'?'}g, Carbos ${c._nutrition.plan.carbs_g||'?'}g, Grasas ${c._nutrition.plan.fat_g||'?'}g`:'no especificados';
   // texto extra de contexto para los prompts
   const extra = [
     enfermedades&&enfermedades!=='ninguna'?`Enfermedades/lesiones: ${enfermedades}.`:'',
     noGusta?`Alimentos que NO le gustan (evítalos): ${noGusta}.`:'',
+    leGusta?`Alimentos que le gustan (priorízalos): ${leGusta}.`:'',
     comidasDia?`Comidas al día: ${comidasDia}.`:'',
     suplementos?`Suplementos: ${suplementos}.`:''
   ].filter(Boolean).join(' ');
   return {
-    objetivo, dias, kcal, alergias, macros, extra,
+    objetivo, dias, kcal, alergias, macros, extra, supermercado,
     indicaciones: (cual==='dieta'?IA.indicacionesDieta:IA.indicacionesEntreno)||'ninguna',
     usarBiblioteca: (cual==='dieta'?IA.fuenteDieta:IA.fuenteEntreno)==='biblioteca'
   };
@@ -14413,6 +14421,9 @@ async function _iaGenerarDieta(c, ctx){
     bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca del entrenador (con sus macros exactos):\n'+lineas.join('; ');
   }
   const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
+  const superTxt = ctx.supermercado
+    ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos y marcas reales de ${ctx.supermercado} (no mezcles supermercados).`
+    : `En "marca" sugiere productos de UN ÚNICO supermercado español coherente para toda la dieta (elige uno: Mercadona/Hacendado, Lidl, Carrefour…) y mantén ese mismo supermercado en todos los alimentos. No mezcles supermercados.`;
   const usr = `Genera 7 OPCIONES de menú diario. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
 ${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
@@ -14421,10 +14432,13 @@ REGLAS:
 - COHERENCIA: desayuno con comida de desayuno (avena, huevos, tostadas, fruta, yogur...); comida y cena con platos principales (proteína + guarnición + verdura); merienda ligera. NUNCA pongas pasta o arroz como desayuno o merienda.
 - VARIEDAD REAL entre las 7 opciones: no repitas las mismas combinaciones. Puedes repetir algún alimento, pero deben ser claramente distintas.
 - Cada opción debe acercarse a las calorías objetivo.
-- Para cada comida añade "marca": sugerencia orientativa de marca/supermercado español (ej "Hacendado","SOS") como TEXTO; no afecta a macros.${bibTxt}
+- Para cada alimento incluye su cantidad y sus macros (kcal, protein, carbs, fat) de esa cantidad.
+- Para cada comida da el total de kcal de la comida.
+- ${superTxt} Pon la "marca" a nivel de cada alimento.${bibTxt}
 Responde EXACTAMENTE este JSON:
-{"opciones":[{"n":1,"kcal":2400,"comidas":[{"tipo":"Desayuno","texto":"Avena con plátano y claras","marca":"Avena Hacendado","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g"}]}]}],"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg"}]}`;
-  return parseIAJson(await callIA(sys, usr, 16000));
+{"supermercado":"Mercadona","opciones":[{"n":1,"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}],"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]}`;
+  const data = parseIAJson(await callIA(sys, usr, 16000));
+  return data;
 }
 
 // ── Propuesta de ENTRENO (burbujitas de día + editable + aplicar) ─────────
@@ -14481,17 +14495,57 @@ function iaPropDietaHtml(){
     return `<span onclick="iaOpcion(${o.n})" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?'var(--text)':'var(--bg)'};color:${on?'#fff':'var(--text2)'};border:1px solid ${on?'var(--text)':'var(--border)'}">Opción ${o.n}</span>`;
   }).join('');
   const op = p.opciones.find(o=>o.n===IA.opcionActiva) || p.opciones[0];
-  const kcalObj = parseInt((currentClient&&currentClient._nutrition&&currentClient._nutrition.plan&&currentClient._nutrition.plan.kcal_target)||0,10);
-  const kcalOk = kcalObj && op.kcal ? (Math.abs(op.kcal-kcalObj)/kcalObj<=0.07) : true;
+  const plan = currentClient&&currentClient._nutrition&&currentClient._nutrition.plan;
+  const kcalObj = parseInt((plan&&(plan.kcal_goal||plan.kcal_target))||0,10);
+  const kcalOk = kcalObj && op.kcal ? (Math.abs(op.kcal-kcalObj)/kcalObj<=0.08) : true;
   const kcalBadge = op.kcal?`<span style="font-size:11px;color:${kcalOk?'#15803d':'#a16207'};background:${kcalOk?'var(--gl)':'#fef9c3'};padding:2px 9px;border-radius:6px;font-weight:600">${op.kcal}${kcalObj?' / '+kcalObj:''} kcal ${kcalOk?'✓':''}</span>`:'';
-  const filas=(op.comidas||[]).map((m,idx)=>`<tr style="border-top:1px solid var(--border)${idx%2?';background:var(--bg)':''}">
-    <td style="padding:9px 12px;font-weight:600;color:var(--text);width:90px">${escHtml(m.tipo||'')}</td>
-    <td style="padding:9px;color:var(--text2)">${escHtml(m.texto||'')}${m.marca?` <span style="font-size:10px;color:var(--text3);font-style:italic">≈ ${escHtml(m.marca)}</span>`:''}</td>
-    <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:60px">${m.kcal||''}</td></tr>`).join('');
-  const compra = (p.compra||[]).map(it=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--border);padding:3px 0"><span style="color:var(--text2)">${escHtml(it.nombre||'')}</span><span style="font-family:'Geist Mono';color:var(--text3)">${escHtml(it.cant||'')}</span></div>`).join('');
-  const compraBox = compra?`<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:14px">
-    <div style="font-size:12.5px;font-weight:700;margin-bottom:10px;color:var(--text)">🛒 Lista de la compra · semana entera</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12.5px">${compra}</div></div>`:'';
+  // tabla por comida con sus alimentos, macros y total de la comida (estilo editor normal)
+  const comidasHtml = (op.comidas||[]).map(m=>{
+    const items = m.alimentos||[];
+    const tot = items.reduce((s,a)=>({k:s.k+(+a.kcal||0),p:s.p+(+a.protein||0),c:s.c+(+a.carbs||0),f:s.f+(+a.fat||0)}),{k:0,p:0,c:0,f:0});
+    const filasItems = items.map(a=>`<tr style="border-top:1px solid var(--border)">
+      <td style="padding:7px 10px;color:var(--text)">${escHtml(a.nombre||'')}${a.marca?`<span style="font-size:10px;color:var(--text3);font-style:italic"> · ${escHtml(a.marca)}</span>`:''}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:54px">${escHtml(a.cant||'')}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:48px">${Math.round(+a.kcal||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.protein||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.carbs||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.fat||0)}</td>
+    </tr>`).join('');
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12.5px;font-weight:700;color:var(--text)">${escHtml(m.tipo||'')}</span>
+        <span style="font-size:11px;color:var(--text3)">${Math.round(m.kcal||tot.k)} kcal · P${Math.round(tot.p)} C${Math.round(tot.c)} G${Math.round(tot.f)}</span>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--bg);color:var(--text3);font-size:9.5px;text-transform:uppercase;font-weight:700">
+            <th style="text-align:left;padding:6px 10px">Alimento</th><th style="padding:6px">Cant</th><th style="padding:6px">Kcal</th><th style="padding:6px">P</th><th style="padding:6px">C</th><th style="padding:6px">G</th>
+          </tr></thead><tbody>${filasItems}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+  // lista de compra desplegable con precio total
+  const compraItems = p.compra||[];
+  const precioTotal = compraItems.reduce((s,it)=>s+(+it.precio||0),0);
+  const compraFilas = compraItems.map(it=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--border);padding:3px 0;gap:8px">
+    <span style="color:var(--text2);flex:1">${escHtml(it.nombre||'')}</span>
+    <span style="font-family:'Geist Mono';color:var(--text3)">${escHtml(it.cant||'')}</span>
+    ${it.precio?`<span style="font-family:'Geist Mono';color:var(--text3);width:48px;text-align:right">${(+it.precio).toFixed(2)}€</span>`:''}
+  </div>`).join('');
+  const compraBox = compraItems.length?`<div style="border:1px solid var(--border);border-radius:12px;margin-top:14px;overflow:hidden">
+    <div onclick="IA.compraAbierta=!IA.compraAbierta;renderClientPanel()" style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;background:var(--bg)">
+      <span style="font-size:15px">🛒</span>
+      <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1">Lista de la compra · semana entera</span>
+      ${precioTotal?`<span style="font-size:11px;color:#15803d;background:var(--gl);padding:2px 9px;border-radius:6px;font-weight:700">≈ ${precioTotal.toFixed(2)}€/sem</span>`:''}
+      <span style="color:var(--text3);font-size:14px">${IA.compraAbierta?'⌃':'⌄'}</span>
+    </div>
+    ${IA.compraAbierta?`<div style="padding:12px 14px;border-top:1px solid var(--border)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12.5px">${compraFilas}</div>
+      ${precioTotal?`<div style="margin-top:10px;padding-top:8px;border-top:1.5px solid var(--border);display:flex;justify-content:space-between;font-weight:700;font-size:13px"><span>Total aproximado</span><span style="font-family:'Geist Mono'">${precioTotal.toFixed(2)}€</span></div>`:''}
+      <div style="font-size:10px;color:var(--text3);margin-top:6px">Precios orientativos. Pueden variar según supermercado y ofertas.</div>
+    </div>`:''}
+  </div>`:'';
   return `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de dieta · ${p.opciones.length} opciones</span>
@@ -14501,8 +14555,8 @@ function iaPropDietaHtml(){
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${burbujas}</div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:13px;font-weight:700;color:var(--text)">Opción ${op.n}</span>${kcalBadge}</div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>${filas}</tbody></table></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13px;font-weight:700;color:var(--text)">Opción ${op.n}</span>${kcalBadge}</div>
+    ${comidasHtml}
     ${compraBox}
   </div>`;
 }
@@ -14522,28 +14576,69 @@ function iaEditarEj(dia, idx){
   renderClientPanel();
 }
 
-// ── Aplicar al plan real ───────────────────────────────────────────────────
-function iaAplicarEntreno(){
-  const c=currentClient; if(!c||!IA.propEntreno) return;
-  if(!confirm('¿Aplicar este entreno al plan? Sobrescribe el split actual (luego podrás editarlo).')) return;
+// ── Aplicar al plan real (Supabase) ───────────────────────────────────────
+async function iaAplicarEntreno(){
+  const c=currentClient; if(!c||!IA.propEntreno||!coachData) return;
+  if(!confirm('¿Aplicar este entreno al plan? Sobrescribe el plan de entreno actual (luego podrás editarlo).')) return;
   try{
-    const ndias=IA.splitDraft.length;
-    initSplit(c.id, ndias);
-    const ts2=getTrainState(c.id);
-    // Para tipos custom, usar su etiqueta (con espacios) como identidad, igual que el split normal
+    // tipos custom → su etiqueta (con espacios), igual que el split normal
     const tipoReal = (t)=> (typeof IA_TIPOS_CUSTOM!=='undefined' && IA_TIPOS_CUSTOM[t]) ? (IA_TIPOS_CUSTOM[t].lbl||t).toUpperCase() : t;
-    IA.splitDraft.forEach((d,i)=>{ if(ts2.split[i]) ts2.split[i].type=tipoReal(d.tipo); });
+    // 1) Split como array de tipos por día
+    const split = IA.splitDraft.map(d=>d.tipo==='OFF'?'OFF':tipoReal(d.tipo));
+    // 2) Asegurar/crear el training_plan
+    let planId = c._training && c._training.plan && c._training.plan.id;
+    if(planId){
+      const {error}=await sb.from('training_plans').update({split, split_days:split.length}).eq('id',planId);
+      if(error) throw new Error(error.message||'No se pudo actualizar el plan');
+    } else {
+      const {data,error}=await sb.from('training_plans').insert({
+        client_id:c.id, coach_id:coachData.id, split, split_days:split.length,
+        is_active:true, activation_date:new Date().toISOString().slice(0,10)
+      }).select().single();
+      if(error||!data) throw new Error(error?.message||'No se pudo crear el plan');
+      planId=data.id;
+      if(!c._training) c._training={}; c._training.plan=data;
+    }
+    // 3) Asegurar los ejercicios en la tabla exercises (reutilizar los existentes)
+    const libByName={};
+    try{
+      const {data:exLib}=await sb.from('exercises').select('id,name').eq('coach_id',coachData.id);
+      (exLib||[]).forEach(e=>{ if(e&&e.name) libByName[e.name.trim().toLowerCase()]=e.id; });
+    }catch(e){}
+    const todosNombres=[]; (IA.propEntreno.dias||[]).forEach(d=>(d.ejercicios||[]).forEach(e=>{ if(e.nombre)todosNombres.push(e.nombre.trim()); }));
+    const nuevos=[...new Set(todosNombres)].filter(n=>n && !libByName[n.toLowerCase()]);
+    if(nuevos.length){
+      try{
+        const {data:ins}=await sb.from('exercises').insert(nuevos.map(n=>({coach_id:coachData.id,name:n}))).select('id,name');
+        (ins||[]).forEach(e=>{ if(e&&e.name) libByName[e.name.trim().toLowerCase()]=e.id; });
+      }catch(e){ console.warn('crear exercises:',e); }
+    }
+    // 4) Borrar los client_plans actuales del cliente y meter los nuevos
+    try{ await sb.from('client_plans').delete().eq('client_id',c.id); }catch(e){}
+    // ¿la columna training_plan_id existe?
+    let tieneTPI=false;
+    try{ const t=await sb.from('client_plans').select('training_plan_id').limit(1); tieneTPI=!t.error; }catch(e){ tieneTPI=false; }
+    const filas=[];
     (IA.propEntreno.dias||[]).forEach(d=>{
-      const slot=ts2.split[d.dia-1]; if(!slot) return;
-      slot.exercises=(d.ejercicios||[]).map(e=>({
-        nombre:e.nombre, tipo:tipoReal(d.tipo), sets:e.sets||3, reps:String(e.reps||'10'),
-        rest_sec:e.restSec||90, restSec:e.restSec||90, approx:'', aprox:'', video:''
-      }));
+      const st=tipoReal(d.tipo);
+      (d.ejercicios||[]).forEach((e,idx)=>{
+        const row={ client_id:c.id, coach_id:coachData.id, is_active:true,
+          exercise_id: libByName[(e.nombre||'').trim().toLowerCase()]||null,
+          session_type:st, exercise_order:idx+1,
+          sets:e.sets||3, reps:String(e.reps||'10'), rest_sec:e.restSec||90, approx:'' };
+        if(tieneTPI) row.training_plan_id=planId;
+        filas.push(row);
+      });
     });
-    saveTrainStorage();
+    if(filas.length){
+      const {error}=await sb.from('client_plans').insert(filas);
+      if(error) throw new Error(error.message||'No se pudieron guardar los ejercicios');
+    }
+    // 5) Recargar el plan del cliente para que se vea abajo
+    if(typeof recargarTrainingDeCliente==='function') await recargarTrainingDeCliente(c, planId);
     IA.entrenoAplicado=true; renderClientPanel();
     showToast('✓ Entreno aplicado al plan');
-  }catch(e){ console.error('iaAplicarEntreno:',e); showToast('No se pudo aplicar el entreno'); }
+  }catch(e){ console.error('iaAplicarEntreno:',e); showToast('No se pudo aplicar el entreno: '+(e.message||'')); }
 }
 
 function iaAplicarDieta(){
@@ -14594,14 +14689,15 @@ async function _iaVolcarDieta(c){
       const key=mealKey(m.tipo);
       const items=(m.alimentos&&m.alimentos.length?m.alimentos:[{nombre:m.texto,cant:''}]).map(al=>{
         const f=findFood(al.nombre);
+        // prioridad: biblioteca (datos exactos) → macros que dio la IA → 0
         return {
           name: al.nombre||m.texto||'—',
           grams: al.cant||al.gramos||null,
-          kcal: f?Number(f.kcal)||0:0,
-          protein: f?Number(f.protein)||0:0,
-          carbs: f?Number(f.carbs)||0:0,
-          fat: f?Number(f.fat)||0:0,
-          marca: m.marca||''
+          kcal: f?Number(f.kcal)||0:(Number(al.kcal)||0),
+          protein: f?Number(f.protein)||0:(Number(al.protein)||0),
+          carbs: f?Number(f.carbs)||0:(Number(al.carbs)||0),
+          fat: f?Number(f.fat)||0:(Number(al.fat)||0),
+          marca: al.marca||m.marca||''
         };
       });
       // si la comida tiene kcal de la IA y no hay biblioteca, ponerla en el primer item como referencia

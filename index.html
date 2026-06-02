@@ -2718,14 +2718,53 @@ function parseIAJson(txt){
   // quitar fences ```json ... ```
   s = s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
   try { return JSON.parse(s); } catch(e){}
-  // intentar recortar al primer { o [ y su cierre
+  // intentar recortar al primer { o [ y su cierre balanceado
   const start = Math.min(...['{','['].map(c=>{const i=s.indexOf(c);return i<0?Infinity:i;}));
   if(start===Infinity) throw new Error('La IA no devolvió un formato válido');
   const open = s[start], close = open==='{'?'}':']';
-  let depth=0, end=-1;
-  for(let i=start;i<s.length;i++){ if(s[i]===open)depth++; else if(s[i]===close){depth--; if(depth===0){end=i;break;}} }
-  if(end<0) throw new Error('La IA devolvió un JSON incompleto');
-  return JSON.parse(s.slice(start,end+1));
+  let depth=0, end=-1, inStr=false, esc=false;
+  for(let i=start;i<s.length;i++){
+    const ch=s[i];
+    if(esc){ esc=false; continue; }
+    if(ch==='\\'){ esc=true; continue; }
+    if(ch==='"'){ inStr=!inStr; continue; }
+    if(inStr) continue;
+    if(ch===open)depth++; else if(ch===close){depth--; if(depth===0){end=i;break;}}
+  }
+  if(end>=0){ try{ return JSON.parse(s.slice(start,end+1)); }catch(e){} }
+  // JSON cortado: intentar recuperar el array "opciones" con los objetos completos que llegaron
+  try{
+    const rec = _iaRecuperarOpciones(s);
+    if(rec) return rec;
+  }catch(e){}
+  throw new Error('La IA devolvió un JSON incompleto');
+}
+// recupera las opciones completas de un JSON de dieta cortado a media respuesta
+function _iaRecuperarOpciones(s){
+  const key = s.indexOf('"opciones"');
+  if(key<0) return null;
+  const arrStart = s.indexOf('[', key);
+  if(arrStart<0) return null;
+  // recorrer el array recogiendo objetos de primer nivel completos
+  const objs=[]; let depth=0, objStart=-1, inStr=false, esc=false;
+  for(let i=arrStart+1;i<s.length;i++){
+    const ch=s[i];
+    if(esc){esc=false;continue;}
+    if(ch==='\\'){esc=true;continue;}
+    if(ch==='"'){inStr=!inStr;continue;}
+    if(inStr) continue;
+    if(ch==='{'){ if(depth===0) objStart=i; depth++; }
+    else if(ch==='}'){ depth--; if(depth===0&&objStart>=0){ objs.push(s.slice(objStart,i+1)); objStart=-1; } }
+    else if(ch===']'&&depth===0){ break; }
+  }
+  const opciones=[];
+  objs.forEach(o=>{ try{ opciones.push(JSON.parse(o)); }catch(e){} });
+  if(!opciones.length) return null;
+  // intentar recuperar el supermercado si está antes del array
+  let supermercado='';
+  const mSup = s.match(/"supermercado"\s*:\s*"([^"]*)"/);
+  if(mSup) supermercado=mSup[1];
+  return { supermercado, opciones, compra:[] };
 }
 
 function openGeminiKeyModal(){
@@ -4991,6 +5030,7 @@ function selectClient(id) {
   IA.entrenoAplicado=false; IA.dietaAplicado=false;
   IA.indicacionesDieta=''; IA.indicacionesEntreno='';
   IA.prefsAbierto=false; IA.gruposAbiertos={}; IA.filtroDia='todos'; IA.opcionActiva=1;
+  IA.macros=null; IA.compraAbierta=false;
   weekOffset = 0;
   segWeekOffset = 0;
   editNutriOpcion = 0;
@@ -13957,7 +13997,8 @@ let IA = {
   opcionActiva:1,        // burbuja activa en propuesta de dieta
   entrenoAplicado:false,
   dietaAplicado:false,
-  compraAbierta:false
+  compraAbierta:false,
+  macros:null   // {kcal,prot,carb,fat} mientras editas, para no perderlos al redibujar
 };
 
 // Tipos de día base + los que el coach añada (persistidos en localStorage)
@@ -14020,10 +14061,16 @@ function iaGeneradorHtml(c){
     <div style="font-size:10.5px;color:var(--text3);line-height:1.4">${sub}</div></div>`;
 
   // ════════════ BLOQUE DIETA ════════════
-  const dietaKcal = plan?(plan.kcal_goal||plan.kcal_target||0):0;
-  const macroBox = (lbl,id,val)=>`<div style="flex:1;border:1.5px solid var(--border);border-radius:9px;padding:6px 9px">
+  // valores de macros: lo que estés editando (IA.macros) tiene prioridad sobre el plan guardado
+  const pm = IA.macros || {};
+  const mKcal = pm.kcal!=null ? pm.kcal : (plan?(plan.kcal_goal||plan.kcal_target||0):0);
+  const mProt = pm.prot!=null ? pm.prot : (plan?(plan.protein_g||0):0);
+  const mCarb = pm.carb!=null ? pm.carb : (plan?(plan.carbs_g||0):0);
+  const mFat  = pm.fat!=null  ? pm.fat  : (plan?(plan.fat_g||0):0);
+  const dietaKcal = mKcal;
+  const macroBox = (lbl,id,key,val)=>`<div style="flex:1;border:1.5px solid var(--border);border-radius:9px;padding:6px 9px">
     <div style="font-size:9.5px;color:var(--text3);font-weight:700;text-transform:uppercase">${lbl}</div>
-    <input id="${id}" type="number" value="${val||0}" style="width:100%;border:none;background:transparent;font-family:'Geist Mono';font-size:15px;font-weight:600;color:var(--text);outline:none;padding:0">
+    <input id="${id}" type="number" value="${val||0}" oninput="if(!IA.macros)IA.macros={};IA.macros.${key}=parseFloat(this.value)||0" style="width:100%;border:none;background:transparent;font-family:'Geist Mono';font-size:15px;font-weight:600;color:var(--text);outline:none;padding:0">
   </div>`;
   // desplegable de preferencias (editables y sincronizadas con el cuestionario)
   const nPrefs = [q.allergies,q.disliked_foods,q.liked_foods,q.supplements,q.supermarket].filter(Boolean).length;
@@ -14040,10 +14087,10 @@ function iaGeneradorHtml(c){
   const bloqueDietaBody = IA.bloqueDieta ? `<div style="padding:15px">
     <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px">Objetivos ${plan?'(sincronizado con el plan nutricional)':'· se creará el plan al generar'}</div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      ${macroBox('Kcal','ia-d-kcal',dietaKcal)}
-      ${macroBox('Prot','ia-d-prot',plan?plan.protein_g:0)}
-      ${macroBox('Carb','ia-d-carb',plan?plan.carbs_g:0)}
-      ${macroBox('Grasa','ia-d-fat',plan?plan.fat_g:0)}
+      ${macroBox('Kcal','ia-d-kcal','kcal',mKcal)}
+      ${macroBox('Prot','ia-d-prot','prot',mProt)}
+      ${macroBox('Carb','ia-d-carb','carb',mCarb)}
+      ${macroBox('Grasa','ia-d-fat','fat',mFat)}
     </div>
     <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px">
       <div onclick="IA.prefsAbierto=!IA.prefsAbierto;renderClientPanel()" style="display:flex;align-items:center;gap:8px;padding:10px 13px;cursor:pointer">
@@ -14331,8 +14378,11 @@ async function iaGenerarEntreno(){
 // sincroniza los macros editados en el bloque dieta con el plan nutricional (Supabase)
 async function _iaSyncMacros(c){
   const g = id => { const el=document.getElementById(id); return el?parseFloat(el.value)||0:null; };
-  const kcal=g('ia-d-kcal'), prot=g('ia-d-prot'), carb=g('ia-d-carb'), fat=g('ia-d-fat');
-  if(kcal===null) return; // bloque no visible
+  // leer del DOM; si no está, usar el estado IA.macros
+  const m = IA.macros||{};
+  let kcal=g('ia-d-kcal'), prot=g('ia-d-prot'), carb=g('ia-d-carb'), fat=g('ia-d-fat');
+  if(kcal===null && m.kcal==null) return; // bloque no visible y nada editado
+  if(kcal===null){ kcal=m.kcal||0; prot=m.prot||0; carb=m.carb||0; fat=m.fat||0; }
   if(!c._nutrition || !c._nutrition.plan){
     // crear plan si no existe
     try{
@@ -14351,6 +14401,7 @@ async function _iaSyncMacros(c){
       }catch(e){ console.warn('sync macros:',e); }
     }
   }
+  IA.macros=null; // ya está guardado en el plan, dejar de usar el borrador
 }
 
 function _iaContexto(c, cual){
@@ -14417,28 +14468,42 @@ Responde EXACTAMENTE este JSON (incluye el grupo de cada ejercicio):
 async function _iaGenerarDieta(c, ctx){
   let bibTxt='';
   if(ctx.usarBiblioteca && typeof FOOD_LIBRARY!=='undefined' && FOOD_LIBRARY.length){
-    const lineas = FOOD_LIBRARY.slice(0,80).map(f=>`${f.name} (${f.kcal||'?'}kcal, P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
+    const lineas = FOOD_LIBRARY.slice(0,60).map(f=>`${f.name} (${f.kcal||'?'}kcal, P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
     bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca del entrenador (con sus macros exactos):\n'+lineas.join('; ');
   }
-  const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
+  const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido y COMPLETO, sin texto alrededor, sin markdown. Cierra siempre todas las llaves y corchetes.`;
   const superTxt = ctx.supermercado
     ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos y marcas reales de ${ctx.supermercado} (no mezcles supermercados).`
     : `En "marca" sugiere productos de UN ÚNICO supermercado español coherente para toda la dieta (elige uno: Mercadona/Hacendado, Lidl, Carrefour…) y mantén ese mismo supermercado en todos los alimentos. No mezcles supermercados.`;
-  const usr = `Genera 7 OPCIONES de menú diario. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
+  // Generar en 2 tandas para no agotar el límite de tokens y evitar JSON cortado
+  const pedirTanda = async (desde, hasta, conCompra)=>{
+    const usr = `Genera las opciones de menú diario numeradas del ${desde} al ${hasta} (${hasta-desde+1} opciones). Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
 ${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
 REGLAS:
 - Cada opción es un día completo: desayuno, comida, merienda, cena.
 - COHERENCIA: desayuno con comida de desayuno (avena, huevos, tostadas, fruta, yogur...); comida y cena con platos principales (proteína + guarnición + verdura); merienda ligera. NUNCA pongas pasta o arroz como desayuno o merienda.
-- VARIEDAD REAL entre las 7 opciones: no repitas las mismas combinaciones. Puedes repetir algún alimento, pero deben ser claramente distintas.
-- Cada opción debe acercarse a las calorías objetivo.
-- Para cada alimento incluye su cantidad y sus macros (kcal, protein, carbs, fat) de esa cantidad.
-- Para cada comida da el total de kcal de la comida.
+- VARIEDAD REAL entre las opciones. Cada opción debe acercarse a las calorías objetivo.
+- Para cada alimento: cantidad y macros (kcal, protein, carbs, fat) de esa cantidad. Para cada comida, el total de kcal.
 - ${superTxt} Pon la "marca" a nivel de cada alimento.${bibTxt}
-Responde EXACTAMENTE este JSON:
-{"supermercado":"Mercadona","opciones":[{"n":1,"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}],"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]}`;
-  const data = parseIAJson(await callIA(sys, usr, 16000));
-  return data;
+${conCompra?'- Incluye además "compra": lista de la compra de la semana entera con categoría, cantidad total y precio aproximado en euros (número).':'- NO incluyas lista de la compra en esta respuesta.'}
+Responde EXACTAMENTE este JSON${conCompra?'':' (sin campo compra)'}:
+{"supermercado":"Mercadona","opciones":[{"n":${desde},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}]${conCompra?',"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]':''}}`;
+    return parseIAJson(await callIA(sys, usr, 12000));
+  };
+  // Tanda 1: opciones 1-4 + lista de la compra. Tanda 2: opciones 5-7.
+  const t1 = await pedirTanda(1,4,true);
+  let opciones = (t1.opciones||[]).slice();
+  let compra = t1.compra||[];
+  let supermercado = t1.supermercado||ctx.supermercado||'';
+  try{
+    const t2 = await pedirTanda(5,7,false);
+    opciones = opciones.concat(t2.opciones||[]);
+  }catch(e){ console.warn('tanda 2 dieta falló, sigo con las que hay:',e); }
+  if(!opciones.length) throw new Error('La IA no devolvió opciones de dieta');
+  // renumerar por si acaso
+  opciones.forEach((o,i)=>{ o.n=i+1; });
+  return { supermercado, opciones, compra };
 }
 
 // ── Propuesta de ENTRENO (burbujitas de día + editable + aplicar) ─────────

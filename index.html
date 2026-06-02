@@ -4654,7 +4654,7 @@ function selectClient(id) {
   renderMiniSidebar();
   // El tab por defecto al seleccionar cliente es Resumen → cargar ajustes
   // (retrasos/reorganización) y re-renderizar cuando lleguen.
-  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); await cargarCheckinsCliente(); await cargarBillingCliente(); renderClientPanel(); }, 0);
+  setTimeout(async () => { await cargarAjustesCliente(currentClient); await cargarSeriesCliente(); await cargarCheckinsCliente(); await cargarBillingCliente(); await cargarDayNotesCliente(); renderClientPanel(); }, 0);
 }
 
 
@@ -4883,6 +4883,26 @@ async function cargarCheckinsCliente(){
       sb.from('weekly_checkins').update({seen_by_coach:true}).in('id', unseen.map(k=>k.id)).then(()=>{}, ()=>{});
     }
   }catch(e){ console.warn('cargarCheckinsCliente exception:', e); }
+  renderClientPanel();
+}
+
+// Carga las notas de día COMPARTIDAS por el cliente (day_notes con shared=true).
+// El RLS solo deja leer las compartidas, así que aunque pidamos todas, vienen solo esas.
+async function cargarDayNotesCliente(){
+  const c = currentClient;
+  if (!c || c._dayNotes != null) return;
+  c._dayNotes = [];
+  try{
+    const { data, error } = await sb
+      .from('day_notes')
+      .select('*')
+      .eq('client_id', c.id)
+      .eq('shared', true)
+      .order('date', { ascending:false })
+      .limit(60);
+    if (error){ console.warn('cargarDayNotesCliente:', error); return; }
+    c._dayNotes = data || [];
+  }catch(e){ console.warn('cargarDayNotesCliente exception:', e); }
   renderClientPanel();
 }
 
@@ -5579,15 +5599,25 @@ function renderCheckinCard(c, mondayRef){
   const fmtWk = (ws)=>{ try{ return new Date(ws+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }catch(e){ return ws; } };
 
   // El check-in que corresponde a la semana que se está viendo.
-  // Se busca por week_start = lunes de la semana visible. Si no se pasa
-  // mondayRef (compat), cae al más reciente.
+  // Se busca por week_start = lunes de la semana visible. Si esa semana no tiene
+  // check-in propio, se muestra el ÚLTIMO anterior (así el último enviado sigue
+  // visible toda la semana siguiente hasta que llegue uno nuevo). Marca si es de
+  // una semana anterior con `esArrastrado`.
   let latest = null;
+  let esArrastrado = false;
   if (mondayRef){
     const y = mondayRef.getFullYear();
     const m = String(mondayRef.getMonth()+1).padStart(2,'0');
     const d = String(mondayRef.getDate()).padStart(2,'0');
     const lunesStr = `${y}-${m}-${d}`;
     latest = list.find(k => String(k.week_start).slice(0,10) === lunesStr) || null;
+    if (!latest){
+      // El más reciente cuyo week_start sea anterior al lunes visible
+      const previos = list
+        .filter(k => String(k.week_start).slice(0,10) < lunesStr)
+        .sort((a,b)=> String(b.week_start).localeCompare(String(a.week_start)));
+      if (previos.length){ latest = previos[0]; esArrastrado = true; }
+    }
   } else {
     latest = list[0] || null;
   }
@@ -5638,8 +5668,10 @@ function renderCheckinCard(c, mondayRef){
     </div>`:'';
   return `<div style="margin-bottom:18px">
     <div class="section-title" style="margin-bottom:8px;display:flex;align-items:center;gap:8px">Check-in semanal
-      <span style="font-size:10.5px;font-weight:600;color:var(--text3)">· semana del ${fmtWk(latest.week_start)}</span></div>
+      <span style="font-size:10.5px;font-weight:600;color:var(--text3)">· semana del ${fmtWk(latest.week_start)}</span>
+      ${esArrastrado?`<span style="font-size:9.5px;font-weight:700;color:var(--amber);background:var(--amber)18;border:1px solid var(--amber)40;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em">Aún sin nuevo</span>`:''}</div>
     <div class="panel-card">
+      ${esArrastrado?`<div style="font-size:11px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:8px 11px;margin-bottom:11px;line-height:1.5">Es el último check-in enviado. El cliente todavía no ha mandado el de esta semana.</div>`:''}
       <div style="display:flex;gap:8px;margin-bottom:12px">
         ${metric('Sueño',a.sleep,'#7c3aed','🌙')}${metric('Energía',a.energy,'#d97706','⚡')}${metric('Hambre',a.hunger,'#111','🍽️')}
       </div>
@@ -7080,19 +7112,35 @@ function tarjetaPesoMesociclo(c){
   const valorTxt = ultimo.peso.toFixed(1) + ' kg';
   const puntos = pesos.map(p => ({ label:'', fechaTxt: formatearFechaCorta(p.fecha), valor: p.peso }));
 
+  // Contexto del eje Y: rango de pesos del periodo
+  const valsP = pesos.map(p=>p.peso);
+  const pMin = Math.min(...valsP), pMax = Math.max(...valsP);
+  const minPeso = (pico)=>pico.toFixed(1);
+  // Media del periodo
+  const media = (valsP.reduce((s,v)=>s+v,0)/valsP.length);
+
   return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
     <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">⚖️ Peso · evolución del mesociclo</div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:8px">${escHtml(meso.name||'Mesociclo')} · ${pesos.length} ${pesos.length===1?'registro':'registros'}</div>
-    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px">${escHtml(meso.name||'Mesociclo')} · ${pesos.length} ${pesos.length===1?'registro':'registros'} · ${formatearFechaCorta(inicial.fecha)} – ${formatearFechaCorta(ultimo.fecha)}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
       <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--text)">${valorTxt}</div>
       <div style="font-size:12px;color:${diffColor};font-weight:700">${diffStr}</div>
+      <div style="font-size:10px;color:var(--text3);margin-left:auto">desde ${inicial.peso.toFixed(1)} kg</div>
     </div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:4px">
-      Inicial: <b>${inicial.peso.toFixed(1)} kg</b> · ${formatearFechaCorta(inicial.fecha)}
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:9px;color:var(--text3);font-family:'Geist Mono',monospace;text-align:right;padding:2px 0 18px;flex-shrink:0;min-width:34px">
+        <span>${minPeso(pMax)}</span><span style="opacity:.6">${minPeso((pMax+pMin)/2)}</span><span>${minPeso(pMin)}</span>
+      </div>
+      <div style="flex:1;min-width:0">${miniLineChart(puntos, '#1a1a18', '', ' kg')}
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+          <span>${formatearFechaCorta(inicial.fecha)}</span><span>${formatearFechaCorta(ultimo.fecha)}</span>
+        </div>
+      </div>
     </div>
-    ${miniLineChart(puntos, '#1a1a18', '', ' kg')}
-    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
-      <span>${formatearFechaCorta(inicial.fecha)}</span><span>${formatearFechaCorta(ultimo.fecha)}</span>
+    <div style="display:flex;gap:14px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)"><span style="width:14px;height:2px;background:#1a1a18;border-radius:1px"></span>Peso registrado</span>
+      <span style="font-size:10px;color:var(--text3)">Media: <b style="color:var(--text2)">${media.toFixed(1)} kg</b></span>
+      <span style="font-size:10px;color:var(--text3)">Rango: <b style="color:var(--text2)">${pMin.toFixed(1)}–${pMax.toFixed(1)} kg</b></span>
     </div>
   </div>`;
 }
@@ -8989,6 +9037,8 @@ function renderPerfil() {
             <span style="font-size:11px;font-weight:600;${esBajaTop?'color:#dc2626;background:#fee2e2':'color:var(--green);background:rgba(22,163,74,.12)'};padding:3px 9px;border-radius:7px">${esBajaTop?'De baja':'Activo'}</span>
           </div>
         </div>
+        <button onclick="openCuestionarioModal()" style="height:30px;padding:0 12px;border-radius:8px;border:1.5px solid var(--green);background:var(--gl);font-size:12px;font-weight:700;color:#15803d;cursor:pointer;display:flex;align-items:center;gap:5px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Cuestionario</button>
         <button onclick="togglePerfilEdit(true)" style="height:30px;padding:0 13px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Editar</button>
       </div>
@@ -9142,13 +9192,105 @@ function renderPerfil() {
     </div>`;
   }
 
+  // El HTML completo de cuota (edición o resumen+pagos) va a un MODAL.
+  // En el perfil solo dejamos un resumen pequeño con botón para abrirlo.
+  _cuotaFullHtmlCache = cardCuota;
+  // Si el modal de cuota está abierto, refrescar su contenido en vivo
+  setTimeout(()=>{ const ov=document.getElementById('cuota-overlay'); if(ov&&ov.style.display!=='none'){ const cont=ov.querySelector('div>div'); if(cont){ const wrap=ov.querySelector('div'); if(wrap) wrap.innerHTML=`<button onclick="cerrarCuotaModal()" style="position:absolute;top:-6px;right:-6px;z-index:2;width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-size:15px;line-height:1">&#10005;</button>`+_cuotaFullHtmlCache; } } }, 0);
+  let cuotaResumen;
+  if (!b){
+    cuotaResumen = `<div style="${cardStyle};display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+        <div><div style="font-size:13px;font-weight:600;color:var(--text)">Sin cuota configurada</div>
+        <div style="font-size:11.5px;color:var(--text3)">Define lo que paga este cliente</div></div>
+      </div>
+      <button onclick="openCuotaModal()" style="height:34px;padding:0 14px;border-radius:9px;border:none;background:var(--green);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0">Configurar cuota</button>
+    </div>`;
+  } else {
+    const st = billingStatus(b);
+    const stMap = {al_dia:['Al día','var(--green)','rgba(22,163,74,.12)'], pendiente:['Pendiente','#b45309','#fef3c7'], vencido:['Vencido','#dc2626','#fee2e2'], saldado:['Saldado','var(--green)','rgba(22,163,74,.12)']};
+    const stInfo = stMap[st.state]||['—','var(--text3)','var(--bg)'];
+    const total = (b.amount*b.num_payments);
+    const resumen = b.num_payments>1
+      ? `${b.num_payments} pagos de ${Number(b.amount).toLocaleString('es-ES')} € · ${billingIntervalLabel(b.interval_months)}`
+      : `1 pago de ${Number(b.amount).toLocaleString('es-ES')} € (pago único)`;
+    cuotaResumen = `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="${secTitle}">Cuota del cliente</div>
+        <button onclick="openCuotaModal()" style="height:28px;padding:0 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);font-size:11.5px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Ver / editar</button>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);line-height:1">${Number(total).toLocaleString('es-ES')} €</div>
+          <div style="font-size:12px;color:var(--text2);font-weight:600;margin-top:3px">${resumen}</div>
+          ${st.next?`<div style="font-size:11.5px;color:var(--text3);font-weight:600;margin-top:5px">Próximo: pago ${st.next.n} de ${st.total} · ${fmtFecha(st.next.due)}</div>`:`<div style="font-size:11.5px;color:var(--green);font-weight:600;margin-top:5px">Plan saldado · ${st.total}/${st.total} pagos</div>`}
+        </div>
+        <span style="font-size:12px;font-weight:700;color:${stInfo[1]};background:${stInfo[2]};padding:5px 11px;border-radius:8px;flex-shrink:0">${stInfo[0]}</span>
+      </div>
+    </div>`;
+  }
+
   return `<div style="display:flex;flex-direction:column;gap:14px">
     ${gridHtml}
-    ${cardCuota}
+    ${cuotaResumen}
+    ${cardDayNotes(c)}
     ${cardFotosProgreso(c)}
     ${cardCuenta}
   </div>`;
 }
+
+// Tarjeta de notas que el cliente ha compartido (calendario aparte cliente↔entrenador).
+// NO son citas: van en su propio espacio, no en la agenda.
+function cardDayNotes(c){
+  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
+  const secTitle  = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
+  const TAGS={nota:['📝','Nota','#111','var(--bg)'],comida:['🍽️','Comida','#7c3aed','#f3f0ff'],descanso:['😴','Descanso','#a16207','#fef9c3'],recordatorio:['⏰','Recordatorio','#1d4ed8','#dbeafe']};
+  const notas = (c._dayNotes)||[];
+  const fmtD = (ds)=>{ try{ return new Date(ds+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }catch(e){ return ds; } };
+  let cuerpo;
+  if(!notas.length){
+    cuerpo = `<div style="font-size:12.5px;color:var(--text3);line-height:1.6;padding:4px 0">${c._dayNotes==null?'Cargando…':'El cliente todavía no ha compartido ninguna nota de su calendario.'}</div>`;
+  } else {
+    cuerpo = notas.map(n=>{
+      const T=TAGS[n.tag]||TAGS.nota;
+      return `<div style="display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="flex-shrink:0;width:54px;font-size:11px;color:var(--text3);font-weight:600;padding-top:2px">${fmtD(String(n.date).slice(0,10))}</div>
+        <div style="flex:1;min-width:0">
+          <span style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${T[2]};background:${T[3]};padding:2px 8px;border-radius:6px">${T[0]} ${T[1]}</span>
+          <div style="font-size:13px;color:var(--text);line-height:1.5;margin-top:5px;white-space:pre-wrap">${escHtml(n.text)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  return `<div style="${cardStyle}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <div style="${secTitle}">Notas compartidas por el cliente</div>
+      ${notas.length?`<span style="font-size:10px;font-weight:700;color:var(--green);background:var(--gl);padding:2px 8px;border-radius:6px;margin-left:auto">${notas.length}</span>`:''}
+    </div>
+    ${cuerpo}
+  </div>`;
+}
+
+// Cache del HTML completo de la cuota (para el modal) y apertura del modal
+let _cuotaFullHtmlCache = '';
+function openCuotaModal(){
+  const c = currentClient; if(!c) return;
+  let ov = document.getElementById('cuota-overlay');
+  if(!ov){
+    ov = document.createElement('div'); ov.id='cuota-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:262;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.onclick=(e)=>{ if(e.target===ov) cerrarCuotaModal(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<div style="width:100%;max-width:480px;position:relative">
+    <button onclick="cerrarCuotaModal()" style="position:absolute;top:-6px;right:-6px;z-index:2;width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-size:15px;line-height:1">&#10005;</button>
+    ${_cuotaFullHtmlCache}
+  </div>`;
+  ov.style.display='flex';
+}
+function cerrarCuotaModal(){ const ov=document.getElementById('cuota-overlay'); if(ov) ov.style.display='none'; }
 
 // ── PERFIL · Edición de datos básicos y cuestionario completo ──
 let _perfilEdit = false;
@@ -9198,7 +9340,6 @@ function cardCuestionarioCompacto(c){
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px">
       ${hdrIcon}
       <div style="font-size:15px;font-weight:600">Cuestionario inicial</div>
-      <button onclick="openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border:1.5px solid var(--green);border-radius:8px;background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">👁 Ver cuestionario completo</button>
     </div>
     <div style="display:flex;gap:9px;flex-wrap:wrap;flex:1;align-items:stretch">
       ${tile('Objetivo', '<div style="margin-top:2px">'+objetivoHtml+'</div>')}

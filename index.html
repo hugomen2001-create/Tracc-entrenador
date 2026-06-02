@@ -2275,6 +2275,78 @@ function closeGuiaCompleta(){
   else { const r=document.getElementById('guia-root'); if(r) r.remove(); }
 }
 
+// Abre el correo del usuario con un email prerrellenado a soporte
+function contactarSoporte(){
+  const nombre = (typeof coachData!=='undefined' && coachData && coachData.name) ? coachData.name : '';
+  const asunto = encodeURIComponent('Soporte Tracc');
+  const cuerpo = encodeURIComponent(
+    'Hola equipo de Tracc,\n\n[Cuéntanos en qué podemos ayudarte]\n\n' +
+    (nombre ? ('— ' + nombre) : '')
+  );
+  const correo = 'tracc.support@gmail.com';
+  window.location.href = `mailto:${correo}?subject=${asunto}&body=${cuerpo}`;
+  showToast('Abriendo tu correo… escríbenos a tracc.support@gmail.com');
+}
+
+// ── Popup "Contactar" del plan A medida ──
+function abrirContactoAMedida(){
+  const nombrePre = (typeof coachData!=='undefined' && coachData && coachData.name) ? coachData.name : '';
+  let nClientes='';
+  try{ if(typeof CLIENTS!=='undefined' && Array.isArray(CLIENTS) && CLIENTS.length>0) nClientes=String(CLIENTS.length); }catch(e){}
+  let ov=document.getElementById('contacto-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='contacto-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(26,26,24,.5);z-index:620;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)';
+    ov.onclick=(e)=>{ if(e.target===ov) cerrarContactoAMedida(); };
+    document.body.appendChild(ov);
+  }
+  const inp='width:100%;height:44px;border:1.5px solid var(--border);border-radius:11px;padding:0 13px;font-size:14px;color:var(--text);box-sizing:border-box;font-family:inherit;outline:none;background:var(--bg)';
+  const lbl='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:7px;display:block';
+  ov.innerHTML=`<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:22px;max-width:420px;width:100%" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <div style="font-family:'DM Serif Display',serif;font-size:21px;color:var(--text)">Plan a medida</div>
+      <button onclick="cerrarContactoAMedida()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-size:15px;flex-shrink:0">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:18px">Cuéntanos un poco sobre ti y te proponemos un precio ajustado a tu volumen de clientes.</div>
+    <div style="margin-bottom:14px"><label style="${lbl}">¿Cuántos clientes tienes?</label><input id="cm-clientes" type="text" value="${escHtml(nClientes)}" placeholder="Ej: 120" style="${inp}"></div>
+    <div style="margin-bottom:14px"><label style="${lbl}">Tu nombre</label><input id="cm-nombre" type="text" value="${escHtml(nombrePre)}" placeholder="Nombre y apellidos" style="${inp}"></div>
+    <div style="margin-bottom:14px"><label style="${lbl}">Email o teléfono</label><input id="cm-contacto" type="text" placeholder="Para poder responderte" style="${inp}"></div>
+    <div style="margin-bottom:20px"><label style="${lbl}">Mensaje (opcional)</label><textarea id="cm-mensaje" placeholder="Cuéntanos lo que necesites…" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:11px;padding:11px 13px;font-size:14px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg)"></textarea></div>
+    <button id="cm-enviar" onclick="enviarContactoAMedida()" style="width:100%;height:48px;border-radius:12px;background:var(--green);color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Enviar solicitud</button>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:11px;line-height:1.4">Te contactaremos en tracc.support@gmail.com</div>
+  </div>`;
+  ov.style.display='flex';
+  setTimeout(()=>{ const f=document.getElementById('cm-contacto'); if(f) f.focus(); },120);
+}
+function cerrarContactoAMedida(){ const ov=document.getElementById('contacto-overlay'); if(ov) ov.style.display='none'; }
+async function enviarContactoAMedida(){
+  const nClientes=(document.getElementById('cm-clientes').value||'').trim();
+  const nombre=(document.getElementById('cm-nombre').value||'').trim();
+  const contacto=(document.getElementById('cm-contacto').value||'').trim();
+  const mensaje=(document.getElementById('cm-mensaje').value||'').trim();
+  if(!contacto){ showToast('Déjanos un email o teléfono para responderte','error'); return; }
+  const btn=document.getElementById('cm-enviar'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+  // 1) Guardar en Supabase (te llega seguro)
+  try{
+    const coachId=(typeof coachData!=='undefined'&&coachData)?coachData.id:null;
+    await sb.from('contact_requests').insert({
+      coach_id:coachId, name:nombre||null, contact:contacto,
+      num_clients:nClientes||null, message:mensaje||null, plan:'a_medida'
+    });
+  }catch(e){ console.warn('contact_requests insert:', e); }
+  // 2) Abrir correo prerrellenado (extra)
+  const asunto=encodeURIComponent('Plan a medida Tracc — '+(nombre||'solicitud'));
+  const cuerpo=encodeURIComponent(
+    'Hola equipo de Tracc,\n\nMe interesa el plan a medida.\n\n'+
+    'Clientes: '+(nClientes||'(sin especificar)')+'\n'+
+    'Nombre: '+(nombre||'(sin especificar)')+'\n'+
+    'Contacto: '+contacto+'\n'+
+    'Mensaje: '+(mensaje||'(sin mensaje)')+'\n'
+  );
+  cerrarContactoAMedida();
+  showToast('✓ Solicitud enviada. Te contactaremos pronto');
+  window.location.href='mailto:tracc.support@gmail.com?subject='+asunto+'&body='+cuerpo;
+}
+
 // Vuelca el nombre real del coach en la tarjeta del sidebar
 function lgApplyCoachToDashboard(){
   if (!coachData) return;
@@ -2574,6 +2646,86 @@ function openGroqKeyModal() {
   document.getElementById('groq-key-input').addEventListener('keydown',e=>{
     if(e.key==='Enter') document.getElementById('groq-key-save').click();
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MOTOR DE IA — Gemini por defecto. Para cambiar de proveedor, edita IA_CFG.
+// (callAI/Groq de arriba se mantiene para la clasificación de ejercicios.)
+// ══════════════════════════════════════════════════════════════════════════
+const IA_CFG = {
+  provider: 'gemini',                 // 'gemini' | 'groq' | 'openrouter'
+  model:    'gemini-2.0-flash',       // modelo a usar
+  // endpoints por proveedor (formato OpenAI-compatible salvo Gemini nativo)
+  geminiBase: 'https://generativelanguage.googleapis.com/v1beta/models'
+};
+let GEMINI_API_KEY = localStorage.getItem('tracc_gemini_key') || '';
+
+// Llama a la IA con un system prompt + user prompt. Devuelve el texto.
+async function callIA(system, user, maxTokens=4000){
+  if(IA_CFG.provider==='gemini'){
+    if(!GEMINI_API_KEY){ openGeminiKeyModal(); throw new Error('Configura tu API key de Gemini'); }
+    const url = `${IA_CFG.geminiBase}/${IA_CFG.model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        system_instruction:{ parts:[{ text: system }] },
+        contents:[{ role:'user', parts:[{ text: user }] }],
+        generationConfig:{ temperature:0.7, maxOutputTokens:maxTokens, responseMimeType:'application/json' }
+      })
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message||'Error Gemini API');
+    const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
+    if(!txt) throw new Error('La IA no devolvió respuesta. Inténtalo de nuevo.');
+    return txt;
+  }
+  // Fallback OpenAI-compatible (groq/openrouter) reutilizando callAI
+  return await callAI(system, user, maxTokens);
+}
+
+// Parser robusto: extrae el primer objeto/array JSON de la respuesta de la IA.
+function parseIAJson(txt){
+  if(!txt) throw new Error('Respuesta vacía de la IA');
+  let s = txt.trim();
+  // quitar fences ```json ... ```
+  s = s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+  try { return JSON.parse(s); } catch(e){}
+  // intentar recortar al primer { o [ y su cierre
+  const start = Math.min(...['{','['].map(c=>{const i=s.indexOf(c);return i<0?Infinity:i;}));
+  if(start===Infinity) throw new Error('La IA no devolvió un formato válido');
+  const open = s[start], close = open==='{'?'}':']';
+  let depth=0, end=-1;
+  for(let i=start;i<s.length;i++){ if(s[i]===open)depth++; else if(s[i]===close){depth--; if(depth===0){end=i;break;}} }
+  if(end<0) throw new Error('La IA devolvió un JSON incompleto');
+  return JSON.parse(s.slice(start,end+1));
+}
+
+function openGeminiKeyModal(){
+  if(document.getElementById('gemini-key-modal')) return;
+  const modal=document.createElement('div');
+  modal.id='gemini-key-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;padding:26px">
+      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">✨ Activar la IA</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.5">Para generar planes con IA necesitas una API key de Google Gemini (gratis, sin tarjeta).</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.5">Consíguela en <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> → "Create API key". Empieza por <b>AIza…</b> y se guarda solo en tu navegador.</div>
+      <input id="gemini-key-input" type="password" placeholder="AIza..." style="width:100%;margin-bottom:16px;font-family:monospace;border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--text);background:var(--bg);box-sizing:border-box;outline:none">
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('gemini-key-modal').remove()" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Cancelar</button>
+        <button id="gemini-key-save" style="flex:1;background:var(--accent);border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Guardar y activar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('gemini-key-input')?.focus(),100);
+  document.getElementById('gemini-key-save').onclick=()=>{
+    const key=document.getElementById('gemini-key-input')?.value?.trim();
+    if(!key||!key.startsWith('AIza')){ showToast('Key inválida — debe empezar por AIza'); return; }
+    GEMINI_API_KEY=key; localStorage.setItem('tracc_gemini_key',key);
+    modal.remove(); showToast('✓ IA activada');
+  };
+  document.getElementById('gemini-key-input').addEventListener('keydown',e=>{ if(e.key==='Enter')document.getElementById('gemini-key-save').click(); });
 }
 
 // ── DATA ─────────────────────────────────────────────────────────────────
@@ -10402,7 +10554,7 @@ function _renderPlanPanelBody(){
       <div style="font-size:13px;font-weight:600;color:var(--text2)">+80 clientes</div>
       <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--text);margin:4px 0">A medida</div>
       <div style="font-size:11.5px;color:var(--text3);margin-bottom:8px">Hablamos contigo</div>
-      <button onclick="irAlPagoMiPlan()" style="font-size:12px;font-weight:600;padding:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:9px;cursor:pointer;color:var(--text2);font-family:inherit">Contactar</button>
+      <button onclick="abrirContactoAMedida()" style="font-size:12px;font-weight:600;padding:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:9px;cursor:pointer;color:var(--text2);font-family:inherit">Contactar</button>
     </div>`;
 
   // Toggle ciclo
@@ -10483,8 +10635,8 @@ function _renderPlanPanelBody(){
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px">🛟 Empieza sin agobios, te acompañamos</div>
         <div style="font-size:12.5px;color:var(--text2);line-height:1.65">No estás solo. Tienes una <b>guía completa</b> (importar clientes con Excel, crear clientes desde cero, funciones de Tracc y cómo usa MyTracc tu cliente), nuestra <b>puesta en marcha</b> si prefieres que lo hagamos por ti, y <b>soporte directo</b> cuando lo necesites.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-          <button onclick="showToast('La guía completa llegará muy pronto.')" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">Ver la guía</button>
-          <button onclick="irAlPagoMiPlan()" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-family:inherit">Contactar soporte</button>
+          <button onclick="openGuiaCompleta()" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">Ver la guía</button>
+          <button onclick="contactarSoporte()" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--bg2);color:var(--text2);border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-family:inherit">Contactar soporte</button>
         </div>
       </div>
     </div>`;
@@ -13575,6 +13727,398 @@ async function guardarSplit(){
 
 
 
+// ══════════════════════════════════════════════════════════════════════════
+// IA EN EDITAR PLAN — banner morado + generador + propuestas + aplicar
+// ══════════════════════════════════════════════════════════════════════════
+let IA = {
+  open:false,            // acordeón desplegado
+  modo:'ambos',          // 'ambos' | 'entreno' | 'nutricion'
+  fuente:'biblioteca',   // 'biblioteca' | 'ia'
+  indicaciones:'',
+  splitDraft:null,       // array de tipos por día para la generación, p.ej. ['PUSH','PULL',...]
+  generando:false,
+  propEntreno:null,      // {dias:[{dia,tipo,ejercicios:[{nombre,sets,reps,restSec,fuente}]}]}
+  propDieta:null,        // {opciones:[{n,comidas:[{tipo,texto,marca,kcal,alimentos:[...]}],kcal}], compra:[{cat,nombre,cant}]}
+  filtroDia:'todos',     // burbuja activa en propuesta de entreno
+  opcionActiva:1,        // burbuja activa en propuesta de dieta
+  entrenoAplicado:false,
+  dietaAplicado:false
+};
+
+const IA_TIPOS = ['PUSH','PULL','LEG','TORSO','BRAZO','FULL','CARDIO','OFF'];
+const IA_TIPO_LBL = {PUSH:'Push',PULL:'Pull',LEG:'Pierna',TORSO:'Torso',BRAZO:'Brazo',FULL:'Full body',CARDIO:'Cardio',OFF:'Descanso'};
+const IA_TIPO_COL = {PUSH:'var(--blue)',PULL:'var(--accent)',LEG:'var(--green)',TORSO:'#0891b2',BRAZO:'#db2777',FULL:'#ca8a04',CARDIO:'#ea580c',OFF:'var(--text3)'};
+
+// Banner morado (cerrado) o generador completo (abierto)
+function iaBannerHtml(c){
+  if(!IA.open){
+    return `<div onclick="iaToggle()" style="background:linear-gradient(135deg,#7c3aed,#9333ea);border-radius:14px;padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:13px;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.22)">
+      <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0">✨</div>
+      <div style="flex:1"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:#fff">Generar plan con IA</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.85)">Crea el entreno y la dieta a partir del cuestionario y tus indicaciones</div></div>
+      <div style="color:#fff;font-size:18px">⌄</div>
+    </div>`;
+  }
+  return `<div style="background:var(--bg2);border:2px solid #c4b5fd;border-radius:14px;padding:18px;margin-bottom:16px">
+    <div onclick="iaToggle()" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);cursor:pointer">
+      <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#7c3aed,#9333ea);display:flex;align-items:center;justify-content:center;font-size:19px">✨</div>
+      <div style="flex:1"><div style="font-family:'DM Serif Display',serif;font-size:17px;color:var(--text)">Generar plan con IA</div></div>
+      <div style="color:var(--text3);font-size:18px">⌃</div>
+    </div>
+    ${iaGeneradorHtml(c)}
+  </div>`;
+}
+
+function iaGeneradorHtml(c){
+  // chips del cuestionario (si hay)
+  const q = c._questionnaire || c.questionnaire || null;
+  let chips='';
+  if(q){
+    const pares=[];
+    if(q.goal||q.objetivo) pares.push(['Objetivo: '+(q.goal||q.objetivo),'var(--green)','var(--gl)']);
+    if(q.days||q.dias_entreno) pares.push([(q.days||q.dias_entreno)+' días/semana','var(--accent)','#f3f0ff']);
+    if(q.kcal||q.calorias) pares.push([(q.kcal||q.calorias)+' kcal','var(--blue)','var(--bl)']);
+    if(q.allergies||q.alergias) pares.push(['Alergias: '+(q.allergies||q.alergias),'var(--amber)','#fef9c3']);
+    chips = pares.map(([t,col,bg])=>`<span style="font-size:11.5px;background:${bg};color:${col};padding:3px 10px;border-radius:6px;font-weight:600">${escHtml(t)}</span>`).join('');
+  }
+  const chipsBox = chips
+    ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:7px">Del cuestionario del cliente</div><div style="display:flex;gap:7px;flex-wrap:wrap">${chips}</div></div>`
+    : `<div style="background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--text3)">Este cliente no tiene cuestionario. La IA se guiará por tus indicaciones de abajo.</div>`;
+
+  // selector de modo
+  const modoBtn=(val,lbl)=>`<span onclick="iaSetModo('${val}')" style="font-size:12.5px;font-weight:${IA.modo===val?'700':'600'};padding:8px 15px;border-radius:9px;cursor:pointer;background:${IA.modo===val?'var(--text)':'var(--bg)'};color:${IA.modo===val?'#fff':'var(--text2)'};border:1.5px solid ${IA.modo===val?'var(--text)':'var(--border)'}">${lbl}</span>`;
+
+  // selector de split (solo si genera entreno) — filas D1, D2... con cuadrados
+  let splitHtml='';
+  if(IA.modo!=='nutricion'){
+    if(!IA.splitDraft) IA.splitDraft = _iaSplitInicial(c);
+    const filas = IA.splitDraft.map((tipo,i)=>{
+      const cuadros = IA_TIPOS.map(t=>{
+        const on=tipo===t;
+        const col=IA_TIPO_COL[t];
+        return `<span onclick="iaSetSplitDia(${i},'${t}')" style="font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?(t==='OFF'?'var(--bg3)':col+'1a'):'var(--bg)'};color:${on?col:'var(--text3)'};border:1.5px solid ${on?col:'var(--border)'}">${IA_TIPO_LBL[t]}</span>`;
+      }).join('');
+      return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:var(--text2);width:30px;flex-shrink:0">D${i+1}</span><div style="display:flex;gap:5px;flex-wrap:wrap">${cuadros}</div></div>`;
+    }).join('');
+    const nEntreno = IA.splitDraft.filter(t=>t!=='OFF').length;
+    splitHtml = `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px">Split — elige el tipo de cada día (la IA rellena los ejercicios)</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${nEntreno} días de entreno · ${IA.splitDraft.length-nEntreno} de descanso · <span onclick="iaSetDias()" style="color:var(--accent);cursor:pointer;font-weight:600">cambiar nº de días</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">${filas}</div>
+    </div>`;
+  }
+
+  // fuente de datos
+  const fuenteCard=(val,icon,tit,sub)=>`<div onclick="iaSetFuente('${val}')" style="flex:1;border:1.5px solid ${IA.fuente===val?'var(--text)':'var(--border)'};background:${IA.fuente===val?'var(--bg3)':'var(--bg)'};border-radius:11px;padding:11px 13px;cursor:pointer">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;color:var(--text)">${icon} ${tit}</div>
+    <div style="font-size:10.5px;color:var(--text3);line-height:1.4">${sub}</div></div>`;
+  const nAlim = (typeof FOOD_LIBRARY!=='undefined'?FOOD_LIBRARY.length:0);
+
+  return `
+    <div style="display:flex;gap:8px;margin-bottom:16px">${modoBtn('ambos','Entreno + Nutrición')}${modoBtn('entreno','Solo entreno')}${modoBtn('nutricion','Solo nutrición')}</div>
+    ${chipsBox}
+    ${splitHtml}
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      ${fuenteCard('biblioteca','📚','Usar mi biblioteca','Datos exactos · '+nAlim+' alimentos')}
+      ${fuenteCard('ia','✨','Que la IA proponga','Orientativo · editable y guardable luego')}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:7px">Tus indicaciones (opcional)</div>
+      <textarea id="ia-indicaciones" oninput="IA.indicaciones=this.value" placeholder="Ej: prioriza pecho, evita sentadilla por la rodilla, comidas sencillas de preparar…" style="width:100%;min-height:60px;border:1.5px solid var(--border);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg)">${escHtml(IA.indicaciones||'')}</textarea>
+    </div>
+    <button onclick="iaGenerar()" ${IA.generando?'disabled':''} style="width:100%;height:50px;border-radius:13px;background:${IA.generando?'var(--bg3)':'linear-gradient(135deg,#7c3aed,#9333ea)'};color:#fff;border:none;font-size:14.5px;font-weight:700;cursor:${IA.generando?'wait':'pointer'};display:flex;align-items:center;justify-content:center;gap:8px">${IA.generando?'Generando… (puede tardar unos segundos)':'✨ Generar propuesta'}</button>
+    ${IA.propEntreno?iaPropEntrenoHtml():''}
+    ${IA.propDieta?iaPropDietaHtml():''}
+  `;
+}
+
+// split inicial para el generador: a partir del split actual del cliente, o 7 OFF
+function _iaSplitInicial(c){
+  try{
+    const ts = getTrainState(c.id);
+    if(ts && ts.split && ts.split.length) return ts.split.map(d=>d.type||'OFF');
+  }catch(e){}
+  return ['PUSH','PULL','LEG','OFF','PUSH','PULL','OFF'];
+}
+
+function iaToggle(){ IA.open=!IA.open; renderClientPanel(); }
+function iaSetModo(m){ IA.modo=m; renderClientPanel(); }
+function iaSetFuente(f){ IA.fuente=f; renderClientPanel(); }
+function iaSetSplitDia(i,t){ if(IA.splitDraft) IA.splitDraft[i]=t; renderClientPanel(); }
+function iaSetDias(){
+  const n=parseInt(prompt('¿Cuántos días tiene el ciclo? (1-7)', String((IA.splitDraft||[]).length||7)),10);
+  if(!n||n<1||n>7) return;
+  const old=IA.splitDraft||[];
+  IA.splitDraft=Array.from({length:n},(_,i)=>old[i]||'OFF');
+  renderClientPanel();
+}
+
+// ── Generación ────────────────────────────────────────────────────────────
+async function iaGenerar(){
+  const c = currentClient; if(!c) return;
+  if(IA.modo!=='nutricion' && (!IA.splitDraft || !IA.splitDraft.some(t=>t!=='OFF'))){
+    showToast('Marca al menos un día de entreno en el split'); return;
+  }
+  IA.generando=true; IA.propEntreno=null; IA.propDieta=null;
+  IA.entrenoAplicado=false; IA.dietaAplicado=false;
+  renderClientPanel();
+  try{
+    const ctx = _iaContexto(c);
+    if(IA.modo!=='nutricion'){ IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos'; renderClientPanel(); }
+    if(IA.modo!=='entreno'){ IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1; }
+    showToast('✓ Propuesta lista — revísala antes de aplicar');
+  }catch(e){
+    console.error('iaGenerar:', e);
+    showToast('No se pudo generar', 'error', e.message||'Inténtalo de nuevo');
+  }finally{
+    IA.generando=false; renderClientPanel();
+  }
+}
+
+function _iaContexto(c){
+  const q = c._questionnaire || c.questionnaire || {};
+  const objetivo = q.goal||q.objetivo||'no especificado';
+  const kcal = q.kcal||q.calorias||(c._nutrition&&c._nutrition.plan&&c._nutrition.plan.kcal_target)||'no especificado';
+  const alergias = q.allergies||q.alergias||'ninguna indicada';
+  const macros = (c._nutrition&&c._nutrition.plan)?`Proteína ${c._nutrition.plan.protein_target||'?'}g, Carbos ${c._nutrition.plan.carbs_target||'?'}g, Grasas ${c._nutrition.plan.fat_target||'?'}g`:'no especificados';
+  return { objetivo, kcal, alergias, macros, indicaciones: IA.indicaciones||'ninguna', usarBiblioteca: IA.fuente==='biblioteca' };
+}
+
+async function _iaGenerarEntreno(c, ctx){
+  const dias = IA.splitDraft.map((t,i)=>({dia:i+1,tipo:t})).filter(d=>d.tipo!=='OFF');
+  let bibTxt='';
+  if(ctx.usarBiblioteca){
+    try{
+      const ts=getTrainState(c.id); const db=ts.exerciseDB||{}; const lineas=[];
+      Object.keys(db).forEach(tipo=>{ const arr=db[tipo]||[]; if(arr.length) lineas.push(`${tipo}: ${arr.map(e=>e.nombre||e.name).filter(Boolean).join(', ')}`); });
+      if(lineas.length) bibTxt='\n\nUSA PREFERENTEMENTE estos ejercicios de la biblioteca del entrenador (puedes añadir alguno nuevo si falta variedad):\n'+lineas.join('\n');
+    }catch(e){}
+  }
+  const sys = `Eres un entrenador experto. Generas planes de entrenamiento de gimnasio coherentes y seguros. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
+  const tiposTxt = dias.map(d=>`Día ${d.dia}: ${IA_TIPO_LBL[d.tipo]} (${d.tipo})`).join('; ');
+  const usr = `Genera los ejercicios para este split. Cliente: objetivo ${ctx.objetivo}.
+Indicaciones del entrenador: ${ctx.indicaciones}.
+Split FIJO (no lo cambies, respeta el tipo de cada día): ${tiposTxt}.
+Reglas: cada día debe tener 4-6 ejercicios COHERENTES con su tipo (PUSH solo empuje pecho/hombro/tríceps; PULL solo tirón espalda/bíceps; LEG solo pierna; etc.). Series 3-4, reps en rango (ej "8-10","12","15").${bibTxt}
+Responde EXACTAMENTE este JSON:
+{"dias":[{"dia":1,"tipo":"PUSH","ejercicios":[{"nombre":"Press banca plano","sets":4,"reps":"8-10","restSec":120}]}]}`;
+  const data = parseIAJson(await callIA(sys, usr, 4000));
+  let bibNames = new Set();
+  if(ctx.usarBiblioteca){ try{ const db=getTrainState(c.id).exerciseDB||{}; Object.values(db).forEach(arr=>(arr||[]).forEach(e=>bibNames.add((e.nombre||e.name||'').toLowerCase()))); }catch(e){} }
+  (data.dias||[]).forEach(d=>{ (d.ejercicios||[]).forEach(e=>{ e.fuente = bibNames.has((e.nombre||'').toLowerCase())?'biblioteca':'nueva'; }); });
+  return data;
+}
+
+async function _iaGenerarDieta(c, ctx){
+  let bibTxt='';
+  if(ctx.usarBiblioteca && typeof FOOD_LIBRARY!=='undefined' && FOOD_LIBRARY.length){
+    const lineas = FOOD_LIBRARY.slice(0,80).map(f=>`${f.name} (${f.kcal||'?'}kcal, P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
+    bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca del entrenador (con sus macros exactos):\n'+lineas.join('; ');
+  }
+  const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido, sin texto alrededor, sin markdown.`;
+  const usr = `Genera 7 OPCIONES de menú diario. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}. Indicaciones del entrenador: ${ctx.indicaciones}.
+REGLAS:
+- Cada opción es un día completo: desayuno, comida, merienda, cena.
+- COHERENCIA: desayuno con comida de desayuno (avena, huevos, tostadas, fruta, yogur...); comida y cena con platos principales (proteína + guarnición + verdura); merienda ligera. NUNCA pongas pasta o arroz como desayuno o merienda.
+- VARIEDAD REAL entre las 7 opciones: no repitas las mismas combinaciones. Puedes repetir algún alimento, pero deben ser claramente distintas.
+- Cada opción debe acercarse a las calorías objetivo.
+- Para cada comida añade "marca": sugerencia orientativa de marca/supermercado español (ej "Hacendado","SOS") como TEXTO; no afecta a macros.${bibTxt}
+Responde EXACTAMENTE este JSON:
+{"opciones":[{"n":1,"kcal":2400,"comidas":[{"tipo":"Desayuno","texto":"Avena con plátano y claras","marca":"Avena Hacendado","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g"}]}]}],"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg"}]}`;
+  return parseIAJson(await callIA(sys, usr, 7000));
+}
+
+// ── Propuesta de ENTRENO (burbujitas de día + editable + aplicar) ─────────
+function iaPropEntrenoHtml(){
+  const p = IA.propEntreno; if(!p||!p.dias) return '';
+  if(IA.entrenoAplicado){
+    return `<div style="margin-top:18px;background:var(--gl);border:1.5px solid var(--gm);border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">✓</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#15803d">Entreno aplicado al plan</div><div style="font-size:11.5px;color:var(--text2)">Puedes seguir editándolo abajo en el plan de entreno.</div></div>
+      <button onclick="iaReabrirEntreno()" style="font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">Ver propuesta</button>
+    </div>`;
+  }
+  const burbujas = '<span onclick="iaFiltroDia(\'todos\')" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:700;background:'+(IA.filtroDia==='todos'?'var(--text)':'var(--bg)')+';color:'+(IA.filtroDia==='todos'?'#fff':'var(--text2)')+';border:1px solid '+(IA.filtroDia==='todos'?'var(--text)':'var(--border)')+'">Todos</span>'+
+    p.dias.map(d=>{ const col=IA_TIPO_COL[d.tipo]||'var(--text2)'; const on=IA.filtroDia===String(d.dia);
+      return `<span onclick="iaFiltroDia('${d.dia}')" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:700;background:${on?col+'1a':'var(--bg)'};color:${on?col:'var(--text2)'};border:1px solid ${on?col:'var(--border)'}">D${d.dia} ${IA_TIPO_LBL[d.tipo]}</span>`;
+    }).join('');
+  const diasMostrar = IA.filtroDia==='todos'?p.dias:p.dias.filter(d=>String(d.dia)===IA.filtroDia);
+  const tablas = diasMostrar.map(d=>{
+    const filas=(d.ejercicios||[]).map((e,idx)=>{
+      const badge = e.fuente==='biblioteca'
+        ? '<span style="font-size:10px;color:#15803d;background:var(--gl);padding:1px 6px;border-radius:5px;margin-left:5px">biblioteca</span>'
+        : '<span style="font-size:10px;color:#a16207;background:#fef9c3;padding:1px 6px;border-radius:5px;margin-left:5px">nueva</span>';
+      return `<tr style="border-top:1px solid var(--border)${idx%2?';background:var(--bg)':''}">
+        <td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(e.nombre||'')}${badge}</td>
+        <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:90px">${e.sets||'?'} × ${escHtml(String(e.reps||'?'))}</td>
+        <td style="text-align:center;width:38px;cursor:pointer;color:var(--text3)" onclick="iaEditarEj(${d.dia},${idx})" title="Editar">✏️</td>
+      </tr>`;
+    }).join('');
+    return `<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">D${d.dia} · ${IA_TIPO_LBL[d.tipo]}</div>
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>${filas}</tbody></table></div></div>`;
+  }).join('');
+  return `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de entreno · revísala</span>
+      <div style="display:flex;gap:7px">
+        <button onclick="iaGenerar()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
+        <button onclick="iaAplicarEntreno()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar entreno</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${burbujas}</div>
+    ${tablas}
+  </div>`;
+}
+
+// ── Propuesta de DIETA (burbujitas de opción + lista de compra + aplicar) ──
+function iaPropDietaHtml(){
+  const p = IA.propDieta; if(!p||!p.opciones) return '';
+  if(IA.dietaAplicado){
+    return `<div style="margin-top:14px;background:var(--gl);border:1.5px solid var(--gm);border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">✓</span><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#15803d">Dieta aplicada al plan</div><div style="font-size:11.5px;color:var(--text2)">Las opciones están abajo en el plan nutricional, listas para editar.</div></div>
+      <button onclick="iaReabrirDieta()" style="font-size:11.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">Ver propuesta</button>
+    </div>`;
+  }
+  const burbujas = p.opciones.map(o=>{ const on=IA.opcionActiva===o.n;
+    return `<span onclick="iaOpcion(${o.n})" style="font-size:11.5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?'var(--text)':'var(--bg)'};color:${on?'#fff':'var(--text2)'};border:1px solid ${on?'var(--text)':'var(--border)'}">Opción ${o.n}</span>`;
+  }).join('');
+  const op = p.opciones.find(o=>o.n===IA.opcionActiva) || p.opciones[0];
+  const kcalObj = parseInt((currentClient&&currentClient._nutrition&&currentClient._nutrition.plan&&currentClient._nutrition.plan.kcal_target)||0,10);
+  const kcalOk = kcalObj && op.kcal ? (Math.abs(op.kcal-kcalObj)/kcalObj<=0.07) : true;
+  const kcalBadge = op.kcal?`<span style="font-size:11px;color:${kcalOk?'#15803d':'#a16207'};background:${kcalOk?'var(--gl)':'#fef9c3'};padding:2px 9px;border-radius:6px;font-weight:600">${op.kcal}${kcalObj?' / '+kcalObj:''} kcal ${kcalOk?'✓':''}</span>`:'';
+  const filas=(op.comidas||[]).map((m,idx)=>`<tr style="border-top:1px solid var(--border)${idx%2?';background:var(--bg)':''}">
+    <td style="padding:9px 12px;font-weight:600;color:var(--text);width:90px">${escHtml(m.tipo||'')}</td>
+    <td style="padding:9px;color:var(--text2)">${escHtml(m.texto||'')}${m.marca?` <span style="font-size:10px;color:var(--text3);font-style:italic">≈ ${escHtml(m.marca)}</span>`:''}</td>
+    <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:60px">${m.kcal||''}</td></tr>`).join('');
+  const compra = (p.compra||[]).map(it=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed var(--border);padding:3px 0"><span style="color:var(--text2)">${escHtml(it.nombre||'')}</span><span style="font-family:'Geist Mono';color:var(--text3)">${escHtml(it.cant||'')}</span></div>`).join('');
+  const compraBox = compra?`<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:14px">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:10px;color:var(--text)">🛒 Lista de la compra · semana entera</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:12.5px">${compra}</div></div>`:'';
+  return `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de dieta · ${p.opciones.length} opciones</span>
+      <div style="display:flex;gap:7px">
+        <button onclick="iaGenerar()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
+        <button onclick="iaAplicarDieta()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar dieta</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${burbujas}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:13px;font-weight:700;color:var(--text)">Opción ${op.n}</span>${kcalBadge}</div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>${filas}</tbody></table></div>
+    ${compraBox}
+  </div>`;
+}
+
+function iaFiltroDia(d){ IA.filtroDia=String(d); renderClientPanel(); }
+function iaOpcion(n){ IA.opcionActiva=n; renderClientPanel(); }
+function iaReabrirEntreno(){ IA.entrenoAplicado=false; renderClientPanel(); }
+function iaReabrirDieta(){ IA.dietaAplicado=false; renderClientPanel(); }
+
+function iaEditarEj(dia, idx){
+  const d=(IA.propEntreno.dias||[]).find(x=>x.dia===dia); if(!d) return;
+  const e=d.ejercicios[idx]; if(!e) return;
+  const nombre=prompt('Ejercicio:', e.nombre||''); if(nombre===null) return;
+  const sets=prompt('Series:', e.sets||3); if(sets===null) return;
+  const reps=prompt('Reps:', e.reps||'10'); if(reps===null) return;
+  e.nombre=nombre.trim()||e.nombre; e.sets=parseInt(sets,10)||e.sets; e.reps=reps.trim()||e.reps;
+  renderClientPanel();
+}
+
+// ── Aplicar al plan real ───────────────────────────────────────────────────
+function iaAplicarEntreno(){
+  const c=currentClient; if(!c||!IA.propEntreno) return;
+  if(!confirm('¿Aplicar este entreno al plan? Sobrescribe el split actual (luego podrás editarlo).')) return;
+  try{
+    const ndias=IA.splitDraft.length;
+    initSplit(c.id, ndias);
+    const ts2=getTrainState(c.id);
+    IA.splitDraft.forEach((t,i)=>{ if(ts2.split[i]) ts2.split[i].type=t; });
+    (IA.propEntreno.dias||[]).forEach(d=>{
+      const slot=ts2.split[d.dia-1]; if(!slot) return;
+      slot.exercises=(d.ejercicios||[]).map(e=>({
+        nombre:e.nombre, tipo:d.tipo, sets:e.sets||3, reps:String(e.reps||'10'),
+        rest_sec:e.restSec||90, restSec:e.restSec||90, approx:'', aprox:'', video:''
+      }));
+    });
+    saveTrainStorage();
+    IA.entrenoAplicado=true; renderClientPanel();
+    showToast('✓ Entreno aplicado al plan');
+  }catch(e){ console.error('iaAplicarEntreno:',e); showToast('No se pudo aplicar','error'); }
+}
+
+function iaAplicarDieta(){
+  const c=currentClient; if(!c||!IA.propDieta) return;
+  if(!confirm('¿Aplicar esta dieta? Se crearán '+(IA.propDieta.opciones||[]).length+' opciones (luego podrás editarlas).')) return;
+  _iaVolcarDieta(c).then(()=>{
+    IA.dietaAplicado=true; renderClientPanel(); showToast('✓ Dieta aplicada — revísala abajo');
+  }).catch(e=>{ console.error('iaAplicarDieta:',e); showToast('No se pudo aplicar la dieta','error', e.message||''); });
+}
+
+// Vuelca las opciones generadas a nutrition_options (creando el plan si hace falta).
+async function _iaVolcarDieta(c){
+  if(!c||!coachData) throw new Error('Sin cliente o coach');
+  // 1) Asegurar plan nutricional
+  let planId = c._nutrition && c._nutrition.plan && c._nutrition.plan.id;
+  if(!planId){
+    const q = c._questionnaire || c.questionnaire || {};
+    const kcal = parseInt(q.kcal||q.calorias||0,10)||0;
+    const {data,error} = await sb.from('nutrition_plans').insert({
+      client_id:c.id, coach_id:coachData.id,
+      kcal_goal:kcal, protein_g:0, carbs_g:0, fat_g:0,
+      preferences:null, is_active:true, activation_date:new Date().toISOString().slice(0,10)
+    }).select().single();
+    if(error||!data) throw new Error('No se pudo crear el plan nutricional');
+    planId = data.id;
+  }
+  // 2) Convertir cada opción de la IA al formato meals{tipo:{items:[...]}}
+  const mealKey = (tipo)=>{
+    const t=(tipo||'').toLowerCase();
+    if(t.includes('desayun')) return 'desayuno';
+    if(t.includes('almuerz')) return 'almuerzo';
+    if(t.includes('comid'))   return 'comida';
+    if(t.includes('merien'))  return 'merienda';
+    if(t.includes('cena'))    return 'cena';
+    if(t.includes('snack'))   return 'snack';
+    return t||'comida';
+  };
+  // buscar macros de un alimento en la biblioteca (datos exactos) si existe
+  const lib = (typeof FOOD_LIBRARY!=='undefined'?FOOD_LIBRARY:[]);
+  const findFood = (nombre)=>{
+    const n=(nombre||'').toLowerCase().trim();
+    return lib.find(f=>(f.name||'').toLowerCase().trim()===n)
+        || lib.find(f=>n && (f.name||'').toLowerCase().includes(n));
+  };
+  const filas = (IA.propDieta.opciones||[]).map(op=>{
+    const meals={};
+    (op.comidas||[]).forEach(m=>{
+      const key=mealKey(m.tipo);
+      const items=(m.alimentos&&m.alimentos.length?m.alimentos:[{nombre:m.texto,cant:''}]).map(al=>{
+        const f=findFood(al.nombre);
+        return {
+          name: al.nombre||m.texto||'—',
+          grams: al.cant||al.gramos||null,
+          kcal: f?Number(f.kcal)||0:0,
+          protein: f?Number(f.protein)||0:0,
+          carbs: f?Number(f.carbs)||0:0,
+          fat: f?Number(f.fat)||0:0,
+          marca: m.marca||''
+        };
+      });
+      // si la comida tiene kcal de la IA y no hay biblioteca, ponerla en el primer item como referencia
+      if(items.length && !items[0].kcal && m.kcal){ items[0].kcal=Number(m.kcal)||0; }
+      meals[key]={ items };
+    });
+    return { nutrition_plan_id:planId, option_number:op.n, meals, kcal_estimate:op.kcal||null, name:'Opción '+op.n };
+  });
+  // 3) Insertar (borrando opciones previas para no duplicar)
+  await sb.from('nutrition_options').delete().eq('nutrition_plan_id', planId);
+  const {error} = await sb.from('nutrition_options').insert(filas);
+  if(error) throw new Error('No se pudieron guardar las opciones');
+  // 4) Recargar la nutrición del cliente para que se vea abajo
+  if(typeof recargarNutricionDeCliente==='function') await recargarNutricionDeCliente(c, planId);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+
 function renderEditar() {
   const c = currentClient;
 
@@ -13623,6 +14167,7 @@ function renderEditar() {
 
   return `
     ${bandaBorrador}
+    ${iaBannerHtml(c)}
     ${barraGlobal}
     ${notasHtml}
     ${seccionPlanNutricional(c)}

@@ -6432,9 +6432,28 @@ function renderResumen() {
           <span style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Evolución del peso</span>
           <span style="font-size:10px;color:var(--green);font-weight:600;background:var(--gl);padding:3px 9px;border-radius:999px">Ver</span>
         </div>
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:90px">
-          ${miniLineChart(_pesoSparkPts, '#16a34a', ' kg', '')}
-        </div>
+        ${(()=>{
+          const vals=_pesoSparkPts.map(p=>p.valor).filter(v=>v!=null);
+          if(vals.length<1){
+            return `<div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:90px">${miniLineChart(_pesoSparkPts, '#16a34a', ' kg', '')}</div>`;
+          }
+          const pMin=Math.min(...vals),pMax=Math.max(...vals);
+          const media=(vals.reduce((s,v)=>s+v,0)/vals.length);
+          const fIni=_pesoSparkPts[0].fechaTxt, fFin=_pesoSparkPts[_pesoSparkPts.length-1].fechaTxt;
+          return `<div style="flex:1;display:flex;gap:7px;align-items:stretch;min-height:90px">
+            <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:8.5px;color:var(--text3);font-family:'Geist Mono',monospace;text-align:right;padding:2px 0 16px;flex-shrink:0;min-width:30px">
+              <span>${pMax.toFixed(1)}</span><span style="opacity:.55">${((pMax+pMin)/2).toFixed(1)}</span><span>${pMin.toFixed(1)}</span>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center">
+              ${miniLineChart(_pesoSparkPts, '#16a34a', ' kg', '')}
+              <div style="display:flex;justify-content:space-between;font-size:8.5px;color:var(--text3);margin-top:1px"><span>${fIni}</span><span>${fFin}</span></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:11px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap">
+            <span style="font-size:9.5px;color:var(--text3)">Media <b style="color:var(--text2)">${media.toFixed(1)} kg</b></span>
+            <span style="font-size:9.5px;color:var(--text3)">Rango <b style="color:var(--text2)">${pMin.toFixed(1)}–${pMax.toFixed(1)}</b></span>
+          </div>`;
+        })()}
       </div>
 
       <div class="panel-card" onclick="openChartModal('pasos')" style="cursor:pointer;display:flex;flex-direction:column">
@@ -9273,7 +9292,7 @@ function renderPerfil() {
   const gridHtml = `
     ${cardDatos}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;align-items:stretch">
-      ${cardCuestionario}
+      <!--CUOTA_SLOT-->
       ${cardEvolucionPeso(c)}
       ${cardMesociclo(c)}
     </div>`;
@@ -9417,8 +9436,7 @@ function renderPerfil() {
   }
 
   return `<div style="display:flex;flex-direction:column;gap:14px">
-    ${gridHtml}
-    ${cuotaResumen}
+    ${gridHtml.replace('<!--CUOTA_SLOT-->', cuotaResumen)}
     ${cardFotosProgreso(c)}
     ${cardCuenta}
   </div>`;

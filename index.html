@@ -2330,7 +2330,7 @@ async function enviarContactoAMedida(){
   const nombre=(document.getElementById('cm-nombre').value||'').trim();
   const contacto=(document.getElementById('cm-contacto').value||'').trim();
   const mensaje=(document.getElementById('cm-mensaje').value||'').trim();
-  if(!contacto){ showToast('Déjanos un email o teléfono para responderte','error'); return; }
+  if(!contacto){ showToast('Déjanos un email o teléfono para responderte'); return; }
   const btn=document.getElementById('cm-enviar'); if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
   // 1) Guardar en Supabase (te llega seguro)
   try{
@@ -4647,7 +4647,7 @@ async function guardarNuevoClienteManual(){
   };
   try{
     const {data,error}=await sb.from('clients').insert(fila).select('*').single();
-    if(error){ console.error('crear cliente:',error); showToast('No se pudo crear el cliente','error',error.message||''); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} return; }
+    if(error){ console.error('crear cliente:',error); showToast('No se pudo crear el cliente: '+(error.message||'')); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} return; }
     cerrarNuevoClienteManual();
     closePendingModal();
     await loadRealClients();
@@ -4655,7 +4655,7 @@ async function guardarNuevoClienteManual(){
     showToast('✓ Cliente creado');
     // abrir su ficha directamente
     if(data && typeof selectClient==='function'){ selectClient(data.id); }
-  }catch(e){ console.error(e); showToast('No se pudo crear el cliente','error'); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} }
+  }catch(e){ console.error(e); showToast('No se pudo crear el cliente'); if(btn){btn.disabled=false;btn.textContent='Crear cliente';} }
 }
 
 function renderPendingModal() {
@@ -10106,7 +10106,7 @@ async function guardarCuestionario(){
     } else {
       res = await sb.from('client_questionnaire').insert(fila).select('*').single();
     }
-    if(res.error){ console.error('guardarCuestionario:',res.error); showToast('No se pudo guardar','error',res.error.message||''); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} return; }
+    if(res.error){ console.error('guardarCuestionario:',res.error); showToast('No se pudo guardar: '+(res.error.message||'')); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} return; }
     c._questionnaire = res.data;
     // si el objetivo cambió, reflejarlo también en el cliente (campo goal)
     if(fila.goal && fila.goal!==c.goal){ try{ await sb.from('clients').update({goal:fila.goal}).eq('id',c.id); c.goal=fila.goal; }catch(e){} }
@@ -10114,7 +10114,7 @@ async function guardarCuestionario(){
     openCuestionarioModal();
     renderClientPanel();
     showToast('✓ Cuestionario guardado');
-  }catch(e){ console.error(e); showToast('No se pudo guardar','error'); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} }
+  }catch(e){ console.error(e); showToast('No se pudo guardar'); if(btn){btn.disabled=false;btn.textContent='Guardar cuestionario';} }
 }
 
 
@@ -14033,7 +14033,7 @@ async function iaGenerar(){
     showToast('✓ Propuesta lista — revísala antes de aplicar');
   }catch(e){
     console.error('iaGenerar:', e);
-    showToast('No se pudo generar', 'error', e.message||'Inténtalo de nuevo');
+    showToast('Error IA: '+(e.message||'inténtalo de nuevo'));
   }finally{
     IA.generando=false; renderClientPanel();
   }
@@ -14221,7 +14221,7 @@ function iaAplicarEntreno(){
     saveTrainStorage();
     IA.entrenoAplicado=true; renderClientPanel();
     showToast('✓ Entreno aplicado al plan');
-  }catch(e){ console.error('iaAplicarEntreno:',e); showToast('No se pudo aplicar','error'); }
+  }catch(e){ console.error('iaAplicarEntreno:',e); showToast('No se pudo aplicar el entreno'); }
 }
 
 function iaAplicarDieta(){
@@ -14229,7 +14229,7 @@ function iaAplicarDieta(){
   if(!confirm('¿Aplicar esta dieta? Se crearán '+(IA.propDieta.opciones||[]).length+' opciones (luego podrás editarlas).')) return;
   _iaVolcarDieta(c).then(()=>{
     IA.dietaAplicado=true; renderClientPanel(); showToast('✓ Dieta aplicada — revísala abajo');
-  }).catch(e=>{ console.error('iaAplicarDieta:',e); showToast('No se pudo aplicar la dieta','error', e.message||''); });
+  }).catch(e=>{ console.error('iaAplicarDieta:',e); showToast('No se pudo aplicar la dieta: '+(e.message||'')); });
 }
 
 // Vuelca las opciones generadas a nutrition_options (creando el plan si hace falta).

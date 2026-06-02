@@ -4771,7 +4771,10 @@ function renderClientPanel() {
             })()}
           </div>
         </div>
-        <div class="status-pill ${statusPill[c.status]}" style="margin-left:auto;align-self:center">${statusLabel[c.status]}</div>
+        <button onclick="openClientCalendar()" title="Calendario del cliente" style="margin-left:auto;align-self:center;width:38px;height:38px;border-radius:50%;background:var(--bg2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+        </button>
+        <div class="status-pill ${statusPill[c.status]}" style="align-self:center;margin-left:10px">${statusLabel[c.status]}</div>
       </div>
       <div class="view-tabs">${tabsHtml}</div>
     </div>
@@ -9235,42 +9238,123 @@ function renderPerfil() {
   return `<div style="display:flex;flex-direction:column;gap:14px">
     ${gridHtml}
     ${cuotaResumen}
-    ${cardDayNotes(c)}
     ${cardFotosProgreso(c)}
     ${cardCuenta}
   </div>`;
 }
 
-// Tarjeta de notas que el cliente ha compartido (calendario aparte cliente↔entrenador).
-// NO son citas: van en su propio espacio, no en la agenda.
-function cardDayNotes(c){
-  const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
-  const secTitle  = 'font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)';
-  const TAGS={nota:['📝','Nota','#111','var(--bg)'],comida:['🍽️','Comida','#7c3aed','#f3f0ff'],descanso:['😴','Descanso','#a16207','#fef9c3'],recordatorio:['⏰','Recordatorio','#1d4ed8','#dbeafe']};
-  const notas = (c._dayNotes)||[];
-  const fmtD = (ds)=>{ try{ return new Date(ds+'T00:00:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }catch(e){ return ds; } };
-  let cuerpo;
-  if(!notas.length){
-    cuerpo = `<div style="font-size:12.5px;color:var(--text3);line-height:1.6;padding:4px 0">${c._dayNotes==null?'Cargando…':'El cliente todavía no ha compartido ninguna nota de su calendario.'}</div>`;
-  } else {
-    cuerpo = notas.map(n=>{
-      const T=TAGS[n.tag]||TAGS.nota;
-      return `<div style="display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--border)">
-        <div style="flex-shrink:0;width:54px;font-size:11px;color:var(--text3);font-weight:600;padding-top:2px">${fmtD(String(n.date).slice(0,10))}</div>
-        <div style="flex:1;min-width:0">
-          <span style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${T[2]};background:${T[3]};padding:2px 8px;border-radius:6px">${T[0]} ${T[1]}</span>
-          <div style="font-size:13px;color:var(--text);line-height:1.5;margin-top:5px;white-space:pre-wrap">${escHtml(n.text)}</div>
-        </div>
-      </div>`;
-    }).join('');
+// ══════════════════════════════════════════════════════════════════════════
+// CALENDARIO DEL CLIENTE (modal). Muestra, de ESTE cliente: sus citas con el
+// entrenador + las notas que ha compartido. Es el espacio entrenador↔cliente,
+// aparte de la agenda general.
+// ══════════════════════════════════════════════════════════════════════════
+let _ccCal = new Date(); _ccCal.setDate(1);
+const CC_TAGS={nota:['📝','Nota','#111','#ececec'],comida:['🍽️','Comida','#7c3aed','#f3f0ff'],descanso:['😴','Descanso','#a16207','#fef9c3'],recordatorio:['⏰','Recordatorio','#1d4ed8','#dbeafe']};
+
+function openClientCalendar(){
+  const c=currentClient; if(!c) return;
+  _ccCal=new Date(); _ccCal.setDate(1);
+  // Asegurar que las notas compartidas están cargadas
+  if(c._dayNotes==null){ cargarDayNotesCliente(); }
+  let ov=document.getElementById('cc-overlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='cc-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:264;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.onclick=(e)=>{ if(e.target===ov) cerrarClientCalendar(); };
+    document.body.appendChild(ov);
   }
-  return `<div style="${cardStyle}">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <div style="${secTitle}">Notas compartidas por el cliente</div>
-      ${notas.length?`<span style="font-size:10px;font-weight:700;color:var(--green);background:var(--gl);padding:2px 8px;border-radius:6px;margin-left:auto">${notas.length}</span>`:''}
+  ov.style.display='flex';
+  renderClientCalendar();
+}
+function cerrarClientCalendar(){ const ov=document.getElementById('cc-overlay'); if(ov) ov.style.display='none'; }
+function ccMes(delta){ _ccCal.setMonth(_ccCal.getMonth()+delta); renderClientCalendar(); }
+function ccHoy(){ _ccCal=new Date(); _ccCal.setDate(1); renderClientCalendar(); }
+
+// Citas vivas de ESTE cliente
+function _ccCitasCliente(){
+  const c=currentClient; if(!c) return [];
+  return (APPOINTMENTS||[]).filter(a=>a&&String(a.client_id)===String(c.id)&&a.status!=='rechazada'&&a.status!=='cancelada');
+}
+function renderClientCalendar(){
+  const ov=document.getElementById('cc-overlay'); if(!ov) return;
+  const c=currentClient; if(!c) return;
+  const y=_ccCal.getFullYear(), m=_ccCal.getMonth();
+  const monthName=_ccCal.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  let lead=new Date(y,m,1).getDay(); lead=(lead===0?6:lead-1);
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  const citas=_ccCitasCliente();
+  const notas=(c._dayNotes)||[];
+  // Mapa día -> {cita:bool, nota:bool}
+  const byDay={};
+  citas.forEach(a=>{ const d=apptDateObj(a); if(d.getFullYear()===y&&d.getMonth()===m){ (byDay[d.getDate()]=byDay[d.getDate()]||{}).cita=(a.status==='aceptada')?'verde':'ambar'; } });
+  notas.forEach(n=>{ const ds=String(n.date).slice(0,10); const dd=new Date(ds+'T00:00:00'); if(dd.getFullYear()===y&&dd.getMonth()===m){ (byDay[dd.getDate()]=byDay[dd.getDate()]||{}).nota=true; } });
+
+  const DOW=['L','M','X','J','V','S','D'];
+  let cells='';
+  for(let i=0;i<lead;i++) cells+='<div></div>';
+  for(let dn=1;dn<=daysInMonth;dn++){
+    const isToday=(y===today.getFullYear()&&m===today.getMonth()&&dn===today.getDate());
+    const info=byDay[dn]||{};
+    const citaCol=info.cita==='verde'?'#16a34a':info.cita==='ambar'?'#d97706':null;
+    const dots=`<div style="display:flex;gap:2px;height:5px;align-items:center;justify-content:center">${citaCol?`<span style="width:5px;height:5px;border-radius:50%;background:${citaCol}"></span>`:''}${info.nota?`<span style="width:5px;height:5px;border-radius:50%;background:#7c3aed"></span>`:''}</div>`;
+    cells+=`<div onclick="ccAbrirDia(${y},${m},${dn})" style="min-height:52px;border:1.5px solid ${isToday?'var(--green)':'var(--border)'};border-radius:9px;padding:5px 4px;background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--green)':'var(--text2)'}">${dn}</div>${dots}</div>`;
+  }
+
+  ov.innerHTML=`<div style="width:100%;max-width:480px;background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:18px 20px">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:16px">
+      <div style="width:38px;height:38px;border-radius:11px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div>
+      <div style="flex:1;min-width:0"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--text);line-height:1.1">Calendario · ${escHtml(c.name.split(' ')[0])}</div>
+      <div style="font-size:11px;color:var(--text3)">Citas y notas compartidas</div></div>
+      <button onclick="cerrarClientCalendar()" style="width:30px;height:30px;border:1.5px solid var(--border);background:var(--bg);border-radius:8px;color:var(--text2);cursor:pointer;font-size:15px;line-height:1">&#10005;</button>
     </div>
-    ${cuerpo}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <button onclick="ccMes(-1)" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">‹</button>
+      <div style="flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--text);text-transform:capitalize">${monthName}</div>
+      <button onclick="ccMes(1)" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--text2)">›</button>
+      <button onclick="ccHoy()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;height:30px;padding:0 12px;cursor:pointer;color:var(--text2);font-size:12px">Hoy</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:5px">${DOW.map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3)">${d}</div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${cells}</div>
+    <div style="display:flex;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)"><span style="width:7px;height:7px;border-radius:50%;background:#d97706"></span>Cita por confirmar</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)"><span style="width:7px;height:7px;border-radius:50%;background:#16a34a"></span>Cita confirmada</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)"><span style="width:7px;height:7px;border-radius:50%;background:#7c3aed"></span>Nota del cliente</span>
+    </div>
+    <div id="cc-day-detail"></div>
   </div>`;
+}
+
+// Detalle de un día: citas + notas compartidas de ese día
+function ccAbrirDia(y,m,dn){
+  const c=currentClient; if(!c) return;
+  const dateStr=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');
+  const el=document.getElementById('cc-day-detail'); if(!el) return;
+  const fmtTit=new Date(dateStr+'T00:00:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  const citas=_ccCitasCliente().filter(a=>{const d=apptDateObj(a);return d.getFullYear()===y&&d.getMonth()===m&&d.getDate()===dn;}).sort((a,b)=>apptDateObj(a)-apptDateObj(b));
+  const notas=((c._dayNotes)||[]).filter(n=>String(n.date).slice(0,10)===dateStr);
+  let html=`<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+    <div style="font-size:12px;font-weight:700;color:var(--text);text-transform:capitalize;margin-bottom:10px">${fmtTit}</div>`;
+  if(!citas.length&&!notas.length){
+    html+=`<div style="font-size:12.5px;color:var(--text3);padding:6px 0">Sin citas ni notas compartidas este día.</div>`;
+  }
+  citas.forEach(a=>{ const T=_apptType(a.type),d=apptDateObj(a);
+    const estado=a.status==='aceptada'?['Confirmada','#16a34a','#dcfce7']:['Por confirmar','#a16207','#fef9c3'];
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:11px;margin-bottom:7px;cursor:pointer" onclick="cerrarClientCalendar();abrirDetalleCita('${a.id}')">
+      <div style="width:34px;height:34px;border-radius:9px;background:${T.bg};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${T.icon}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text)">${T.label} · ${apptFmtHora(d)}</div>${a.location?`<div style="font-size:11px;color:var(--text3)">${escHtml(a.location)}</div>`:''}</div>
+      <span style="font-size:10px;font-weight:700;color:${estado[1]};background:${estado[2]};padding:2px 8px;border-radius:6px;white-space:nowrap">${estado[0]}</span>
+    </div>`;
+  });
+  notas.forEach(n=>{ const T=CC_TAGS[n.tag]||CC_TAGS.nota;
+    html+=`<div style="padding:11px 13px;background:var(--bg);border:1px solid var(--border);border-left:3px solid #7c3aed;border-radius:0 11px 11px 0;margin-bottom:7px">
+      <span style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${T[2]};background:${T[3]};padding:2px 8px;border-radius:6px">${T[0]} ${T[1]}</span>
+      <div style="font-size:13px;color:var(--text);line-height:1.5;margin-top:6px;white-space:pre-wrap">${escHtml(n.text)}</div>
+    </div>`;
+  });
+  html+=`</div>`;
+  el.innerHTML=html;
 }
 
 // Cache del HTML completo de la cuota (para el modal) y apertura del modal

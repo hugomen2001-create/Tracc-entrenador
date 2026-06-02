@@ -2675,20 +2675,37 @@ async function callIA(system, user, maxTokens=4000, jsonMode=true){
     const url = `${IA_CFG.geminiBase}/${IA_CFG.model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
     const genCfg = { temperature:0.7, maxOutputTokens:maxTokens };
     if(jsonMode) genCfg.responseMimeType='application/json';
-    const res = await fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        system_instruction:{ parts:[{ text: system }] },
-        contents:[{ role:'user', parts:[{ text: user }] }],
-        generationConfig: genCfg
-      })
+    const body = JSON.stringify({
+      system_instruction:{ parts:[{ text: system }] },
+      contents:[{ role:'user', parts:[{ text: user }] }],
+      generationConfig: genCfg
     });
-    const data = await res.json();
-    if(data.error) throw new Error(data.error.message||'Error Gemini API');
-    const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
-    if(!txt) throw new Error('La IA no devolvió respuesta. Inténtalo de nuevo.');
-    return txt;
+    const esperar = ms => new Promise(r=>setTimeout(r,ms));
+    const MAX_INTENTOS = 3;
+    let ultimoErr = '';
+    for(let intento=1; intento<=MAX_INTENTOS; intento++){
+      let res, data;
+      try{ res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body}); }
+      catch(e){ ultimoErr='Sin conexión con la IA'; await esperar(1200*intento); continue; }
+      try{ data = await res.json(); }catch(e){ ultimoErr='Respuesta no válida de la IA'; await esperar(1200*intento); continue; }
+      // error de la API
+      if(data.error){
+        const msg = data.error.message||'Error Gemini API';
+        const code = data.error.code || res.status;
+        const temporal = code===429 || code===503 || code===500 || /high demand|overloaded|temporar|try again|unavailable|exceeded/i.test(msg);
+        ultimoErr = msg;
+        if(temporal && intento<MAX_INTENTOS){ await esperar(1500*intento); continue; } // reintentar
+        throw new Error(msg);
+      }
+      const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
+      if(!txt){
+        ultimoErr = 'La IA no devolvió respuesta';
+        if(intento<MAX_INTENTOS){ await esperar(1200*intento); continue; }
+        throw new Error(ultimoErr);
+      }
+      return txt; // éxito
+    }
+    throw new Error(ultimoErr||'La IA no respondió tras varios intentos');
   }
   // Fallback OpenAI-compatible (groq/openrouter) reutilizando callAI
   return await callAI(system, user, maxTokens);
@@ -4969,6 +4986,11 @@ function selectClient(id) {
   currentTab = 'resumen';
   currentOpcionTab = 0;
   editPlan = null;
+  // resetear el generador de IA para el nuevo cliente
+  IA.splitDraft=null; IA.propEntreno=null; IA.propDieta=null;
+  IA.entrenoAplicado=false; IA.dietaAplicado=false;
+  IA.indicacionesDieta=''; IA.indicacionesEntreno='';
+  IA.prefsAbierto=false; IA.gruposAbiertos={}; IA.filtroDia='todos'; IA.opcionActiva=1;
   weekOffset = 0;
   segWeekOffset = 0;
   editNutriOpcion = 0;
@@ -13917,12 +13939,18 @@ async function guardarSplit(){
 // IA EN EDITAR PLAN — banner morado + generador + propuestas + aplicar
 // ══════════════════════════════════════════════════════════════════════════
 let IA = {
-  open:false,            // acordeón desplegado
-  modo:'ambos',          // 'ambos' | 'entreno' | 'nutricion'
-  fuente:'biblioteca',   // 'biblioteca' | 'ia'
-  indicaciones:'',
+  open:false,            // banner desplegado
+  bloqueDieta:true,      // bloque dieta abierto
+  bloqueEntreno:true,    // bloque entreno abierto
+  prefsAbierto:false,    // desplegable de alergias/preferencias (dentro de dieta)
+  gruposAbiertos:{},     // { indiceDia: true } — qué días tienen los grupos desplegados
+  fuenteDieta:'biblioteca',   // 'biblioteca' | 'ia'
+  fuenteEntreno:'biblioteca', // 'biblioteca' | 'ia'
+  indicacionesDieta:'',
+  indicacionesEntreno:'',
   splitDraft:null,       // [{tipo:'PUSH', grupos:[{nombre:'Pecho',n:3},...]}, {tipo:'OFF',grupos:[]}, ...]
-  generando:false,
+  generandoDieta:false,
+  generandoEntreno:false,
   propEntreno:null,      // {dias:[{dia,tipo,ejercicios:[{nombre,sets,reps,restSec,fuente}]}]}
   propDieta:null,        // {opciones:[{n,comidas:[{tipo,texto,marca,kcal,alimentos:[...]}],kcal}], compra:[{cat,nombre,cant}]}
   filtroDia:'todos',     // burbuja activa en propuesta de entreno
@@ -13981,101 +14009,138 @@ function iaBannerHtml(c){
 }
 
 function iaGeneradorHtml(c){
-  // chips del cuestionario (si hay)
-  const q = c._questionnaire || null;
-  let chips='';
-  if(q){
-    const pares=[];
-    if(q.goal) pares.push(['Objetivo: '+q.goal,'var(--green)','var(--gl)']);
-    if(q.available_days_per_week) pares.push([q.available_days_per_week+' días/semana','var(--accent)','#f3f0ff']);
-    if(c._nutrition&&c._nutrition.plan&&(c._nutrition.plan.kcal_goal||c._nutrition.plan.kcal_target)) pares.push([(c._nutrition.plan.kcal_goal||c._nutrition.plan.kcal_target)+' kcal','var(--blue)','var(--bl)']);
-    if(q.allergies) pares.push(['Alergias: '+q.allergies,'var(--amber)','#fef9c3']);
-    if(q.disliked_foods) pares.push(['No le gusta: '+(q.disliked_foods.length>40?q.disliked_foods.slice(0,40)+'…':q.disliked_foods),'var(--text2)','var(--bg3)']);
-    chips = pares.map(([t,col,bg])=>`<span style="font-size:11.5px;background:${bg};color:${col};padding:3px 10px;border-radius:6px;font-weight:600">${escHtml(t)}</span>`).join('');
-  }
-  const chipsBox = chips
-    ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:7px">Del cuestionario del cliente</div><div style="display:flex;gap:7px;flex-wrap:wrap">${chips}</div></div>`
-    : `<div style="background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--text3)">Este cliente no tiene cuestionario. La IA se guiará por tus indicaciones de abajo.</div>`;
+  const nAlim = (typeof FOOD_LIBRARY!=='undefined'?FOOD_LIBRARY.length:0);
+  const plan = (c._nutrition&&c._nutrition.plan)||null;
+  const q = c._questionnaire || {};
 
-  // selector de modo
-  const modoBtn=(val,lbl)=>`<span onclick="iaSetModo('${val}')" style="font-size:12.5px;font-weight:${IA.modo===val?'700':'600'};padding:8px 15px;border-radius:9px;cursor:pointer;background:${IA.modo===val?'var(--text)':'var(--bg)'};color:${IA.modo===val?'#fff':'var(--text2)'};border:1.5px solid ${IA.modo===val?'var(--text)':'var(--border)'}">${lbl}</span>`;
-
-  // selector de split (solo si genera entreno) — filas D1, D2... con tipo + grupos
-  let splitHtml='';
-  if(IA.modo!=='nutricion'){
-    if(!IA.splitDraft) IA.splitDraft = _iaSplitInicial(c);
-    const tiposBtns = (dia,i)=>{
-      const todos = [...iaTiposDisponibles(),'OFF'];
-      return todos.map(t=>{
-        const on=dia.tipo===t; const col=iaTipoCol(t);
-        return `<span onclick="iaSetSplitDia(${i},'${t}')" style="font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?(t==='OFF'?'var(--bg3)':col+'1a'):'var(--bg)'};color:${on?col:'var(--text3)'};border:1.5px solid ${on?col:'var(--border)'}">${iaTipoLbl(t)}</span>`;
-      }).join('') + `<span onclick="iaNuevoTipo(${i})" title="Crear tipo de día propio" style="font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer;font-weight:700;background:var(--bg);color:var(--accent);border:1.5px dashed var(--accent)">+ tipo</span>`;
-    };
-    const gruposBox = (dia,i)=>{
-      if(dia.tipo==='OFF') return '';
-      const grupos = dia.grupos||[];
-      const filasG = grupos.map((g,gi)=>`<div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:12.5px;flex:1;color:var(--text)">${escHtml(g.nombre)}</span>
-        <div style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px">
-          <span onclick="iaGrupoN(${i},${gi},-1)" style="width:23px;height:23px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:var(--text2)">−</span>
-          <span style="font-family:'Geist Mono';font-size:13px;width:16px;text-align:center;font-weight:600;color:var(--text)">${g.n}</span>
-          <span onclick="iaGrupoN(${i},${gi},1)" style="width:23px;height:23px;border-radius:6px;background:var(--text);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:#fff">+</span>
-          <span onclick="iaQuitarGrupo(${i},${gi})" title="Quitar grupo" style="width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text3)">✕</span>
-        </div></div>`).join('');
-      const totalEj = grupos.reduce((s,g)=>s+(g.n||0),0);
-      return `<div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-top:8px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:9px">Ejercicios por grupo ${totalEj?'· '+totalEj+' en total':'(la IA decide si lo dejas vacío)'}</div>
-        <div style="display:flex;flex-direction:column;gap:7px">${filasG||'<div style="font-size:12px;color:var(--text3)">Sin grupos. Añade uno o deja que la IA decida.</div>'}</div>
-        <div style="margin-top:9px"><span onclick="iaNuevoGrupo(${i})" style="font-size:11.5px;color:var(--accent);cursor:pointer;font-weight:600">+ Añadir grupo</span></div>
-      </div>`;
-    };
-    const filas = IA.splitDraft.map((dia,i)=>{
-      const col = iaTipoCol(dia.tipo);
-      return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:12px 13px;background:var(--bg2)">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:12px;font-weight:700;color:var(--text2);width:30px;flex-shrink:0">D${i+1}</span>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">${tiposBtns(dia,i)}</div>
-        </div>
-        ${gruposBox(dia,i)}
-      </div>`;
-    }).join('');
-    const nEntreno = IA.splitDraft.filter(d=>d.tipo!=='OFF').length;
-    const nPlantillas = (TRAINING_TEMPLATES||[]).filter(_iaEsPlantillaConfig).length;
-    splitHtml = `<div style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Split — elige el tipo y los grupos de cada día</div>
-        <div style="display:flex;gap:6px">
-          <button onclick="iaCargarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">📂 Cargar plantilla${nPlantillas?' ('+nPlantillas+')':''}</button>
-          <button onclick="iaGuardarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--accent);background:#f3f0ff;color:var(--accent);cursor:pointer">💾 Guardar plantilla</button>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${nEntreno} días de entreno · ${IA.splitDraft.length-nEntreno} de descanso · <span onclick="iaSetDias()" style="color:var(--accent);cursor:pointer;font-weight:600">cambiar nº de días</span></div>
-      <div style="display:flex;flex-direction:column;gap:10px">${filas}</div>
-    </div>`;
-  }
-
-  // fuente de datos
-  const fuenteCard=(val,icon,tit,sub)=>`<div onclick="iaSetFuente('${val}')" style="flex:1;border:1.5px solid ${IA.fuente===val?'var(--text)':'var(--border)'};background:${IA.fuente===val?'var(--bg3)':'var(--bg)'};border-radius:11px;padding:11px 13px;cursor:pointer">
+  // ── helper: tarjeta de fuente (biblioteca/IA) por bloque ──
+  const fuenteCard=(setter,actual,val,icon,tit,sub)=>`<div onclick="${setter}('${val}')" style="flex:1;border:1.5px solid ${actual===val?'var(--text)':'var(--border)'};background:${actual===val?'var(--bg3)':'var(--bg)'};border-radius:11px;padding:10px 12px;cursor:pointer">
     <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;color:var(--text)">${icon} ${tit}</div>
     <div style="font-size:10.5px;color:var(--text3);line-height:1.4">${sub}</div></div>`;
-  const nAlim = (typeof FOOD_LIBRARY!=='undefined'?FOOD_LIBRARY.length:0);
 
-  return `
-    <div style="display:flex;gap:8px;margin-bottom:16px">${modoBtn('ambos','Entreno + Nutrición')}${modoBtn('entreno','Solo entreno')}${modoBtn('nutricion','Solo nutrición')}</div>
-    ${chipsBox}
-    ${splitHtml}
+  // ════════════ BLOQUE DIETA ════════════
+  const dietaKcal = plan?(plan.kcal_goal||plan.kcal_target||0):0;
+  const macroBox = (lbl,id,val)=>`<div style="flex:1;border:1.5px solid var(--border);border-radius:9px;padding:6px 9px">
+    <div style="font-size:9.5px;color:var(--text3);font-weight:700;text-transform:uppercase">${lbl}</div>
+    <input id="${id}" type="number" value="${val||0}" style="width:100%;border:none;background:transparent;font-family:'Geist Mono';font-size:15px;font-weight:600;color:var(--text);outline:none;padding:0">
+  </div>`;
+  // desplegable de preferencias (alergias, no le gusta, etc.) editables y sincronizadas con el cuestionario
+  const nPrefs = [q.allergies,q.disliked_foods,q.diseases,q.supplements].filter(Boolean).length;
+  const prefsHtml = IA.prefsAbierto ? `<div style="padding:12px 13px;border-top:1px solid var(--border)">
+    ${_iaPrefField('Alergias / intolerancias','cq2-allergies',q.allergies)}
+    ${_iaPrefField('Alimentos que NO le gustan','cq2-disliked_foods',q.disliked_foods)}
+    ${_iaPrefField('Enfermedades / lesiones','cq2-diseases',q.diseases)}
+    ${_iaPrefField('Suplementación','cq2-supplements',q.supplements)}
+    <button onclick="iaGuardarPrefs()" style="margin-top:8px;height:36px;padding:0 14px;border-radius:9px;background:var(--green);border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Guardar preferencias</button>
+  </div>` : '';
+  const bloqueDietaBody = IA.bloqueDieta ? `<div style="padding:15px">
+    <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px">Objetivos ${plan?'(sincronizado con el plan nutricional)':'· se creará el plan al generar'}</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      ${macroBox('Kcal','ia-d-kcal',dietaKcal)}
+      ${macroBox('Prot','ia-d-prot',plan?plan.protein_g:0)}
+      ${macroBox('Carb','ia-d-carb',plan?plan.carbs_g:0)}
+      ${macroBox('Grasa','ia-d-fat',plan?plan.fat_g:0)}
+    </div>
+    <div style="border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px">
+      <div onclick="IA.prefsAbierto=!IA.prefsAbierto;renderClientPanel()" style="display:flex;align-items:center;gap:8px;padding:10px 13px;cursor:pointer">
+        <span style="font-size:13px;font-weight:600;flex:1;color:var(--text)">Alergias y preferencias</span>
+        <span style="font-size:11px;color:var(--text3)">${nPrefs?nPrefs+' indicadas':'añadir'}</span>
+        <span style="color:var(--text3);font-size:14px">${IA.prefsAbierto?'⌃':'⌄'}</span>
+      </div>
+      ${prefsHtml}
+    </div>
     <div style="display:flex;gap:10px;margin-bottom:14px">
-      ${fuenteCard('biblioteca','📚','Usar mi biblioteca','Datos exactos · '+nAlim+' alimentos')}
-      ${fuenteCard('ia','✨','Que la IA proponga','Orientativo · editable y guardable luego')}
+      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'biblioteca','📚','Mi biblioteca','Datos exactos · '+nAlim+' alimentos')}
+      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'ia','✨','Que la IA proponga','Orientativo')}
     </div>
-    <div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:7px">Tus indicaciones (opcional)</div>
-      <textarea id="ia-indicaciones" oninput="IA.indicaciones=this.value" placeholder="Ej: prioriza pecho, evita sentadilla por la rodilla, comidas sencillas de preparar…" style="width:100%;min-height:60px;border:1.5px solid var(--border);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg)">${escHtml(IA.indicaciones||'')}</textarea>
-    </div>
-    <button onclick="iaGenerar()" ${IA.generando?'disabled':''} style="width:100%;height:50px;border-radius:13px;background:${IA.generando?'var(--bg3)':'linear-gradient(135deg,#7c3aed,#9333ea)'};color:#fff;border:none;font-size:14.5px;font-weight:700;cursor:${IA.generando?'wait':'pointer'};display:flex;align-items:center;justify-content:center;gap:8px">${IA.generando?'Generando… (puede tardar unos segundos)':'✨ Generar propuesta'}</button>
-    ${IA.propEntreno?iaPropEntrenoHtml():''}
+    <textarea id="ia-ind-dieta" oninput="IA.indicacionesDieta=this.value" placeholder="Indicaciones para la dieta (opcional): comidas sencillas, mucho boniato, sin lactosa…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesDieta||'')}</textarea>
+    <button onclick="iaGenerarDieta()" ${IA.generandoDieta?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoDieta?'var(--bg3)':'linear-gradient(135deg,#7c3aed,#9333ea)'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoDieta?'wait':'pointer'}">${IA.generandoDieta?'Generando dieta…':'✨ Generar dieta'}</button>
     ${IA.propDieta?iaPropDietaHtml():''}
-  `;
+  </div>` : '';
+  const bloqueDieta = `<div style="border:1.5px solid var(--border);border-radius:13px;margin-bottom:14px;overflow:hidden">
+    <div onclick="IA.bloqueDieta=!IA.bloqueDieta;renderClientPanel()" style="display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border-bottom:${IA.bloqueDieta?'1px solid var(--border)':'none'};cursor:pointer">
+      <span style="font-size:18px">🥗</span>
+      <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--text)">Dieta</div></div>
+      ${dietaKcal?`<span style="font-size:11px;color:#15803d;background:var(--gl);padding:3px 9px;border-radius:6px;font-weight:600">${dietaKcal} kcal</span>`:''}
+      <span style="color:var(--text3);font-size:16px">${IA.bloqueDieta?'⌃':'⌄'}</span>
+    </div>
+    ${bloqueDietaBody}
+  </div>`;
+
+  // ════════════ BLOQUE ENTRENO ════════════
+  if(!IA.splitDraft) IA.splitDraft = _iaSplitInicial(c);
+  const tiposBtns = (dia,i)=>{
+    const todos = [...iaTiposDisponibles(),'OFF'];
+    return todos.map(t=>{
+      const on=dia.tipo===t; const col=iaTipoCol(t);
+      return `<span onclick="iaSetSplitDia(${i},'${t}')" style="font-size:11px;padding:5px 10px;border-radius:8px;cursor:pointer;font-weight:${on?'700':'600'};background:${on?(t==='OFF'?'var(--bg3)':col+'1a'):'var(--bg)'};color:${on?col:'var(--text3)'};border:1.5px solid ${on?col:'var(--border)'}">${iaTipoLbl(t)}</span>`;
+    }).join('') + `<span onclick="iaNuevoTipo(${i})" title="Crear tipo de día propio" style="font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer;font-weight:700;background:var(--bg);color:var(--accent);border:1.5px dashed var(--accent)">+ tipo</span>`;
+  };
+  const gruposBox = (dia,i)=>{
+    if(dia.tipo==='OFF') return '';
+    const grupos = dia.grupos||[];
+    const totalEj = grupos.reduce((s,g)=>s+(g.n||0),0);
+    const abierto = !!IA.gruposAbiertos[i];
+    const cab = `<div onclick="iaToggleGrupos(${i})" style="display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--border);cursor:pointer">
+      <span style="font-size:11.5px;color:var(--accent);font-weight:600;flex:1">Grupos musculares${grupos.length?' ('+grupos.length+' grupos'+(totalEj?' · '+totalEj+' ejercicios':'')+')':''}</span>
+      <span style="color:var(--text3);font-size:13px">${abierto?'⌃':'⌄'}</span></div>`;
+    if(!abierto) return cab;
+    const filasG = grupos.map((g,gi)=>`<div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12.5px;flex:1;color:var(--text)">${escHtml(g.nombre)}</span>
+      <div style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px">
+        <span onclick="iaGrupoN(${i},${gi},-1)" style="width:23px;height:23px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:var(--text2)">−</span>
+        <span style="font-family:'Geist Mono';font-size:13px;width:16px;text-align:center;font-weight:600;color:var(--text)">${g.n}</span>
+        <span onclick="iaGrupoN(${i},${gi},1)" style="width:23px;height:23px;border-radius:6px;background:var(--text);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;color:#fff">+</span>
+        <span onclick="iaQuitarGrupo(${i},${gi})" title="Quitar grupo" style="width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text3)">✕</span>
+      </div></div>`).join('');
+    return cab + `<div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-top:8px">
+      <div style="display:flex;flex-direction:column;gap:7px">${filasG||'<div style="font-size:12px;color:var(--text3)">Sin grupos. Añade uno o deja que la IA decida.</div>'}</div>
+      <div style="margin-top:9px"><span onclick="iaNuevoGrupo(${i})" style="font-size:11.5px;color:var(--accent);cursor:pointer;font-weight:600">+ Añadir grupo</span></div>
+    </div>`;
+  };
+  const filasSplit = IA.splitDraft.map((dia,i)=>`<div style="border:1.5px solid var(--border);border-radius:11px;padding:11px 12px;background:var(--bg)">
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--text2);width:28px;flex-shrink:0">D${i+1}</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">${tiposBtns(dia,i)}</div>
+    </div>
+    ${gruposBox(dia,i)}
+  </div>`).join('');
+  const nEntreno = IA.splitDraft.filter(d=>d.tipo!=='OFF').length;
+  const nPlantillas = (TRAINING_TEMPLATES||[]).filter(_iaEsPlantillaConfig).length;
+  const bloqueEntrenoBody = IA.bloqueEntreno ? `<div style="padding:15px">
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'biblioteca','📚','Mi biblioteca','Tus ejercicios guardados')}
+      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'ia','✨','Que la IA proponga','Orientativo')}
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Split — ${nEntreno} días de entreno · <span onclick="iaSetDias()" style="color:var(--accent);cursor:pointer">cambiar nº</span></div>
+      <div style="display:flex;gap:6px">
+        <button onclick="iaCargarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">📂 Plantilla${nPlantillas?' ('+nPlantillas+')':''}</button>
+        <button onclick="iaGuardarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--accent);background:#f3f0ff;color:var(--accent);cursor:pointer">💾 Guardar</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${filasSplit}</div>
+    <textarea id="ia-ind-entreno" oninput="IA.indicacionesEntreno=this.value" placeholder="Indicaciones para el entreno (opcional): prioriza pecho, evita sentadilla por la rodilla…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesEntreno||'')}</textarea>
+    <button onclick="iaGenerarEntreno()" ${IA.generandoEntreno?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoEntreno?'var(--bg3)':'linear-gradient(135deg,#7c3aed,#9333ea)'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoEntreno?'wait':'pointer'}">${IA.generandoEntreno?'Generando entreno…':'✨ Generar entreno'}</button>
+    ${IA.propEntreno?iaPropEntrenoHtml():''}
+  </div>` : '';
+  const bloqueEntreno = `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
+    <div onclick="IA.bloqueEntreno=!IA.bloqueEntreno;renderClientPanel()" style="display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border-bottom:${IA.bloqueEntreno?'1px solid var(--border)':'none'};cursor:pointer">
+      <span style="font-size:18px">🏋️</span>
+      <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--text)">Entreno</div></div>
+      <span style="font-size:11px;color:var(--blue);background:var(--bl);padding:3px 9px;border-radius:6px;font-weight:600">${nEntreno} días</span>
+      <span style="color:var(--text3);font-size:16px">${IA.bloqueEntreno?'⌃':'⌄'}</span>
+    </div>
+    ${bloqueEntrenoBody}
+  </div>`;
+
+  return bloqueDieta + bloqueEntreno;
+}
+
+// campo de preferencia editable (para el desplegable de dieta)
+function _iaPrefField(lbl,id,val){
+  return `<div style="margin-bottom:9px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">${lbl}</div>
+    <textarea id="${id}" style="width:100%;min-height:38px;border:1.5px solid var(--border);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg2)">${escHtml(val||'')}</textarea></div>`;
 }
 
 // split inicial para el generador: a partir del split del cliente, o uno por defecto
@@ -14089,8 +14154,33 @@ function _iaSplitInicial(c){
 }
 
 function iaToggle(){ IA.open=!IA.open; renderClientPanel(); }
-function iaSetModo(m){ IA.modo=m; renderClientPanel(); }
-function iaSetFuente(f){ IA.fuente=f; renderClientPanel(); }
+function iaSetFuenteDieta(f){ IA.fuenteDieta=f; renderClientPanel(); }
+function iaSetFuenteEntreno(f){ IA.fuenteEntreno=f; renderClientPanel(); }
+function iaToggleGrupos(i){ IA.gruposAbiertos[i] = !IA.gruposAbiertos[i]; renderClientPanel(); }
+// guardar las preferencias editadas en el cuestionario (sincroniza con el plan)
+async function iaGuardarPrefs(){
+  const c=currentClient; if(!c) return;
+  const val=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
+  const fila={
+    client_id:c.id,
+    allergies:val('cq2-allergies')||null,
+    disliked_foods:val('cq2-disliked_foods')||null,
+    diseases:val('cq2-diseases')||null,
+    supplements:val('cq2-supplements')||null
+  };
+  try{
+    let res;
+    if(c._questionnaire && c._questionnaire.id){
+      res = await sb.from('client_questionnaire').update(fila).eq('id',c._questionnaire.id).select('*').single();
+    } else {
+      res = await sb.from('client_questionnaire').insert(fila).select('*').single();
+    }
+    if(res.error){ showToast('No se pudo guardar: '+(res.error.message||'')); return; }
+    c._questionnaire = Object.assign({}, c._questionnaire, res.data);
+    showToast('✓ Preferencias guardadas');
+    renderClientPanel();
+  }catch(e){ console.error(e); showToast('No se pudo guardar'); }
+}
 
 // cambiar el tipo de un día → recarga sus grupos por defecto
 function iaSetSplitDia(i,t){
@@ -14206,35 +14296,59 @@ async function iaBorrarPlantilla(id){
   }catch(e){ console.error(e); showToast('No se pudo borrar'); }
 }
 
-// ── Generación ────────────────────────────────────────────────────────────
-async function iaGenerar(){
+// ── Generación (botones separados por bloque) ─────────────────────────────
+async function iaGenerarDieta(){
   const c = currentClient; if(!c) return;
-  if(IA.modo!=='nutricion' && (!IA.splitDraft || !IA.splitDraft.some(d=>d.tipo!=='OFF'))){
-    showToast('Marca al menos un día de entreno en el split'); return;
-  }
-  IA.generando=true; IA.propEntreno=null; IA.propDieta=null;
-  IA.entrenoAplicado=false; IA.dietaAplicado=false;
+  // sincronizar macros editados con el plan nutricional antes de generar
+  await _iaSyncMacros(c);
+  IA.generandoDieta=true; IA.propDieta=null; IA.dietaAplicado=false;
   renderClientPanel();
-  const ctx = _iaContexto(c);
-  let errEntreno=null, errDieta=null;
-  if(IA.modo!=='nutricion'){
-    try{ IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos'; }
-    catch(e){ console.error('IA entreno:',e); errEntreno=e.message||'error'; }
-    renderClientPanel();
-  }
-  if(IA.modo!=='entreno'){
-    try{ IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1; }
-    catch(e){ console.error('IA dieta:',e); errDieta=e.message||'error'; }
-  }
-  IA.generando=false; renderClientPanel();
-  // Mensajes según qué salió
-  if(errEntreno && errDieta){ showToast('Error IA: '+errDieta); }
-  else if(errEntreno){ showToast('El entreno falló: '+errEntreno); }
-  else if(errDieta){ showToast('La dieta falló: '+errDieta+' (el entreno sí se generó)'); }
-  else { showToast('✓ Propuesta lista — revísala antes de aplicar'); }
+  try{
+    const ctx = _iaContexto(c,'dieta');
+    IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1;
+    showToast('✓ Dieta lista — revísala antes de aplicar');
+  }catch(e){ console.error('IA dieta:',e); showToast('La dieta falló: '+(e.message||'inténtalo de nuevo')); }
+  finally{ IA.generandoDieta=false; renderClientPanel(); }
+}
+async function iaGenerarEntreno(){
+  const c = currentClient; if(!c) return;
+  if(!IA.splitDraft || !IA.splitDraft.some(d=>d.tipo!=='OFF')){ showToast('Marca al menos un día de entreno en el split'); return; }
+  IA.generandoEntreno=true; IA.propEntreno=null; IA.entrenoAplicado=false;
+  renderClientPanel();
+  try{
+    const ctx = _iaContexto(c,'entreno');
+    IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos';
+    showToast('✓ Entreno listo — revísalo antes de aplicar');
+  }catch(e){ console.error('IA entreno:',e); showToast('El entreno falló: '+(e.message||'inténtalo de nuevo')); }
+  finally{ IA.generandoEntreno=false; renderClientPanel(); }
 }
 
-function _iaContexto(c){
+// sincroniza los macros editados en el bloque dieta con el plan nutricional (Supabase)
+async function _iaSyncMacros(c){
+  const g = id => { const el=document.getElementById(id); return el?parseFloat(el.value)||0:null; };
+  const kcal=g('ia-d-kcal'), prot=g('ia-d-prot'), carb=g('ia-d-carb'), fat=g('ia-d-fat');
+  if(kcal===null) return; // bloque no visible
+  if(!c._nutrition || !c._nutrition.plan){
+    // crear plan si no existe
+    try{
+      const {data} = await sb.from('nutrition_plans').insert({
+        client_id:c.id, coach_id:coachData.id, kcal_goal:kcal, protein_g:prot, carbs_g:carb, fat_g:fat,
+        is_active:true, activation_date:new Date().toISOString().slice(0,10)
+      }).select().single();
+      if(data){ if(!c._nutrition) c._nutrition={}; c._nutrition.plan=data; c._nutrition.options=c._nutrition.options||[]; }
+    }catch(e){ console.warn('crear plan en sync:',e); }
+  } else {
+    const p=c._nutrition.plan;
+    if(p.kcal_goal!==kcal||p.protein_g!==prot||p.carbs_g!==carb||p.fat_g!==fat){
+      try{
+        await sb.from('nutrition_plans').update({kcal_goal:kcal,protein_g:prot,carbs_g:carb,fat_g:fat}).eq('id',p.id);
+        p.kcal_goal=kcal; p.protein_g=prot; p.carbs_g=carb; p.fat_g=fat;
+      }catch(e){ console.warn('sync macros:',e); }
+    }
+  }
+}
+
+function _iaContexto(c, cual){
   const q = c._questionnaire || {};
   const objetivo = q.goal || (c.goal) || 'no especificado';
   const dias = q.available_days_per_week || null;
@@ -14252,7 +14366,11 @@ function _iaContexto(c){
     comidasDia?`Comidas al día: ${comidasDia}.`:'',
     suplementos?`Suplementos: ${suplementos}.`:''
   ].filter(Boolean).join(' ');
-  return { objetivo, dias, kcal, alergias, macros, extra, indicaciones: IA.indicaciones||'ninguna', usarBiblioteca: IA.fuente==='biblioteca' };
+  return {
+    objetivo, dias, kcal, alergias, macros, extra,
+    indicaciones: (cual==='dieta'?IA.indicacionesDieta:IA.indicacionesEntreno)||'ninguna',
+    usarBiblioteca: (cual==='dieta'?IA.fuenteDieta:IA.fuenteEntreno)==='biblioteca'
+  };
 }
 
 async function _iaGenerarEntreno(c, ctx){
@@ -14341,7 +14459,7 @@ function iaPropEntrenoHtml(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de entreno · revísala</span>
       <div style="display:flex;gap:7px">
-        <button onclick="iaGenerar()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
+        <button onclick="iaGenerarEntreno()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
         <button onclick="iaAplicarEntreno()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar entreno</button>
       </div>
     </div>
@@ -14378,7 +14496,7 @@ function iaPropDietaHtml(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de dieta · ${p.opciones.length} opciones</span>
       <div style="display:flex;gap:7px">
-        <button onclick="iaGenerar()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
+        <button onclick="iaGenerarDieta()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
         <button onclick="iaAplicarDieta()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar dieta</button>
       </div>
     </div>

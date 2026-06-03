@@ -2681,26 +2681,27 @@ async function callIA(system, user, maxTokens=4000, jsonMode=true){
       generationConfig: genCfg
     });
     const esperar = ms => new Promise(r=>setTimeout(r,ms));
-    const MAX_INTENTOS = 3;
+    const MAX_INTENTOS = 5;
     let ultimoErr = '';
     for(let intento=1; intento<=MAX_INTENTOS; intento++){
       let res, data;
       try{ res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body}); }
-      catch(e){ ultimoErr='Sin conexión con la IA'; await esperar(1200*intento); continue; }
-      try{ data = await res.json(); }catch(e){ ultimoErr='Respuesta no válida de la IA'; await esperar(1200*intento); continue; }
+      catch(e){ ultimoErr='Sin conexión con la IA'; await esperar(1500*intento); continue; }
+      try{ data = await res.json(); }catch(e){ ultimoErr='Respuesta no válida de la IA'; await esperar(1500*intento); continue; }
       // error de la API
       if(data.error){
         const msg = data.error.message||'Error Gemini API';
         const code = data.error.code || res.status;
         const temporal = code===429 || code===503 || code===500 || /high demand|overloaded|temporar|try again|unavailable|exceeded/i.test(msg);
         ultimoErr = msg;
-        if(temporal && intento<MAX_INTENTOS){ await esperar(1500*intento); continue; } // reintentar
+        // espera progresiva más larga ante saturación: 2s, 4s, 6s, 8s
+        if(temporal && intento<MAX_INTENTOS){ await esperar(2000*intento); continue; }
         throw new Error(msg);
       }
       const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
       if(!txt){
         ultimoErr = 'La IA no devolvió respuesta';
-        if(intento<MAX_INTENTOS){ await esperar(1200*intento); continue; }
+        if(intento<MAX_INTENTOS){ await esperar(1500*intento); continue; }
         throw new Error(ultimoErr);
       }
       return txt; // éxito
@@ -14351,15 +14352,37 @@ async function iaBorrarPlantilla(id){
 // ── Generación (botones separados por bloque) ─────────────────────────────
 async function iaGenerarDieta(){
   const c = currentClient; if(!c) return;
-  // sincronizar macros editados con el plan nutricional antes de generar
   await _iaSyncMacros(c);
   IA.generandoDieta=true; IA.propDieta=null; IA.dietaAplicado=false;
   renderClientPanel();
   try{
     const ctx = _iaContexto(c,'dieta');
-    IA.propDieta = await _iaGenerarDieta(c, ctx); IA.opcionActiva=1;
-    showToast('✓ Dieta lista — revísala antes de aplicar');
-  }catch(e){ console.error('IA dieta:',e); showToast('La dieta falló: '+(e.message||'inténtalo de nuevo')); }
+    IA.propDieta = await _iaGenerarDieta(c, ctx, []); IA.opcionActiva=1;
+    const n=(IA.propDieta.opciones||[]).length;
+    showToast(n>=7?'✓ Dieta lista — revísala antes de aplicar':`✓ Dieta lista con ${n} opciones (Gemini iba saturado; pulsa "Completar las que faltan")`);
+  }catch(e){
+    console.error('IA dieta:',e);
+    const sat=/high demand|overloaded|unavailable|429|503|temporar/i.test(e.message||'');
+    showToast(sat?'Gemini está saturado ahora mismo. Espera 1-2 min y vuelve a darle a Generar dieta.':'La dieta falló: '+(e.message||'inténtalo de nuevo'));
+  }
+  finally{ IA.generandoDieta=false; renderClientPanel(); }
+}
+// completa las opciones que falten SIN borrar las que ya tienes
+async function iaCompletarDieta(){
+  const c = currentClient; if(!c||!IA.propDieta) return;
+  const previas = IA.propDieta.opciones||[];
+  if(previas.length>=7){ showToast('Ya tienes las 7 opciones'); return; }
+  IA.generandoDieta=true; renderClientPanel();
+  try{
+    const ctx = _iaContexto(c,'dieta');
+    IA.propDieta = await _iaGenerarDieta(c, ctx, previas);
+    const n=(IA.propDieta.opciones||[]).length;
+    showToast(n>=7?'✓ Completada — ya tienes las 7 opciones':`Añadidas algunas. Ahora tienes ${n}. Si falta, pulsa de nuevo.`);
+  }catch(e){
+    console.error('IA completar dieta:',e);
+    const sat=/high demand|overloaded|unavailable|429|503|temporar/i.test(e.message||'');
+    showToast(sat?'Gemini sigue saturado. Espera 1-2 min y pulsa otra vez.':'No se pudieron añadir más: '+(e.message||''));
+  }
   finally{ IA.generandoDieta=false; renderClientPanel(); }
 }
 async function iaGenerarEntreno(){
@@ -14371,7 +14394,11 @@ async function iaGenerarEntreno(){
     const ctx = _iaContexto(c,'entreno');
     IA.propEntreno = await _iaGenerarEntreno(c, ctx); IA.filtroDia='todos';
     showToast('✓ Entreno listo — revísalo antes de aplicar');
-  }catch(e){ console.error('IA entreno:',e); showToast('El entreno falló: '+(e.message||'inténtalo de nuevo')); }
+  }catch(e){
+    console.error('IA entreno:',e);
+    const sat=/high demand|overloaded|unavailable|429|503|temporar/i.test(e.message||'');
+    showToast(sat?'Gemini está saturado ahora mismo. Espera 1-2 min y vuelve a darle a Generar entreno.':'El entreno falló: '+(e.message||'inténtalo de nuevo'));
+  }
   finally{ IA.generandoEntreno=false; renderClientPanel(); }
 }
 
@@ -14465,7 +14492,10 @@ Responde EXACTAMENTE este JSON (incluye el grupo de cada ejercicio):
   return data;
 }
 
-async function _iaGenerarDieta(c, ctx){
+async function _iaGenerarDieta(c, ctx, opcionesPrevias){
+  const previas = Array.isArray(opcionesPrevias)?opcionesPrevias:[];
+  const TOTAL = 7;
+  if(previas.length>=TOTAL) return { supermercado:ctx.supermercado||'', opciones:previas, compra:(IA.propDieta&&IA.propDieta.compra)||[] };
   let bibTxt='';
   if(ctx.usarBiblioteca && typeof FOOD_LIBRARY!=='undefined' && FOOD_LIBRARY.length){
     const lineas = FOOD_LIBRARY.slice(0,60).map(f=>`${f.name} (${f.kcal||'?'}kcal, P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
@@ -14475,7 +14505,7 @@ async function _iaGenerarDieta(c, ctx){
   const superTxt = ctx.supermercado
     ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos y marcas reales de ${ctx.supermercado} (no mezcles supermercados).`
     : `En "marca" sugiere productos de UN ÚNICO supermercado español coherente para toda la dieta (elige uno: Mercadona/Hacendado, Lidl, Carrefour…) y mantén ese mismo supermercado en todos los alimentos. No mezcles supermercados.`;
-  // Generar en 2 tandas para no agotar el límite de tokens y evitar JSON cortado
+  // pide un rango de opciones; conCompra solo en la primera tanda cuando no hay nada previo
   const pedirTanda = async (desde, hasta, conCompra)=>{
     const usr = `Genera las opciones de menú diario numeradas del ${desde} al ${hasta} (${hasta-desde+1} opciones). Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
 ${ctx.extra}
@@ -14491,17 +14521,29 @@ Responde EXACTAMENTE este JSON${conCompra?'':' (sin campo compra)'}:
 {"supermercado":"Mercadona","opciones":[{"n":${desde},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}]${conCompra?',"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]':''}}`;
     return parseIAJson(await callIA(sys, usr, 12000));
   };
-  // Tanda 1: opciones 1-4 + lista de la compra. Tanda 2: opciones 5-7.
-  const t1 = await pedirTanda(1,4,true);
-  let opciones = (t1.opciones||[]).slice();
-  let compra = t1.compra||[];
-  let supermercado = t1.supermercado||ctx.supermercado||'';
-  try{
-    const t2 = await pedirTanda(5,7,false);
-    opciones = opciones.concat(t2.opciones||[]);
-  }catch(e){ console.warn('tanda 2 dieta falló, sigo con las que hay:',e); }
+
+  let opciones = previas.slice();
+  let compra = (IA.propDieta&&IA.propDieta.compra)||[];
+  let supermercado = (IA.propDieta&&IA.propDieta.supermercado)||ctx.supermercado||'';
+
+  if(previas.length===0){
+    // generación desde cero en 2 tandas: 1-4 (con compra) y 5-7
+    const t1 = await pedirTanda(1,4,true);
+    opciones = (t1.opciones||[]).slice();
+    compra = t1.compra||[];
+    supermercado = t1.supermercado||supermercado;
+    try{
+      const t2 = await pedirTanda(5,7,false);
+      opciones = opciones.concat(t2.opciones||[]);
+    }catch(e){ console.warn('tanda 2 dieta falló, sigo con las que hay:',e); }
+  } else {
+    // completar solo las que faltan (ej: tengo 4 → pido 5-7)
+    const faltan = TOTAL - previas.length;
+    const t = await pedirTanda(previas.length+1, TOTAL, opciones.length && !compra.length);
+    opciones = opciones.concat(t.opciones||[]);
+    if(!compra.length && t.compra) compra = t.compra;
+  }
   if(!opciones.length) throw new Error('La IA no devolvió opciones de dieta');
-  // renumerar por si acaso
   opciones.forEach((o,i)=>{ o.n=i+1; });
   return { supermercado, opciones, compra };
 }
@@ -14614,8 +14656,9 @@ function iaPropDietaHtml(){
   return `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de dieta · ${p.opciones.length} opciones</span>
-      <div style="display:flex;gap:7px">
-        <button onclick="iaGenerarDieta()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        ${p.opciones.length<7?`<button onclick="iaCompletarDieta()" ${IA.generandoDieta?'disabled':''} style="font-size:12px;font-weight:700;color:#fff;padding:7px 13px;border:none;border-radius:9px;cursor:${IA.generandoDieta?'wait':'pointer'};background:linear-gradient(135deg,#7c3aed,#9333ea)">${IA.generandoDieta?'Completando…':'+ Completar las que faltan ('+(7-p.opciones.length)+')'}</button>`:''}
+        <button onclick="iaGenerarDieta()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar todo</button>
         <button onclick="iaAplicarDieta()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar dieta</button>
       </div>
     </div>

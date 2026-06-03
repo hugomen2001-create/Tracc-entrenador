@@ -545,7 +545,7 @@ canvas{width:100%!important}
 .help-body b{color:var(--text)}
 .help-body code{background:var(--bg3);padding:1px 5px;border-radius:5px;font-size:12px;font-family:'Geist Mono',monospace}
 .help-tip{display:flex;gap:8px;background:#fef9ed;border:1px solid #f5e3b8;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:12.5px;color:#7a5a12;line-height:1.5}
-.help-tip::before{content:'💡';flex-shrink:0}
+.help-tip::before{content:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>';flex-shrink:0}
 .help-tip b{color:#5a4209}
 #help-fab:hover{border-color:var(--green)}
 .reorg-ic:hover .reorg-tip{opacity:1 !important;visibility:visible !important}
@@ -829,7 +829,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
             </div>
             <div class="lg-inp-wrap">
               <input class="lg-inp" type="password" id="lg-pwd" placeholder="••••••••" autocomplete="current-password" oninput="lgValidateLogin()" onkeydown="if(event.key==='Enter')lgDoLogin()">
-              <span class="lg-inp-icon" id="lg-pwd-eye" onclick="lgTogglePwd('lg-pwd','lg-pwd-eye')">👁</span>
+              <span class="lg-inp-icon" id="lg-pwd-eye" onclick="lgTogglePwd('lg-pwd','lg-pwd-eye')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
             </div>
           </div>
           <div class="lg-check-row" onclick="lgToggleRemember()">
@@ -903,7 +903,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
           <div class="lg-badge">Paso 2 de 2</div>
         </div>
         <div class="lg-success">
-          <div style="width:52px;height:52px;border-radius:50%;background:#eff6ff;border:2px solid rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;margin-bottom:8px;font-size:22px">📧</div>
+          <div style="width:52px;height:52px;border-radius:50%;background:#eff6ff;border:2px solid rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;margin-bottom:8px;font-size:22px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></div>
           <div class="lg-success-title" style="font-size:22px">Revisa tu email</div>
           <div style="font-size:13px;color:#a3a39e;margin-top:4px;text-align:center;line-height:1.5">Hemos enviado un enlace a<br><span style="color:#6b6b66;font-weight:600" id="lg-recover-email-shown">tu email</span></div>
           <div class="lg-info-card">
@@ -929,7 +929,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
             <div class="lg-field-lbl">Nueva contraseña</div>
             <div class="lg-inp-wrap">
               <input class="lg-inp" type="password" id="lg-new-pwd" placeholder="••••••••••" autocomplete="new-password" oninput="lgValidateNewPwd()">
-              <span class="lg-inp-icon" id="lg-new-pwd-eye" onclick="lgTogglePwd('lg-new-pwd','lg-new-pwd-eye')">👁</span>
+              <span class="lg-inp-icon" id="lg-new-pwd-eye" onclick="lgTogglePwd('lg-new-pwd','lg-new-pwd-eye')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
             </div>
           </div>
           <div class="lg-field">
@@ -1102,7 +1102,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       <div><div class="coach-name">Pol De Blas</div><div class="coach-role">Entrenador personal</div></div>
       <div style="margin-left:auto;display:flex;gap:5px">
         <button onclick="startTour()" title="Ver el tour de bienvenida" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:13px;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">?</button>
-        <button onclick="openGeminiKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
+        <button onclick="openGeminiKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 5.4h.09A1.65 1.65 0 0 0 10 3.6V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 9v.09A1.65 1.65 0 0 0 21 10h.09"/></svg></button>
         <button onclick="lgLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);display:flex;align-items:center;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
@@ -1495,7 +1495,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   <div class="modal-box" style="width:480px">
     <div class="modal-hdr">
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:36px;height:36px;border-radius:10px;background:var(--al);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0">⚡</div>
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--al);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
         <div>
           <div class="modal-title" style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:400">Actividad física</div>
           <div style="font-size:11.5px;color:var(--text3);margin-top:1px">Registro semanal del cliente</div>
@@ -1540,7 +1540,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   <div class="chart-modal-box">
     <div class="modal-hdr">
       <div style="display:flex;align-items:center;gap:12px">
-        <div id="chart-modal-icon" style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0">📊</div>
+        <div id="chart-modal-icon" style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 3v18h18M7 16v-5M12 16V8M17 16v-9"/></svg></div>
         <div>
           <div class="modal-title" id="chart-modal-title" style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:400">Pasos diarios</div>
           <div style="font-size:11.5px;color:var(--text3);margin-top:1px" id="chart-modal-sub"></div>
@@ -1710,8 +1710,10 @@ function lgGoto(screen){
 function lgTogglePwd(inputId, eyeId){
   const inp = document.getElementById(inputId);
   const eye = document.getElementById(eyeId);
-  if (inp.type === 'password'){ inp.type = 'text'; eye.textContent = '🙈'; }
-  else { inp.type = 'password'; eye.textContent = '👁'; }
+  const ojoAbierto = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const ojoTachado = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c7 0 10 7 10 7a13.2 13.2 0 0 1-1.7 2.7M6.6 6.6A13.3 13.3 0 0 0 2 11s3 7 10 7a10.9 10.9 0 0 0 3.4-.5M14.1 14.1a3 3 0 0 1-4.2-4.2M2 2l20 20"/></svg>';
+  if (inp.type === 'password'){ inp.type = 'text'; eye.innerHTML = ojoTachado; }
+  else { inp.type = 'password'; eye.innerHTML = ojoAbierto; }
 }
 
 function lgToggleRemember(){
@@ -2126,7 +2128,7 @@ function _tourPaint(step){
 window.addEventListener('resize', ()=>{ if(document.getElementById('tour-root')) _tourPaint(TOUR_STEPS[_tourIdx]); });
 
 // ─────────────────────────────────────────────────────────────
-// AYUDA CONTEXTUAL (botón 📖 que explica la pantalla actual)
+// AYUDA CONTEXTUAL (botón <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> que explica la pantalla actual)
 // Panel deslizante desde la derecha. El contenido depende de
 // en qué sección/pestaña esté el entrenador.
 // ─────────────────────────────────────────────────────────────
@@ -2141,10 +2143,10 @@ const HELP_CONTENT = {
     <div class="help-tip">Empieza el día aquí: si alguien aparece en alerta, entra y escríbele.</div>` },
   editar: { t:'Editar plan', h:`
     <p>Aquí montas el <b>plan completo</b> del cliente: dieta y entrenamiento. Lo que cambies se guarda en su cuenta y lo ve en MyTracc.</p>
-    <h4>🍎 Plan nutricional</h4>
+    <h4><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 6c0-2 1-3 3-3M12 6c-3 0-6 2-6 6 0 5 3 9 6 9s6-4 6-9c0-4-3-6-6-6Z"/></svg> Plan nutricional</h4>
     <p>Defines los <b>objetivos diarios</b> (kcal y macros) y creas varias <b>opciones de dieta</b> intercambiables.</p>
     <div class="help-tip">Usa la <b>biblioteca de alimentos</b>: creas un alimento una vez con sus macros y lo reutilizas, así los datos son exactos.</div>
-    <h4>🏋️ Plan de entreno</h4>
+    <h4><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg> Plan de entreno</h4>
     <p>Eliges el <b>split</b> (qué toca cada día) y añades los <b>ejercicios por sesión</b> con series, reps y descansos.</p>
     <p>Con <b>“Programar cambio”</b> dejas listo un plan nuevo que entra en una fecha futura.</p>
     <div class="help-tip">Pulsa <b>Guardar plan completo</b> al terminar para que el cliente lo reciba.</div>` },
@@ -2194,7 +2196,7 @@ function _ensureHelpFab(){
   fab.title='Ayuda de esta pantalla';
   fab.onclick=()=>openHelp();
   fab.style.cssText='position:fixed;bottom:20px;right:20px;z-index:500;display:flex;align-items:center;gap:7px;background:var(--bg2);border:1.5px solid var(--gm);color:var(--green);font-size:13px;font-weight:600;padding:9px 14px;border-radius:12px;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(0,0,0,.12)';
-  fab.innerHTML='<span style="font-size:15px">📖</span> Ayuda';
+  fab.innerHTML='<span style="font-size:15px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg></span> Ayuda';
   document.body.appendChild(fab);
 }
 function openHelp(key){
@@ -2207,13 +2209,13 @@ function openHelp(key){
     <div id="help-panel" style="position:fixed;top:0;right:0;width:min(360px,90vw);height:100%;background:var(--bg2);border-left:1px solid var(--border);z-index:601;box-shadow:-8px 0 30px rgba(0,0,0,.12);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease">
       <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">📖 Ayuda de esta pantalla</div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Ayuda de esta pantalla</div>
           <div style="font-family:'DM Serif Display',serif;font-size:19px;color:var(--text)">${c.t}</div>
         </div>
         <div onclick="closeHelp()" style="width:28px;height:28px;min-width:28px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:15px;cursor:pointer">✕</div>
       </div>
       <div class="help-body" style="padding:16px 18px;overflow-y:auto;font-size:13px;color:var(--text2);line-height:1.65">${c.h}
-        <button onclick="closeHelp();openGuiaCompleta()" style="width:100%;margin-top:16px;height:42px;border-radius:11px;background:var(--gl);border:1.5px solid var(--gm);color:#15803d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px">📚 Ver guía completa</button>
+        <button onclick="closeHelp();openGuiaCompleta()" style="width:100%;margin-top:16px;height:42px;border-radius:11px;background:var(--gl);border:1.5px solid var(--gm);color:#15803d;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Ver guía completa</button>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)">¿Sigues con dudas? Escríbenos a <b>tracc.support@gmail.com</b> y te ayudamos.</div>
       </div>
     </div>`;
@@ -2231,47 +2233,47 @@ function closeHelp(){
 // calendario del cliente, cuota/pagos y cómo usa MyTracc el cliente.
 // ══════════════════════════════════════════════════════════════════════════
 const GUIA_SECCIONES = [
-  { icon:'🚀', t:'Primeros pasos', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>', t:'Primeros pasos', h:`
     <p>Tienes <b>dos formas</b> de empezar a trabajar con tus clientes en Tracc:</p>
     <h4>Crear un cliente desde cero</h4>
     <p>En la barra lateral, pulsa <b>"+ Nuevo cliente"</b>. Rellenas su nombre (lo único obligatorio) y, si quieres, su email. El <b>email es clave</b>: es lo que vincula la ficha con la cuenta de MyTracc cuando el cliente se registre con ese mismo correo.</p>
     <h4>Importar con Excel</h4>
     <p>Si vienes de otra herramienta, en la barra lateral entra en <b>"Importar"</b>. Descarga la plantilla <code>.xlsx</code> (trae pestañas: Clientes, Métricas, Entrenos, Rutina y Nutrición), rellénala y súbela. Verás un resumen antes de confirmar.</p>
     <div class="help-tip">¿No quieres montarlo tú? Con el extra de puesta en marcha nos pasas tus archivos y te lo dejamos listo.</div>` },
-  { icon:'📊', t:'El día a día', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 3v18h18M7 16v-5M12 16V8M17 16v-9"/></svg>', t:'El día a día', h:`
     <p>Tu punto de partida cada día es la <b>Vista general</b>: ves de un vistazo cómo van todos tus clientes (al día, los que necesitan atención y la adherencia general), con alertas de quien lleva días sin registrar.</p>
     <p>Pulsa cualquier cliente para abrir su <b>ficha</b>, que tiene cuatro pestañas: Resumen, Seguimiento, Editar plan y Perfil.</p>
     <p>En <b>Resumen</b> ves su día a día: entrenos de la semana, métricas de hoy (pasos, sueño, peso), dieta y próximas citas. Todo lo que el cliente registra en MyTracc aparece aquí al instante.</p>
     <div class="help-tip">Si en el Resumen ves el icono de nota junto a un ejercicio del último entreno, el cliente te dejó un comentario ahí. Púlsalo para leerlo.</div>` },
-  { icon:'✏️', t:'Editar el plan', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>', t:'Editar el plan', h:`
     <p>En <b>Editar plan</b> montas el entrenamiento y la dieta del cliente. Lo que guardes se sincroniza con su MyTracc.</p>
-    <h4>🏋️ Entrenamiento</h4>
+    <h4><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg> Entrenamiento</h4>
     <p>Eliges el <b>split</b> (qué toca cada día) y añades los <b>ejercicios por sesión</b> con series, reps y descansos. Con "Programar cambio" dejas listo un plan que entra en una fecha futura.</p>
-    <h4>🍎 Nutrición</h4>
+    <h4><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 6c0-2 1-3 3-3M12 6c-3 0-6 2-6 6 0 5 3 9 6 9s6-4 6-9c0-4-3-6-6-6Z"/></svg> Nutrición</h4>
     <p>Defines los <b>objetivos diarios</b> (kcal y macros) y creas varias <b>opciones de dieta</b> intercambiables. Usa la biblioteca de alimentos: creas un alimento una vez con sus macros y lo reutilizas.</p>
     <div class="help-tip">Pulsa "Guardar plan completo" al terminar para que el cliente lo reciba.</div>` },
-  { icon:'📈', t:'Seguimiento', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"/></svg>', t:'Seguimiento', h:`
     <p>El progreso del cliente en formato de <b>hoja de cálculo</b>.</p>
     <p>Filtras por tipo de entreno (Push / Pull / Leg…) y eliges entre dos vistas:</p>
     <p><b>Vista completa:</b> matriz con ejercicios en filas y cada entreno en columnas (1, 2, 3…). Ves la progresión de cargas de un vistazo; en verde, las mejoras.</p>
     <p><b>Por sesión:</b> eliges una sesión y ves cada ejercicio con sus series.</p>
     <p>Arriba se mantiene el resumen de actividad y abajo el historial de sesiones completadas.</p>` },
-  { icon:'📅', t:'Agenda y citas', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>', t:'Agenda y citas', h:`
     <p>En <b>Agenda</b> (barra lateral) tienes tu calendario de citas con todos los clientes, en vista mes o lista, con filtros por cliente y tipo.</p>
     <h4>Crear y proponer</h4>
     <p>Con <b>"Nueva cita"</b> propones una cita a un cliente (revisión, llamada, sesión…). Puedes hacerla recurrente (cada semana o cada dos). Al cliente le llega para aceptar, rechazar o proponer otra hora.</p>
     <h4>Cuando el cliente propone</h4>
     <p>El cliente también puede proponerte citas desde MyTracc. Te llegan a la agenda: ábrelas y verás botones para <b>aceptar, rechazar o proponer otra hora</b>.</p>
     <p>En cada cita puedes marcar <b>asistencia</b> (realizada / no asistió) y dejar una <b>nota privada</b> que el cliente no ve.</p>` },
-  { icon:'🗓️', t:'Calendario del cliente', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 18h2M14 18h2"/></svg>️', t:'Calendario del cliente', h:`
     <p>Dentro de la ficha de un cliente, junto a su nombre, hay un <b>botón de calendario</b>.</p>
     <p>Abre un calendario solo de ese cliente, donde ves sus <b>citas</b> contigo (punto ámbar = por confirmar, verde = confirmada) y las <b>notas que te ha compartido</b> desde su MyTracc (punto morado).</p>
     <p>Es vuestro espacio común, aparte de la agenda general. Toca un día para ver el detalle. Las notas privadas del cliente nunca aparecen aquí.</p>` },
-  { icon:'💶', t:'Cuota y pagos', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 12h5M7 9h6M9 15a3 3 0 0 0 4-1"/></svg>', t:'Cuota y pagos', h:`
     <p>La <b>cuota</b> de cada cliente se configura en su <b>Perfil</b>: un resumen con botón "Ver / editar" que abre el detalle (importe, número de pagos, cada cuánto, enlace de pago y calendario de cobros).</p>
     <p>En <b>Pagos</b> (barra lateral) tienes tu resumen de negocio: ingresos al mes, cobrado, pendiente y precio medio, con la lista de clientes y su estado.</p>
     <div class="help-tip">Marca cada pago como cobrado desde el detalle de la cuota para que el resumen de Pagos cuadre.</div>` },
-  { icon:'📱', t:'Cómo usa MyTracc tu cliente', h:`
+  { icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>', t:'Cómo usa MyTracc tu cliente', h:`
     <p>Tu cliente tiene su propia app (MyTracc) con cuatro pestañas: <b>Inicio, Entreno, Dieta y Progreso</b>.</p>
     <p>Registra sus <b>entrenos</b> serie a serie con un temporizador de descanso; lo que apunta te llega a ti al instante. Puede dejar <b>notas en cada ejercicio</b> (las ves en su Resumen).</p>
     <p>Sigue su <b>dieta</b> con las opciones que le pusiste y registra <b>cheats</b>. Cada semana te manda un <b>check-in</b> (sueño, energía, hambre, cumplimiento), que tú ves en su Resumen toda la semana siguiente.</p>
@@ -2296,7 +2298,7 @@ function openGuiaCompleta(){
     <div id="guia-panel" style="position:fixed;top:0;right:0;width:min(460px,94vw);height:100%;background:var(--bg2);border-left:1px solid var(--border);z-index:611;box-shadow:-8px 0 30px rgba(0,0,0,.15);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .24s ease">
       <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-shrink:0">
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">📚 Guía de uso</div>
+          <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Guía de uso</div>
           <div style="font-family:'DM Serif Display',serif;font-size:21px;color:var(--text)">Todo sobre Tracc</div>
         </div>
         <div onclick="closeGuiaCompleta()" style="width:30px;height:30px;min-width:30px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:15px;cursor:pointer">✕</div>
@@ -2674,7 +2676,7 @@ function openGroqKeyModal() {
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
   modal.innerHTML=`
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;padding:28px">
-      <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px">⚙️ Configurar API de IA</div>
+      <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8.4l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 5.4h.09A1.65 1.65 0 0 0 10 3.6V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 9v.09A1.65 1.65 0 0 0 21 10h.09"/></svg> Configurar API de IA</div>
       <div style="font-size:13px;color:var(--text3);margin-bottom:4px">Introduce tu API key de Groq para activar la generación de planes con IA.</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:18px">Gratis en <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a> → API Keys → Create API Key. Se guarda solo en tu navegador.</div>
       <input id="groq-key-input" type="password" class="edit-input" placeholder="gsk_..." style="width:100%;margin-bottom:16px;font-family:monospace">
@@ -2837,7 +2839,7 @@ function openGeminiKeyModal(){
   const keyMask = yaHay ? (GEMINI_API_KEY.slice(0,6)+'••••••••'+GEMINI_API_KEY.slice(-4)) : '';
   modal.innerHTML=`
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;padding:26px">
-      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px">✨ ${yaHay?'IA configurada':'Activar la IA'}</div>
+      <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> ${yaHay?'IA configurada':'Activar la IA'}</div>
       ${yaHay
         ? `<div style="font-size:13px;color:var(--text3);margin-bottom:14px;line-height:1.5">Ya tienes una API key guardada en este navegador. No hace falta volver a meterla.</div>
            <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
@@ -2892,10 +2894,10 @@ const CLIENTS = [
     weekHistory:{'-7':{sessions:[true,true,true,true,true,true,true]},'-6':{sessions:[true,true,true,true,true,true,true]},'-5':{sessions:[true,true,true,true,true,true,true]},'-4':{sessions:[true,true,true,true,true,true,true]},'-3':{sessions:[true,true,true,true,true,true,true]},'-2':{sessions:[true,true,true,true,true,true,true]},'-1':{sessions:[true,true,true,true,true,true,true]},'0':{sessions:[false,true,true,false,false,false,false]},},
     todayMetrics:{steps:10420,sleep:7.5,weight:76.2,activity:68},
     actividades:[
-      {nombre:'Fútbol 7',tipo:'⚽',dia:'Lunes',kcal:480,min:70},
-      {nombre:'Caminar',tipo:'🚶',dia:'Martes',kcal:180,min:45},
-      {nombre:'Pádel',tipo:'🎾',dia:'Jueves',kcal:420,min:60},
-      {nombre:'Caminar',tipo:'🚶',dia:'Viernes',kcal:150,min:35},
+      {nombre:'Fútbol 7',tipo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><path d="m12 7 3 2-1 4h-4l-1-4Z"/></svg>',dia:'Lunes',kcal:480,min:70},
+      {nombre:'Caminar',tipo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="13" cy="4" r="1.5"/><path d="m11 7 3 2 1 4M14 9l-3 5-2 5M14 13l3 3"/></svg>',dia:'Martes',kcal:180,min:45},
+      {nombre:'Pádel',tipo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><path d="M5 5a14 14 0 0 1 0 14M19 5a14 14 0 0 0 0 14"/></svg>',dia:'Jueves',kcal:420,min:60},
+      {nombre:'Caminar',tipo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="13" cy="4" r="1.5"/><path d="m11 7 3 2 1 4M14 9l-3 5-2 5M14 13l3 3"/></svg>',dia:'Viernes',kcal:150,min:35},
     ],
     lastWorkout:{
       name:'LEG', date:'Miércoles 20 may', completed: true,
@@ -4292,7 +4294,7 @@ function bandaModoBorradorHtml(c){
       Editando <strong>borrador</strong> del ${tipoTxt} · entra en vigor el <strong>${formatearFechaCorta(fecha)}</strong>
     </div>
     <button onclick="salirModoBorrador()" style="height:28px;padding:0 12px;border:1.5px solid #fde68a;border-radius:8px;background:#fff;color:#92400e;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">← Volver al vigente</button>
-    <button onclick="descartarBorradorActual()" title="Borrar este borrador" style="height:28px;padding:0 10px;border:none;border-radius:8px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">🗑 Descartar</button>
+    <button onclick="descartarBorradorActual()" title="Borrar este borrador" style="height:28px;padding:0 10px;border:none;border-radius:8px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Descartar</button>
   </div>`;
 }
 
@@ -4522,7 +4524,7 @@ function renderSidebar() {
 // ── HUGO FULL HISTORY (8 weeks) ──────────────────────────────────────────
 const HUGO_METRICS_HISTORY    = {"-7": {"L": {"steps": 8418, "sleep": 7.6, "weight": 76.3}, "M": {"steps": 11520, "sleep": 6.7, "weight": 76.2}, "X": {"steps": 8682, "sleep": 8.4, "weight": 76.5}, "J": {"steps": 8326, "sleep": 7.8, "weight": 76.2}, "V": {"steps": 10044, "sleep": 7.5, "weight": 76.2}, "S": {"steps": 12586, "sleep": 7.8, "weight": 76.3}, "D": {"steps": 7542, "sleep": 8.1, "weight": 76.5}}, "-6": {"L": {"steps": 5969, "sleep": 8.3, "weight": 76.5}, "M": {"steps": 9450, "sleep": 7.8, "weight": 76.1}, "X": {"steps": 8016, "sleep": 8.4, "weight": 76.4}, "J": {"steps": 11372, "sleep": 7.7, "weight": 76.4}, "V": {"steps": 10032, "sleep": 6.9, "weight": 76.4}, "S": {"steps": 8885, "sleep": 7.1, "weight": 76.1}, "D": {"steps": 6927, "sleep": 7.3, "weight": 76.4}}, "-5": {"L": {"steps": 6885, "sleep": 7.5, "weight": 76.4}, "M": {"steps": 9864, "sleep": 6.8, "weight": 76.4}, "X": {"steps": 6632, "sleep": 7.5, "weight": 76.4}, "J": {"steps": 10286, "sleep": 7.0, "weight": 76.3}, "V": {"steps": 13566, "sleep": 8.0, "weight": 76.3}, "S": {"steps": 8226, "sleep": 6.7, "weight": 76.5}, "D": {"steps": 5731, "sleep": 7.9, "weight": 76.5}}, "-4": {"L": {"steps": 5156, "sleep": 7.2, "weight": 76.3}, "M": {"steps": 13968, "sleep": 7.7, "weight": 76.3}, "X": {"steps": 7094, "sleep": 7.2, "weight": 76.5}, "J": {"steps": 9557, "sleep": 6.9, "weight": 76.4}, "V": {"steps": 8013, "sleep": 7.3, "weight": 76.4}, "S": {"steps": 13626, "sleep": 7.6, "weight": 76.4}, "D": {"steps": 7746, "sleep": 7.3, "weight": 76.3}}, "-3": {"L": {"steps": 8886, "sleep": 8.0, "weight": 76.2}, "M": {"steps": 10571, "sleep": 7.5, "weight": 76.1}, "X": {"steps": 8686, "sleep": 7.5, "weight": 76.2}, "J": {"steps": 11345, "sleep": 7.0, "weight": 76.4}, "V": {"steps": 12541, "sleep": 6.7, "weight": 76.3}, "S": {"steps": 11105, "sleep": 7.5, "weight": 76.5}, "D": {"steps": 7521, "sleep": 7.9, "weight": 76.3}}, "-2": {"L": {"steps": 8414, "sleep": 7.0, "weight": 76.2}, "M": {"steps": 11521, "sleep": 7.7, "weight": 76.3}, "X": {"steps": 6319, "sleep": 7.7, "weight": 76.3}, "J": {"steps": 9750, "sleep": 7.3, "weight": 76.4}, "V": {"steps": 9390, "sleep": 7.5, "weight": 76.2}, "S": {"steps": 13438, "sleep": 7.4, "weight": 76.2}, "D": {"steps": 8352, "sleep": 8.4, "weight": 76.2}}, "-1": {"L": {"steps": 6271, "sleep": 7.3, "weight": 76.2}, "M": {"steps": 8200, "sleep": 6.6, "weight": 76.5}, "X": {"steps": 7503, "sleep": 8.3, "weight": 76.1}, "J": {"steps": 11395, "sleep": 7.8, "weight": 76.3}, "V": {"steps": 13884, "sleep": 7.5, "weight": 76.3}, "S": {"steps": 9998, "sleep": 6.7, "weight": 76.4}, "D": {"steps": 8656, "sleep": 8.1, "weight": 76.4}}, "0": {"L": {"steps": 6200, "sleep": 7.5, "weight": 76.3}, "M": {"steps": 11400, "sleep": 7.0, "weight": 76.2}, "X": {"steps": 9800, "sleep": 7.5, "weight": 76.2}, "J": {"steps": 10420, "sleep": 8.0, "weight": 76.2}, "V": null, "S": null, "D": null}};
 const HUGO_TRAINING_HISTORY   = {"S1": {"TORSO": {"Press banca plano": "10x80 / 10x80 / 8x80 / 8x80", "Remo cable agarre neutro": "10x65 / 10x65 / 9x65 / 8x65", "Press inclinado mancuernas": "12x28 / 10x28 / 10x28", "Jalón polea frontal": "12x60 / 12x60 / 10x60", "Elevaciones laterales": "15x12 / 12x12 / 15x12", "Face pull": "20x20 / 15x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x45 / 10x45 / 11x45", "Extensión cuádriceps": "15x55 / 11x55 / 14x55", "Sentadilla hack": "10x80 / 10x80 / 6x80 / 10x80", "Prensa de piernas": "12x160 / 9x160 / 12x160", "Hip thrust": "12x100 / 11x100 / 9x100", "Gemelo en prensa": "15x120 / 15x120 / 14x120"}, "PUSH": {"Press banca inclinado barra": "10x70 / 6x70 / 7x70 / 9x70", "Press militar mancuernas": "12x24 / 10x24 / 10x24", "Aperturas pec deck": "15x35 / 13x35 / 13x35", "Extensión tríceps polea": "15x32.5 / 12x32.5 / 10x32.5", "Press francés": "12x30 / 8x30 / 11x30"}, "PULL": {"Jalón al pecho agarre ancho": "12x60 / 8x60 / 10x60", "Remo con barra": "10x70 / 8x70 / 10x70", "Pull-over con mancuerna": "15x24 / 12x24 / 10x24", "Curl martillo": "12x16 / 11x16 / 12x16", "Curl concentración": "15x12 / 10x12 / 13x12"}}, "S2": {"TORSO": {"Press banca plano": "10x82.5 / 8x82.5 / 10x82.5 / 9x81.2", "Remo cable agarre neutro": "10x67.5 / 10x67.5 / 10x67.5 / 9x66.2", "Press inclinado mancuernas": "12x29.2 / 12x29.2 / 10x28.5", "Jalón polea frontal": "12x62.5 / 12x62.5 / 10x61.2", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 17x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x47.5 / 11x47.5 / 10x46.2", "Extensión cuádriceps": "15x57.5 / 13x57.5 / 12x56.2", "Sentadilla hack": "10x85 / 9x85 / 8x85 / 7x82.5", "Prensa de piernas": "12x170 / 10x170 / 10x165", "Hip thrust": "12x105 / 9x105 / 10x102.5", "Gemelo en prensa": "15x120 / 12x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x72.5 / 10x72.5 / 7x72.5 / 7x71.2", "Press militar mancuernas": "12x25.2 / 11x25.2 / 11x24.5", "Aperturas pec deck": "15x37.5 / 14x37.5 / 13x36.2", "Extensión tríceps polea": "15x35 / 15x35 / 12x33.8", "Press francés": "12x32.5 / 8x32.5 / 9x31.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x62.5 / 8x62.5 / 10x61.2", "Remo con barra": "10x72.5 / 9x72.5 / 8x71.2", "Pull-over con mancuerna": "15x25.2 / 10x25.2 / 11x24.5", "Curl martillo": "12x17.2 / 12x17.2 / 10x16.5", "Curl concentración": "15x13.2 / 11x13.2 / 15x12.5"}}, "S3": {"TORSO": {"Press banca plano": "10x85 / 9x85 / 9x85 / 10x83.8", "Remo cable agarre neutro": "10x70 / 9x70 / 8x70 / 9x68.8", "Press inclinado mancuernas": "12x30.5 / 10x30.5 / 10x30", "Jalón polea frontal": "12x65 / 12x65 / 12x63.8", "Elevaciones laterales": "15x12 / 14x12 / 15x12", "Face pull": "20x20 / 19x20 / 18x20"}, "LEG": {"Curl femoral tumbado": "15x50 / 12x50 / 11x48.8", "Extensión cuádriceps": "15x60 / 11x60 / 14x58.8", "Sentadilla hack": "10x90 / 9x90 / 6x90 / 6x87.5", "Prensa de piernas": "12x180 / 8x180 / 9x175", "Hip thrust": "12x110 / 9x110 / 11x107.5", "Gemelo en prensa": "15x120 / 12x120 / 15x120"}, "PUSH": {"Press banca inclinado barra": "10x75 / 9x75 / 10x75 / 9x73.8", "Press militar mancuernas": "12x26.5 / 12x26.5 / 10x26", "Aperturas pec deck": "15x40 / 12x40 / 12x38.8", "Extensión tríceps polea": "15x37.5 / 15x37.5 / 14x36.2", "Press francés": "12x35 / 10x35 / 10x33.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x65 / 8x65 / 10x63.8", "Remo con barra": "10x75 / 9x75 / 7x73.8", "Pull-over con mancuerna": "15x26.5 / 13x26.5 / 10x26", "Curl martillo": "12x18.5 / 10x18.5 / 12x18", "Curl concentración": "15x14.5 / 11x14.5 / 14x14"}}, "S4": {"TORSO": {"Press banca plano": "10x87.5 / 8x87.5 / 10x87.5 / 9x86.2", "Remo cable agarre neutro": "10x72.5 / 10x72.5 / 10x72.5 / 10x71.2", "Press inclinado mancuernas": "12x31.8 / 10x31.8 / 10x31", "Jalón polea frontal": "12x67.5 / 11x67.5 / 10x66.2", "Elevaciones laterales": "15x12 / 12x12 / 14x12", "Face pull": "20x20 / 18x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x52.5 / 10x52.5 / 12x51.2", "Extensión cuádriceps": "15x62.5 / 12x62.5 / 11x61.2", "Sentadilla hack": "10x95 / 6x95 / 7x95 / 10x92.5", "Prensa de piernas": "12x190 / 8x190 / 8x185", "Hip thrust": "12x115 / 11x115 / 8x112.5", "Gemelo en prensa": "15x120 / 13x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x77.5 / 9x77.5 / 10x77.5 / 7x76.2", "Press militar mancuernas": "12x27.8 / 10x27.8 / 12x27", "Aperturas pec deck": "15x42.5 / 15x42.5 / 13x41.2", "Extensión tríceps polea": "15x40 / 14x40 / 15x38.8", "Press francés": "12x37.5 / 9x37.5 / 10x36.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x67.5 / 11x67.5 / 10x66.2", "Remo con barra": "10x77.5 / 9x77.5 / 10x76.2", "Pull-over con mancuerna": "15x27.8 / 13x27.8 / 10x27", "Curl martillo": "12x19.8 / 9x19.8 / 9x19", "Curl concentración": "15x15.8 / 10x15.8 / 12x15"}}, "S5": {"TORSO": {"Press banca plano": "10x90 / 8x90 / 10x90 / 10x88.8", "Remo cable agarre neutro": "10x75 / 8x75 / 10x75 / 8x73.8", "Press inclinado mancuernas": "12x33 / 10x33 / 10x32.5", "Jalón polea frontal": "12x70 / 12x70 / 12x68.8", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 15x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x55 / 12x55 / 10x53.8", "Extensión cuádriceps": "15x65 / 14x65 / 11x63.8", "Sentadilla hack": "10x100 / 8x100 / 9x100 / 7x97.5", "Prensa de piernas": "12x200 / 12x200 / 9x195", "Hip thrust": "12x120 / 12x120 / 12x117.5", "Gemelo en prensa": "15x120 / 15x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x80 / 9x80 / 9x80 / 7x78.8", "Press militar mancuernas": "12x29 / 8x29 / 8x28.5", "Aperturas pec deck": "15x45 / 15x45 / 14x43.8", "Extensión tríceps polea": "15x42.5 / 13x42.5 / 13x41.2", "Press francés": "12x40 / 11x40 / 8x38.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x70 / 8x70 / 8x68.8", "Remo con barra": "10x80 / 9x80 / 8x78.8", "Pull-over con mancuerna": "15x29 / 10x29 / 11x28.5", "Curl martillo": "12x21 / 9x21 / 9x20.5", "Curl concentración": "15x17 / 14x17 / 13x16.5"}}, "S6": {"TORSO": {"Press banca plano": "10x92.5 / 8x92.5 / 9x92.5 / 8x91.2", "Remo cable agarre neutro": "10x77.5 / 9x77.5 / 9x77.5 / 8x76.2", "Press inclinado mancuernas": "12x34.2 / 10x34.2 / 11x33.5", "Jalón polea frontal": "12x72.5 / 12x72.5 / 10x71.2", "Elevaciones laterales": "15x12 / 12x12 / 12x12", "Face pull": "20x20 / 15x20 / 16x20"}, "LEG": {"Curl femoral tumbado": "15x57.5 / 11x57.5 / 13x56.2", "Extensión cuádriceps": "15x67.5 / 13x67.5 / 13x66.2", "Sentadilla hack": "10x105 / 7x105 / 9x105 / 6x102.5", "Prensa de piernas": "12x210 / 9x210 / 11x205", "Hip thrust": "12x125 / 8x125 / 11x122.5", "Gemelo en prensa": "15x120 / 14x120 / 15x120"}, "PUSH": {"Press banca inclinado barra": "10x82.5 / 8x82.5 / 9x82.5 / 10x81.2", "Press militar mancuernas": "12x30.2 / 11x30.2 / 9x29.5", "Aperturas pec deck": "15x47.5 / 13x47.5 / 14x46.2", "Extensión tríceps polea": "15x45 / 11x45 / 10x43.8", "Press francés": "12x42.5 / 12x42.5 / 12x41.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x72.5 / 8x72.5 / 10x71.2", "Remo con barra": "10x82.5 / 6x82.5 / 6x81.2", "Pull-over con mancuerna": "15x30.2 / 14x30.2 / 13x29.5", "Curl martillo": "12x22.2 / 12x22.2 / 12x21.5", "Curl concentración": "15x18.2 / 11x18.2 / 10x17.5"}}, "S7": {"TORSO": {"Press banca plano": "10x95 / 10x95 / 8x95 / 8x93.8", "Remo cable agarre neutro": "10x80 / 8x80 / 10x80 / 8x78.8", "Press inclinado mancuernas": "12x35.5 / 12x35.5 / 10x35", "Jalón polea frontal": "12x75 / 11x75 / 10x73.8", "Elevaciones laterales": "15x12 / 13x12 / 12x12", "Face pull": "20x20 / 19x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x60 / 13x60 / 15x58.8", "Extensión cuádriceps": "15x70 / 14x70 / 14x68.8", "Sentadilla hack": "10x110 / 10x110 / 8x110 / 8x107.5", "Prensa de piernas": "12x220 / 9x220 / 10x215", "Hip thrust": "12x130 / 9x130 / 10x127.5", "Gemelo en prensa": "15x120 / 15x120 / 13x120"}, "PUSH": {"Press banca inclinado barra": "10x85 / 8x85 / 9x85 / 8x83.8", "Press militar mancuernas": "12x31.5 / 8x31.5 / 8x31", "Aperturas pec deck": "15x50 / 15x50 / 12x48.8", "Extensión tríceps polea": "15x47.5 / 10x47.5 / 14x46.2", "Press francés": "12x45 / 9x45 / 12x43.8"}, "PULL": {"Jalón al pecho agarre ancho": "12x75 / 10x75 / 9x73.8", "Remo con barra": "10x85 / 8x85 / 6x83.8", "Pull-over con mancuerna": "15x31.5 / 11x31.5 / 12x31", "Curl martillo": "12x23.5 / 10x23.5 / 9x23", "Curl concentración": "15x19.5 / 13x19.5 / 14x19"}}, "S8": {"TORSO": {"Press banca plano": "10x97.5 / 10x97.5 / 9x97.5 / 10x96.2", "Remo cable agarre neutro": "10x82.5 / 10x82.5 / 10x82.5 / 8x81.2", "Press inclinado mancuernas": "12x36.8 / 12x36.8 / 12x36", "Jalón polea frontal": "12x77.5 / 11x77.5 / 12x76.2", "Elevaciones laterales": "15x12 / 12x12 / 13x12", "Face pull": "20x20 / 17x20 / 15x20"}, "LEG": {"Curl femoral tumbado": "15x62.5 / 10x62.5 / 15x61.2", "Extensión cuádriceps": "15x72.5 / 14x72.5 / 11x71.2", "Sentadilla hack": "10x115 / 8x115 / 8x115 / 10x112.5", "Prensa de piernas": "12x230 / 9x230 / 10x225", "Hip thrust": "12x135 / 9x135 / 10x132.5", "Gemelo en prensa": "15x120 / 15x120 / 14x120"}, "PUSH": {"Press banca inclinado barra": "10x87.5 / 6x87.5 / 6x87.5 / 9x86.2", "Press militar mancuernas": "12x32.8 / 10x32.8 / 8x32", "Aperturas pec deck": "15x52.5 / 12x52.5 / 14x51.2", "Extensión tríceps polea": "15x50 / 11x50 / 15x48.8", "Press francés": "12x47.5 / 10x47.5 / 9x46.2"}, "PULL": {"Jalón al pecho agarre ancho": "12x77.5 / 11x77.5 / 12x76.2", "Remo con barra": "10x87.5 / 9x87.5 / 10x86.2", "Pull-over con mancuerna": "15x32.8 / 10x32.8 / 10x32", "Curl martillo": "12x24.8 / 8x24.8 / 9x24", "Curl concentración": "15x20.8 / 14x20.8 / 10x20"}}};
-const HUGO_ACTIVITIES_HISTORY = {"-7": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Sábado", "kcal": 480, "min": 70}], "-6": [{"nombre": "Caminar", "tipo": "🚶", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "🎾", "dia": "Sábado", "kcal": 420, "min": 60}], "-5": [], "-4": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Viernes", "kcal": 510, "min": 75}], "-3": [{"nombre": "Caminar", "tipo": "🚶", "dia": "Miércoles", "kcal": 150, "min": 35}], "-2": [{"nombre": "Pádel", "tipo": "🎾", "dia": "Jueves", "kcal": 440, "min": 65}], "-1": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "🚶", "dia": "Viernes", "kcal": 160, "min": 40}], "0": [{"nombre": "Fútbol 7", "tipo": "⚽", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "🚶", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "🎾", "dia": "Jueves", "kcal": 420, "min": 60}]};
+const HUGO_ACTIVITIES_HISTORY = {"-7": [{"nombre": "Fútbol 7", "tipo": "futbol", "dia": "Sábado", "kcal": 480, "min": 70}], "-6": [{"nombre": "Caminar", "tipo": "caminar", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "padel", "dia": "Sábado", "kcal": 420, "min": 60}], "-5": [], "-4": [{"nombre": "Fútbol 7", "tipo": "futbol", "dia": "Viernes", "kcal": 510, "min": 75}], "-3": [{"nombre": "Caminar", "tipo": "caminar", "dia": "Miércoles", "kcal": 150, "min": 35}], "-2": [{"nombre": "Pádel", "tipo": "padel", "dia": "Jueves", "kcal": 440, "min": 65}], "-1": [{"nombre": "Fútbol 7", "tipo": "futbol", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "caminar", "dia": "Viernes", "kcal": 160, "min": 40}], "0": [{"nombre": "Fútbol 7", "tipo": "futbol", "dia": "Lunes", "kcal": 480, "min": 70}, {"nombre": "Caminar", "tipo": "caminar", "dia": "Martes", "kcal": 180, "min": 45}, {"nombre": "Pádel", "tipo": "padel", "dia": "Jueves", "kcal": 420, "min": 60}]};
 
 
 // ── UTILITIES ────────────────────────────────────────────────────────────
@@ -4597,7 +4599,7 @@ function confirmDestructive(opts){
 
     const warnHtml = warning ? (
       '<div style="background:#fef2f2;border-radius:10px;padding:10px 13px;font-size:12px;color:#ef4444;margin-bottom:18px;font-weight:500;">' +
-        '⚠️ ' + escHtml(warning) +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> ' + escHtml(warning) +
       '</div>'
     ) : '';
 
@@ -5269,7 +5271,7 @@ function renderClientPanel() {
             <span class="meta-chip">·</span>
             <span class="meta-chip">${c.edad} años</span>
             <span class="meta-chip">·</span>
-            <span class="meta-chip" title="Semana del mesociclo" style="cursor:pointer" onclick="switchTab('editar')"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm1-13h-2v5l4 2.5.75-1.23-3.25-1.92Z"/><path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clip-rule="evenodd"/></svg> Semana ${c.weeks}/${c.mesoWeeks||12} del meso${c.weeks>=(c.mesoWeeks||12)?'  ⚠️ toca cambiar':''}</span>
+            <span class="meta-chip" title="Semana del mesociclo" style="cursor:pointer" onclick="switchTab('editar')"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm1-13h-2v5l4 2.5.75-1.23-3.25-1.92Z"/><path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clip-rule="evenodd"/></svg> Semana ${c.weeks}/${c.mesoWeeks||12} del meso${c.weeks>=(c.mesoWeeks||12)?'  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> toca cambiar':''}</span>
             ${(()=>{
               const rev = getRevisionStatus(c);
               if (!rev) return '';
@@ -6141,7 +6143,7 @@ function renderCheckinCard(c, mondayRef){
       <div class="section-title" style="margin-bottom:8px">Check-in semanal</div>
       <div class="panel-card">
         <div style="padding:22px 16px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6">
-          <div style="font-size:24px;margin-bottom:8px;opacity:.5">📋</div>
+          <div style="font-size:24px;margin-bottom:8px;opacity:.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg></div>
           ${list.length ? 'El cliente no envió check-in esta semana.' : 'El cliente aún no ha enviado ningún check-in.'}<br>Se envían cada domingo desde la app del cliente.
         </div>
       </div>
@@ -6164,7 +6166,7 @@ function renderCheckinCard(c, mondayRef){
       <span style="font-size:12px;font-weight:800;color:${planColor[a.plan]||'var(--text2)'}">${planLabel[a.plan]||a.plan}</span>
     </div>`:'';
   const notesHtml = (latest.notes&&latest.notes.trim())?`<div style="background:var(--bg2);border-left:3px solid var(--green);border-radius:0 10px 10px 0;padding:11px 13px;margin-top:11px">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px">💬 Nota del cliente</div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg> Nota del cliente</div>
       <div style="font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap">${escHtml(latest.notes)}</div>
     </div>`:'';
   // Historial breve: check-ins anteriores al que se está mostrando
@@ -6174,9 +6176,9 @@ function renderCheckinCard(c, mondayRef){
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px">Semanas anteriores</div>
       ${hist.map(k=>{const ka=k.answers||{};return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12px;color:var(--text2)">
         <span style="width:50px;color:var(--text3);font-weight:600">${fmtWk(k.week_start)}</span>
-        <span title="Sueño">🌙 ${ka.sleep!=null?ka.sleep:'—'}</span>
-        <span title="Energía">⚡ ${ka.energy!=null?ka.energy:'—'}</span>
-        <span title="Hambre">🍽️ ${ka.hunger!=null?ka.hunger:'—'}</span>
+        <span title="Sueño"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> ${ka.sleep!=null?ka.sleep:'—'}</span>
+        <span title="Energía"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg> ${ka.energy!=null?ka.energy:'—'}</span>
+        <span title="Hambre"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2M5 11v11M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg> ${ka.hunger!=null?ka.hunger:'—'}</span>
         <span style="margin-left:auto;font-weight:600;color:${planColor[ka.plan]||'var(--text3)'}">${planLabel[ka.plan]||'—'}</span>
       </div>`;}).join('')}
     </div>`:'';
@@ -6187,7 +6189,7 @@ function renderCheckinCard(c, mondayRef){
     <div class="panel-card">
       ${esArrastrado?`<div style="font-size:11px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:8px 11px;margin-bottom:11px;line-height:1.5">Es el último check-in enviado. El cliente todavía no ha mandado el de esta semana.</div>`:''}
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        ${metric('Sueño',a.sleep,'#7c3aed','🌙')}${metric('Energía',a.energy,'#d97706','⚡')}${metric('Hambre',a.hunger,'#111','🍽️')}
+        ${metric('Sueño',a.sleep,'#7c3aed','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>')}${metric('Energía',a.energy,'#d97706','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>')}${metric('Hambre',a.hunger,'#111','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2M5 11v11M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>')}
       </div>
       ${planPill}
       ${notesHtml}
@@ -6792,7 +6794,7 @@ function renderResumen() {
         const desc = ch.description || ch.descripcion || ch.name || 'Cheat';
         return `<div class="cheat-item">
           <div style="display:flex;align-items:center;gap:9px">
-            <span style="font-size:14px">🍕</span>
+            <span style="font-size:14px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3 2 21l10-3 10 3ZM12 3v6M9 14h.01M14 13h.01"/></svg></span>
             <div>
               <div style="font-size:12.5px;font-weight:600">${desc}</div>
               <div style="font-size:10.5px;color:var(--text3);margin-top:2px;text-transform:capitalize">${fechaFmt}</div>
@@ -6877,7 +6879,7 @@ function renderResumen() {
     return filas.join('');
   })();
 
-  // Aviso de reorganización (icono ⚠ + tooltip) si el cliente movió la semana
+  // Aviso de reorganización (icono <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> + tooltip) si el cliente movió la semana
   const _reorgIconHtml = (() => {
     if (!avisos.reorg) return '';
     const cambios = (avisos.reorg.cambios || []);
@@ -6887,7 +6889,7 @@ function renderResumen() {
     return `<div class="reorg-ic" style="position:relative;display:flex;align-items:center;cursor:help">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div class="reorg-tip" style="position:absolute;top:24px;right:-4px;width:200px;background:#1a1a18;color:#fff;border-radius:10px;padding:10px 12px;font-size:11px;line-height:1.5;box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:20;opacity:0;visibility:hidden;transition:opacity .15s;text-align:left">
-        <div style="font-weight:700;margin-bottom:4px;color:#fbbf24">⚠ Reorganizó la semana</div>
+        <div style="font-weight:700;margin-bottom:4px;color:#fbbf24"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> Reorganizó la semana</div>
         <div style="color:#d4d3cf">${detalle}</div>
       </div>
     </div>`;
@@ -7267,17 +7269,17 @@ function renderActModal() {
   // Icono según el texto de la actividad (detectado por palabras clave)
   function iconoActividad(txt){
     const t = (txt||'').toLowerCase();
-    if(/f[úu]tbol|futsal|partido/.test(t)) return '⚽';
-    if(/p[áa]del|tenis/.test(t)) return '🎾';
-    if(/correr|running|trote|atletismo|maraton|maratón/.test(t)) return '🏃';
-    if(/caminar|andar|paseo/.test(t)) return '🚶';
-    if(/bici|ciclismo|spinning/.test(t)) return '🚴';
-    if(/nadar|nataci[óo]n|piscina|swim/.test(t)) return '🏊';
-    if(/yoga|pilates|estiramiento|movilidad/.test(t)) return '🧘';
-    if(/push|pull|torso|leg|pierna|gym|gimnasio|crossfit|pecho|espalda|hombro|brazo/.test(t)) return '🏋️';
-    if(/baloncesto|basket/.test(t)) return '🏀';
-    if(/boxeo|kick/.test(t)) return '🥊';
-    return '⚡';
+    if(/f[úu]tbol|futsal|partido/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><path d="m12 7 3 2-1 4h-4l-1-4Z"/></svg>';
+    if(/p[áa]del|tenis/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><path d="M5 5a14 14 0 0 1 0 14M19 5a14 14 0 0 0 0 14"/></svg>';
+    if(/correr|running|trote|atletismo|maraton|maratón/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="14" cy="4" r="1.5"/><path d="m12 7 3 2 2 3M15 9l-4 4-3 1M11 13l-1 6M11 13l4 2"/></svg>';
+    if(/caminar|andar|paseo/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="13" cy="4" r="1.5"/><path d="m11 7 3 2 1 4M14 9l-3 5-2 5M14 13l3 3"/></svg>';
+    if(/bici|ciclismo|spinning/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17 10 7h3l3 5M13 7h3"/></svg>';
+    if(/nadar|nataci[óo]n|piscina|swim/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="16" cy="6" r="1.5"/><path d="M2 16c2 1 3 1 5 0s3-1 5 0 3 1 5 0 3-1 5 0M5 13l5-3 3 2"/></svg>';
+    if(/yoga|pilates|estiramiento|movilidad/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="4" r="2"/><path d="M12 7v6M5 21l7-5 7 5M8 11h8"/></svg>';
+    if(/push|pull|torso|leg|pierna|gym|gimnasio|crossfit|pecho|espalda|hombro|brazo/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>';
+    if(/baloncesto|basket/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2v20M5 5c4 3 4 11 0 14M19 5c-4 3-4 11 0 14"/></svg>';
+    if(/boxeo|kick/.test(t)) return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M7 5h7a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H9M7 5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M9 13v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4"/></svg>';
+    return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>';
   }
 
   // Recopilar actividad real de cada día desde c._metrics (columna activity)
@@ -7361,11 +7363,11 @@ function renderDietCard(op, c) {
   const totP  = dieta.comidas.reduce((s,com)=>s+com.items.reduce((ss,it)=>ss+(it.p||0),0),0);
   const kcalGoal  = dieta.kcalObjetivo || totalKcal || 2000;
   const kcalPct   = Math.min(100, Math.round(totalKcal / kcalGoal * 100));
-  const mealIcons = {desayuno:'☕',almuerzo:'🥪',comida:'🍗',merienda:'🍎',cena:'🌙',snack:'🥜'};
+  const mealIcons = {desayuno:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4ZM6 2v2M10 2v2M14 2v2"/></svg>',almuerzo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 11h18l-2-5H5ZM3 11v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/></svg>',comida:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M15 4a4 4 0 0 1 5 5c-1 3-4 4-6 4l-5 5-3-3 5-5c0-2 1-5 4-6Z"/></svg>',merienda:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 6c0-2 1-3 3-3M12 6c-3 0-6 2-6 6 0 5 3 9 6 9s6-4 6-9c0-4-3-6-6-6Z"/></svg>',cena:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',snack:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M9 4a3 3 0 0 0 0 6 3 3 0 0 1 0 6 3 3 0 0 0 6 0 3 3 0 0 1 0-6 3 3 0 0 0-6-6Z"/></svg>'};
   const mealsHtml = dieta.comidas.map((com,idx) => {
     const comKcal = Math.round(com.items.reduce((s,it)=>s+(it.kcal||0),0));
     const itemsTxt = com.items.map(it=>it.name).join(' · ');
-    const ico = mealIcons[com.nombre.toLowerCase()] || '🍽️';
+    const ico = mealIcons[com.nombre.toLowerCase()] || '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2M5 11v11M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
     return `<div onclick="openMacrosModal(${idx})" style="cursor:pointer;display:flex;align-items:center;gap:9px;padding:10px 12px;background:var(--bg3);border-radius:11px;transition:background .12s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--bg3)'">
       <span style="font-size:16px;flex-shrink:0">${ico}</span>
       <div style="flex:1;min-width:0">
@@ -7399,8 +7401,8 @@ function openMacrosModal(idx){
   const totCH = com.items.reduce((s,it)=>s+(it.ch||0),0);
   const totG  = com.items.reduce((s,it)=>s+(it.g||0),0);
   const totP  = com.items.reduce((s,it)=>s+(it.p||0),0);
-  const mealIcons = {desayuno:'☕',almuerzo:'🥪',comida:'🍗',merienda:'🍎',cena:'🌙',snack:'🥜'};
-  const ico = mealIcons[com.nombre.toLowerCase()] || '🍽️';
+  const mealIcons = {desayuno:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4ZM6 2v2M10 2v2M14 2v2"/></svg>',almuerzo:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 11h18l-2-5H5ZM3 11v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/></svg>',comida:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M15 4a4 4 0 0 1 5 5c-1 3-4 4-6 4l-5 5-3-3 5-5c0-2 1-5 4-6Z"/></svg>',merienda:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 6c0-2 1-3 3-3M12 6c-3 0-6 2-6 6 0 5 3 9 6 9s6-4 6-9c0-4-3-6-6-6Z"/></svg>',cena:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',snack:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M9 4a3 3 0 0 0 0 6 3 3 0 0 1 0 6 3 3 0 0 0 6 0 3 3 0 0 1 0-6 3 3 0 0 0-6-6Z"/></svg>'};
+  const ico = mealIcons[com.nombre.toLowerCase()] || '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2M5 11v11M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
   // gramos totales de macros para barra proporcional
   const sumaMacros = totCH+totG+totP || 1;
   const pctCH=Math.round(totCH/sumaMacros*100), pctG=Math.round(totG/sumaMacros*100), pctP=100-pctCH-pctG;
@@ -7653,7 +7655,7 @@ function tarjetaPesoMesociclo(c){
   const media = (valsP.reduce((s,v)=>s+v,0)/valsP.length);
 
   return `<div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:14px;padding:13px 15px">
-    <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">⚖️ Peso · evolución del mesociclo</div>
+    <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v18M7 21h10M5 7h14M5 7 2 13a3 3 0 0 0 6 0ZM19 7l-3 6a3 3 0 0 0 6 0Z"/></svg> Peso · evolución del mesociclo</div>
     <div style="font-size:10px;color:var(--text3);margin-bottom:8px">${escHtml(meso.name||'Mesociclo')} · ${pesos.length} ${pesos.length===1?'registro':'registros'} · ${formatearFechaCorta(inicial.fecha)} – ${formatearFechaCorta(ultimo.fecha)}</div>
     <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
       <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--text)">${valorTxt}</div>
@@ -7958,7 +7960,7 @@ function seccionHistorialSesiones(c){
 
   if (!sesiones.length){
     return `<div style="${cardStyle}">
-      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🗓️ Historial de sesiones</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 18h2M14 18h2"/></svg>️ Historial de sesiones</div>
       <div style="font-size:12px;color:var(--text3);padding:8px 0">
         Este cliente todavía no ha registrado ninguna sesión de entreno.
       </div>
@@ -8325,7 +8327,7 @@ function seccionEvolucionCargas(c){
   // Si las series aún no se han cargado, mensaje de carga
   if (c._workoutSets == null){
     return `<div style="${cardStyle}">
-      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">📈 Evolución de cargas</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"/></svg> Evolución de cargas</div>
       <div style="font-size:12px;color:var(--text3);padding:8px 0">Cargando series del cliente…</div>
     </div>`;
   }
@@ -9094,7 +9096,7 @@ function revisionColumna(c, rev){
               style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--red);border:1.5px solid #fff;color:#fff;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3)">✕</button>
             <button onclick="event.stopPropagation();renombrarFoto('${escHtml(foto.id)}')"
               title="Cambiar nombre"
-              style="position:absolute;bottom:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);border:1.5px solid #fff;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✎</button>
+              style="position:absolute;bottom:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);border:1.5px solid #fff;color:#fff;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
           </div>
           <div style="font-size:9px;color:${foto.label?'var(--text2)':'var(--text3)'};text-align:center;font-weight:600;font-style:${foto.label?'normal':'italic'}">${foto.label?escHtml(foto.label):'Sin nombre'}</div>
         </div>
@@ -9115,7 +9117,7 @@ function revisionColumna(c, rev){
   const nota = rev.notes && String(rev.notes).trim();
   const notaHtml = `<div style="padding:9px 12px;background:var(--bg2);border-top:1.5px solid var(--border)">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;${nota?'margin-bottom:5px':''}">
-      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">📋 Nota para el cliente</div>
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg> Nota para el cliente</div>
       <button onclick="editarNotaRevision('${escHtml(rev.id)}')"
         style="height:22px;padding:0 9px;border-radius:7px;background:var(--bg);border:1.5px solid var(--border);color:var(--text2);font-size:10.5px;font-weight:600;cursor:pointer">${nota?'Editar':'+ Añadir'}</button>
     </div>
@@ -9898,7 +9900,7 @@ function renderPerfil() {
         <span style="font-size:12px;font-weight:700;color:${stInfo[1]};background:${stInfo[2]};padding:5px 11px;border-radius:8px;flex-shrink:0">${stInfo[0]}</span>
       </div>
       ${st.next?`<div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:10px">Próximo: pago ${st.next.n} de ${st.total} · ${fmtFecha(st.next.due)}</div>`:`<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">Plan saldado · ${st.total} de ${st.total} pagos</div>`}
-      ${b.pay_link?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;word-break:break-all"><b style="color:var(--text2)">Enlace:</b> ${escHtml(b.pay_link)}</div>`:'<div style="font-size:11px;color:#b45309;margin-bottom:6px">⚠ Sin enlace de pago. El cliente no verá botón para pagar.</div>'}
+      ${b.pay_link?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;word-break:break-all"><b style="color:var(--text2)">Enlace:</b> ${escHtml(b.pay_link)}</div>`:'<div style="font-size:11px;color:#b45309;margin-bottom:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> Sin enlace de pago. El cliente no verá botón para pagar.</div>'}
       <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:4px">
         <div style="${lblStyle};margin:8px 0 2px">Pagos del plan</div>
         ${rows}
@@ -9959,7 +9961,7 @@ function renderPerfil() {
 // aparte de la agenda general.
 // ══════════════════════════════════════════════════════════════════════════
 let _ccCal = new Date(); _ccCal.setDate(1);
-const CC_TAGS={nota:['📝','Nota','#111','#ececec'],comida:['🍽️','Comida','#7c3aed','#f3f0ff'],descanso:['😴','Descanso','#a16207','#fef9c3'],recordatorio:['⏰','Recordatorio','#1d4ed8','#dbeafe']};
+const CC_TAGS={nota:['<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>','Nota','#111','#ececec'],comida:['<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2M5 11v11M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>','Comida','#7c3aed','#f3f0ff'],descanso:['<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9ZM8 13h3l-3 3h3"/></svg>','Descanso','#a16207','#fef9c3'],recordatorio:['<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M5 3 2 6M22 6l-3-3"/></svg>','Recordatorio','#1d4ed8','#dbeafe']};
 
 function openClientCalendar(){
   const c=currentClient; if(!c) return;
@@ -10118,7 +10120,7 @@ function cardCuestionarioCompacto(c){
   const cardStyle = 'background:var(--bg2);border:1.5px solid var(--border);border-radius:18px;padding:16px 18px';
   const lblStyle  = 'font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px';
   const q = c._questionnaire;
-  const hdrIcon = `<div style="width:30px;height:30px;border-radius:9px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📋</div>`;
+  const hdrIcon = `<div style="width:30px;height:30px;border-radius:9px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg></div>`;
   if(!q){
     return `<div style="${cardStyle}">
       <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">${hdrIcon}<div style="font-size:15px;font-weight:600">Cuestionario inicial</div></div>
@@ -10238,10 +10240,10 @@ function openCuestionarioModal(){
   }
 
   const tituloSub = _cuestEdit ? 'editando' : (c._questionnaire ? 'completado en MyTracc' : 'sin completar');
-  const btnEditar = _cuestEdit ? '' : `<button onclick="_cuestEdit=true;openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border-radius:8px;border:1.5px solid var(--green);background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer">✎ Editar</button>`;
+  const btnEditar = _cuestEdit ? '' : `<button onclick="_cuestEdit=true;openCuestionarioModal()" style="margin-left:auto;height:30px;padding:0 13px;border-radius:8px;border:1.5px solid var(--green);background:var(--gl);color:#15803d;font-size:12px;font-weight:700;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Editar</button>`;
   ov.innerHTML = `<div style="width:100%;max-width:580px;background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:20px 22px">
     <div style="display:flex;align-items:center;gap:11px;margin-bottom:4px">
-      <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📋</div>
+      <div style="width:34px;height:34px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg></div>
       <div>
         <div style="font-family:'DM Serif Display',serif;font-size:19px;line-height:1.1;color:var(--text)">Cuestionario inicial</div>
         <div style="font-size:11px;color:var(--text3);margin-top:1px">${escHtml(c.name)} · ${tituloSub}</div>
@@ -10845,9 +10847,9 @@ const PLAN_DEFS = [
   {id:'studio',  nombre:'Studio',  precio:79, min:31, max:80, desc:'31–80 clientes'},
 ];
 const EXTRA_DEFS = [
-  {id:'ia',     nombre:'Inteligencia artificial', precio:9,  tipo:'mes',   icon:'✨', desc:'Crea dietas y entrenos 100% con IA (macros orientativos) o con tu biblioteca (datos exactos).'},
-  {id:'blanca', nombre:'Marca blanca',            precio:19, tipo:'mes',   icon:'🎨', desc:'Tu logo, tus colores y sin la marca "Tracc". Dominio propio — te ayudamos a configurarlo.'},
-  {id:'setup',  nombre:'Puesta en marcha',        precio:39, antes:59, tipo:'unico', icon:'🚀', desc:'Nos pasas los archivos de tus clientes y te lo migramos todo, listo para usar. Pago único.'},
+  {id:'ia',     nombre:'Inteligencia artificial', precio:9,  tipo:'mes',   icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg>', desc:'Crea dietas y entrenos 100% con IA (macros orientativos) o con tu biblioteca (datos exactos).'},
+  {id:'blanca', nombre:'Marca blanca',            precio:19, tipo:'mes',   icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="10" r="1"/><path d="M12 21a3 3 0 0 1 0-6 2 2 0 0 0 2-2 2 2 0 0 1 2-2"/></svg>', desc:'Tu logo, tus colores y sin la marca "Tracc". Dominio propio — te ayudamos a configurarlo.'},
+  {id:'setup',  nombre:'Puesta en marcha',        precio:39, antes:59, tipo:'unico', icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>', desc:'Nos pasas los archivos de tus clientes y te lo migramos todo, listo para usar. Pago único.'},
 ];
 let _planSel = undefined;          // 'starter'|'pro'|'studio'
 let _planCiclo = 'mensual';        // 'mensual'|'anual'
@@ -10979,7 +10981,7 @@ function _renderPlanPanelBody(){
       ${totalBox}
 
       <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:18px;margin-top:16px">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px">🛟 Empieza sin agobios, te acompañamos</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.9 4.9 4.2 4.2M14.9 14.9l4.2 4.2M14.9 9.1l4.2-4.2M9.1 14.9l-4.2 4.2"/></svg> Empieza sin agobios, te acompañamos</div>
         <div style="font-size:12.5px;color:var(--text2);line-height:1.65">No estás solo. Tienes una <b>guía completa</b> (importar clientes con Excel, crear clientes desde cero, funciones de Tracc y cómo usa MyTracc tu cliente), nuestra <b>puesta en marcha</b> si prefieres que lo hagamos por ti, y <b>soporte directo</b> cuando lo necesites.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <button onclick="openGuiaCompleta()" style="font-size:12.5px;font-weight:600;padding:9px 14px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit">Ver la guía</button>
@@ -11229,7 +11231,7 @@ function renderEntrenoSection() {
         <div class="edit-section-title"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:inline-block;vertical-align:middle;flex-shrink:0;margin-right:5px"><path d="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29l-1.43-1.43Z"/></svg> Plan de entrenamiento</div>
         <div style="display:flex;gap:8px;align-items:center">
           ${dbTotal>0?`<span style="font-size:11px;color:var(--green);font-weight:500">✓ ${dbTotal} ejercicios importados</span>`:''}
-          <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="openImportModal()">📋 Importar lista</button>
+          <button class="ai-btn secondary" style="font-size:11px;padding:5px 10px" onclick="openImportModal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg> Importar lista</button>
         </div>
       </div>
       <div class="diet-setup" style="margin-bottom:14px">
@@ -11501,7 +11503,7 @@ function tiraBibliotecaAlimentos(){
   return `<div style="background:var(--gl);border:1.5px solid rgba(22,163,74,.25);border-radius:13px;
     padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
     <div>
-      <div style="font-size:13.5px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
+      <div style="font-size:13.5px;font-weight:700;color:var(--green)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Biblioteca de alimentos</div>
       <div style="font-size:11.5px;color:var(--green);opacity:.75;margin-top:1px">${n} ${n===1?'alimento guardado':'alimentos guardados'} · crea alimentos una vez y reutilízalos en las dietas</div>
     </div>
     <div style="display:flex;gap:7px">
@@ -11511,7 +11513,7 @@ function tiraBibliotecaAlimentos(){
         cursor:not-allowed;opacity:.7">✦ Generar con IA</button>
       <button onclick="abrirBiblioteca()" style="
         height:32px;padding:0 14px;border-radius:10px;background:var(--green);
-        border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer">📚 Abrir biblioteca (${n})</button>
+        border:none;font-size:13px;font-weight:600;color:#fff;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Abrir biblioteca (${n})</button>
     </div>
   </div>`;
 }
@@ -11545,7 +11547,7 @@ function panelBibliotecaHtml(){
         <div>${f.fat_g ?? 0} g</div>
         <div style="font-size:10px;color:var(--text2)">${escHtml(f.food_group||'—')}</div>
         <div style="display:flex;gap:3px;justify-content:flex-end">
-          <button onclick="editarAlimento('${escHtml(f.id)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px">✏️</button>
+          <button onclick="editarAlimento('${escHtml(f.id)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
           <button onclick="borrarAlimento('${escHtml(f.id)}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px;color:var(--red)">&#10005;</button>
         </div>
       </div>`;
@@ -11560,15 +11562,15 @@ function panelBibliotecaHtml(){
 
   return `<div style="border:1.5px solid var(--green);border-radius:13px;padding:13px;margin-bottom:14px;background:var(--bg)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-      <div style="font-size:12px;font-weight:700;color:var(--green)">📚 Biblioteca de alimentos</div>
+      <div style="font-size:12px;font-weight:700;color:var(--green)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Biblioteca de alimentos</div>
       <div style="display:flex;gap:6px">
         <input type="file" id="import-food-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarAlimentosExcel(this)">
         <button onclick="descargarPlantillaAlimentos()" title="Descargar plantilla Excel con el formato esperado" style="
           height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📄 Plantilla</button>
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6"/></svg> Plantilla</button>
         <button onclick="document.getElementById('import-food-input').click()" title="Importar un Excel/CSV con alimentos" style="
           height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📂 Importar Excel/CSV</button>
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z"/></svg> Importar Excel/CSV</button>
         <button onclick="cerrarBiblioteca()" style="
           height:25px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
           background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">Cerrar</button>
@@ -12162,7 +12164,7 @@ function seccionPlanNutricional(c){
   // Sin plan de nutrición
   if (!nut || !nut.plan){
     return `<div style="${cardStyle};margin-bottom:18px">
-      <div style="${secTitle};margin-bottom:10px">🥗 Plan nutricional</div>
+      <div style="${secTitle};margin-bottom:10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 11h18a9 9 0 0 1-18 0ZM7 11a3 3 0 0 1 5-2M12 9a3 3 0 0 1 5 2"/></svg> Plan nutricional</div>
       ${emptyState({
         icon: 'utensils',
         title: 'Sin plan nutricional',
@@ -12218,7 +12220,7 @@ function seccionPlanNutricional(c){
         <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Objetivos diarios</div>
         <button onclick="editarObjetivosNutri()" style="
           height:28px;padding:0 13px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">✏️ Editar</button>
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Editar</button>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
         ${objetivo('Calorías', plan.kcal_goal, ' kcal', 'var(--green)')}
@@ -12276,7 +12278,7 @@ function seccionPlanNutricional(c){
           width:${ancho};box-sizing:border-box;border:1.5px solid var(--green);border-radius:6px;
           padding:4px 6px;background:var(--bg2);color:var(--text);font-size:11px">`;
         const filasEd = work.map((it,idx) => {
-          const deBiblio = it._fromLib ? `<span title="Calculado desde la biblioteca" style="font-size:9px;color:var(--green);font-weight:700">📚</span>` : '';
+          const deBiblio = it._fromLib ? `<span title="Calculado desde la biblioteca" style="font-size:9px;color:var(--green);font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg></span>` : '';
           // Botón "guardar en biblioteca" solo si NO viene de la biblioteca y tiene datos
           const btnGuardarBib = (!it._fromLib)
             ? `<button onclick="guardarAlimentoEnBiblioteca(${idx})" title="Guardar este alimento en la biblioteca" style="
@@ -12311,7 +12313,7 @@ function seccionPlanNutricional(c){
               background:var(--bg2);color:var(--text2);font-size:10.5px;font-weight:600">+ Añadir alimento</button>
             <button onclick="abrirSelectorAlimento()" style="
               flex:1;height:28px;border:1.5px solid var(--green);border-radius:7px;cursor:pointer;
-              background:var(--gl);color:var(--green);font-size:10.5px;font-weight:700">📚 Desde biblioteca</button>
+              background:var(--gl);color:var(--green);font-size:10.5px;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg> Desde biblioteca</button>
           </div>
           ${selectorAlimentoHtml()}
           <div style="display:flex;gap:6px;margin-top:9px">
@@ -12350,7 +12352,7 @@ function seccionPlanNutricional(c){
       return `<div style="background:var(--bg);border-radius:11px;padding:13px 15px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
           <span style="font-size:13.5px;font-weight:700;color:var(--text)">${escHtml(comida)}</span>
-          <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0">✏️</button>
+          <button onclick="editarComida('${escHtml(comida)}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
         </div>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <colgroup><col style="width:44px"><col><col style="width:42px"><col style="width:28px"><col style="width:32px"><col style="width:28px"></colgroup>
@@ -12387,23 +12389,23 @@ function seccionPlanNutricional(c){
 
   // Badge "Cambia el [fecha]" si hay plan nutricional futuro programado
   const schedNutriBadge = c._scheduledNutritionDate
-    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan nutricional programado">📅 Cambia el ${formatearFechaCorta(c._scheduledNutritionDate)}</span>`
+    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan nutricional programado"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Cambia el ${formatearFechaCorta(c._scheduledNutritionDate)}</span>`
     : '';
 
   return `<div style="${cardStyle};margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:11px">
-        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🥗</div>
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 11h18a9 9 0 0 1-18 0ZM7 11a3 3 0 0 1 5-2M12 9a3 3 0 0 1 5 2"/></svg></div>
         <div style="font-family:'DM Serif Display',serif;font-size:21px;line-height:1.1;color:var(--text)">Plan nutricional</div>
         ${(!editandoBorradorPlan && !c._scheduledNutritionDate)
           ? `<button onclick="abrirModalProgramarCambio('diet')" title="Crear un borrador del plan que se activará en una fecha futura" style="
               height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">📅 Programar cambio</button>`
+              background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Programar cambio</button>`
           : ''}
         ${(!editandoBorradorPlan && c._scheduledNutritionDate)
           ? `<button onclick="entrarBorradorExistente('diet')" title="Editar el borrador programado" style="
               height:26px;padding:0 11px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
-              background:#fffbeb;color:#92400e;font-size:11px;font-weight:700">✏️ Editar borrador</button>`
+              background:#fffbeb;color:#92400e;font-size:11px;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Editar borrador</button>`
           : ''}
         ${schedNutriBadge}
       </div>
@@ -12486,7 +12488,7 @@ function _totalOpcionComparado(plan, tot, numOpcion){
     && dentro(tot.fat, plan.fat_g, false);
   const badge = allOk
     ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--green);background:var(--gl);border-radius:7px;padding:3px 10px">✓ Cuadra con el objetivo</span>`
-    : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1.5px solid #fde68a;border-radius:7px;padding:2px 10px">⚠ Revisar macros</span>`;
+    : `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1.5px solid #fde68a;border-radius:7px;padding:2px 10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> Revisar macros</span>`;
   return `<div style="background:var(--bg);border-radius:12px;padding:13px 15px;margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total de la opción ${numOpcion} vs objetivo</span>
@@ -12982,7 +12984,7 @@ function seccionPlanEntreno(c){
   // Sin plan de entrenamiento
   if (!nut || (!nut.exercises.length && !nut.split.length)){
     return `<div style="${cardStyle}">
-      <div style="${secTitle};margin-bottom:10px">🏋️ Plan de entreno</div>
+      <div style="${secTitle};margin-bottom:10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg> Plan de entreno</div>
       ${emptyState({
         icon: 'dumbbell',
         title: 'Sin plan de entreno',
@@ -13127,7 +13129,7 @@ function seccionPlanEntreno(c){
             <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Distribución del split</div>
             <button onclick="editarSplit()" style="
               height:28px;padding:0 13px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">✏️ Editar</button>
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Editar</button>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${split.map((s,i) => {
@@ -13234,7 +13236,7 @@ function seccionPlanEntreno(c){
       // ── Fila en modo lectura ──
       const botonEditar = ej.id
         ? `<button onclick="editarEjercicio('${escHtml(ej.id)}')" title="Editar" style="
-            background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0">✏️</button>`
+            background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>`
         : '';
       // Flechas para reordenar y botón de quitar (Bloque 6D)
       const flechas = ej.id ? `
@@ -13265,9 +13267,9 @@ function seccionPlanEntreno(c){
           ${ej.video_url
             ? `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
                 <a href="${escHtml(ej.video_url)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--green);text-decoration:none;white-space:nowrap;font-weight:600">▶ Ver vídeo</a>
-                <button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Editar el link del vídeo" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:2px 4px">✎</button>
+                <button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Editar el link del vídeo" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:2px 4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
               </div>`
-            : `<button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Añadir link de vídeo (YouTube/Vimeo)" style="font-size:11.5px;color:var(--text3);background:var(--bg);border:1.5px dashed var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif">🔗 Pegar link</button>`}
+            : `<button onclick="pegarLinkVideo('${escHtml(ej.id)}')" title="Añadir link de vídeo (YouTube/Vimeo)" style="font-size:11.5px;color:var(--text3);background:var(--bg);border:1.5px dashed var(--border2);border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg> Pegar link</button>`}
           ${flechas}
           ${botonEditar}
           ${botonQuitar}
@@ -13285,7 +13287,7 @@ function seccionPlanEntreno(c){
         </span>
         ${lista.length ? `<button onclick="guardarSesionComoPlantilla()" style="
           height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">💾 Guardar sesión como plantilla</button>` : ''}
+          background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8"/></svg> Guardar sesión como plantilla</button>` : ''}
       </div>
       ${filas}
       ${selectorEjercicioHtml(tipoSel)}`;
@@ -13293,26 +13295,26 @@ function seccionPlanEntreno(c){
 
   // Badge "Cambia el [fecha]" si hay plan futuro programado
   const schedTrainBadge = c._scheduledTrainingDate
-    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan de entreno programado">📅 Cambia el ${formatearFechaCorta(c._scheduledTrainingDate)}</span>`
+    ? `<span style="height:22px;padding:0 9px;border-radius:11px;background:#fffbeb;border:1.5px solid #fde68a;font-size:10px;font-weight:700;color:#92400e;display:inline-flex;align-items:center;gap:4px;white-space:nowrap" title="Hay un plan de entreno programado"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Cambia el ${formatearFechaCorta(c._scheduledTrainingDate)}</span>`
     : '';
 
   return `<div style="${cardStyle}">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">
-        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏋️</div>
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--gl);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg></div>
         <div style="font-family:'DM Serif Display',serif;font-size:21px;line-height:1.1;color:var(--text)">Plan de entreno</div>
         <button onclick="abrirMesociclo()" style="
           height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📅 ${etiquetaBotonMeso(c)}</button>
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> ${etiquetaBotonMeso(c)}</button>
         ${(!editandoBorradorPlan && !c._scheduledTrainingDate)
           ? `<button onclick="abrirModalProgramarCambio('train')" title="Crear un borrador del plan que se activará en una fecha futura" style="
               height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📅 Programar cambio</button>`
+              background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Programar cambio</button>`
           : ''}
         ${(!editandoBorradorPlan && c._scheduledTrainingDate)
           ? `<button onclick="entrarBorradorExistente('train')" title="Editar el borrador programado" style="
               height:28px;padding:0 12px;border:1.5px solid #fde68a;border-radius:8px;cursor:pointer;
-              background:#fffbeb;color:#92400e;font-size:12px;font-weight:700">✏️ Editar borrador</button>`
+              background:#fffbeb;color:#92400e;font-size:12px;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Editar borrador</button>`
           : ''}
         ${schedTrainBadge}
       </div>
@@ -13321,13 +13323,13 @@ function seccionPlanEntreno(c){
         <input type="file" id="import-ex-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarEjerciciosExcel(this)">
         <button onclick="descargarPlantillaEjercicios()" title="Descargar plantilla Excel con el formato esperado" style="
           height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📄 Plantilla</button>
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6"/></svg> Plantilla</button>
         <button onclick="document.getElementById('import-ex-input').click()" title="Importar un Excel/CSV con ejercicios" style="
           height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📂 Importar Excel</button>
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z"/></svg> Importar Excel</button>
         <button onclick="abrirPlantillas()" style="
           height:28px;padding:0 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600">📋 Plantillas</button>
+          background:var(--bg2);color:var(--text2);font-size:12px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg> Plantillas</button>
       </div>
     </div>
     ${panelMesocicloHtml(c)}
@@ -13338,7 +13340,7 @@ function seccionPlanEntreno(c){
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Ejercicios por sesión</div>
       <button onclick="guardarPlanComoPlantilla()" style="
         height:26px;padding:0 11px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
-        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600">💾 Guardar plan completo</button>
+        background:var(--bg2);color:var(--text2);font-size:11px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8"/></svg> Guardar plan completo</button>
     </div>
     ${sesionesHtml}
   </div>`;
@@ -13988,7 +13990,7 @@ function panelMesocicloHtml(c){
 
   return `<div style="border:1.5px solid var(--green);border-radius:12px;padding:12px;margin-bottom:14px;background:var(--bg)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">📅 Mesociclo</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Mesociclo</div>
       <button onclick="cerrarMesociclo()" style="
         height:24px;padding:0 10px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;
         background:var(--bg2);color:var(--text2);font-size:10.5px;font-weight:600">Cerrar</button>
@@ -14265,7 +14267,7 @@ function iaGruposDe(t){
 function iaBannerHtml(c){
   if(!IA.open){
     return `<div onclick="iaToggle()" style="background:#7c3aed;border-radius:14px;padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:13px;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.22)">
-      <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0">✨</div>
+      <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg></div>
       <div style="flex:1"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:#fff">Generar plan con IA</div>
       <div style="font-size:12px;color:rgba(255,255,255,.85)">Crea el entreno y la dieta a partir del cuestionario y tus indicaciones</div></div>
       <div style="color:#fff;font-size:18px">⌄</div>
@@ -14273,7 +14275,7 @@ function iaBannerHtml(c){
   }
   return `<div style="background:var(--bg2);border:2px solid #c4b5fd;border-radius:14px;padding:18px;margin-bottom:16px">
     <div onclick="iaToggle()" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);cursor:pointer">
-      <div style="width:38px;height:38px;border-radius:11px;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:19px">✨</div>
+      <div style="width:38px;height:38px;border-radius:11px;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:19px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg></div>
       <div style="flex:1"><div style="font-family:'DM Serif Display',serif;font-size:17px;color:var(--text)">Generar plan con IA</div></div>
       <div style="color:var(--text3);font-size:18px">⌃</div>
     </div>
@@ -14332,16 +14334,16 @@ function iaGeneradorHtml(c){
       ${prefsHtml}
     </div>
     <div style="display:flex;gap:10px;margin-bottom:14px">
-      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'biblioteca','📚','Mi biblioteca','Datos exactos · '+nAlim+' alimentos')}
-      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'ia','✨','Que la IA proponga','Orientativo')}
+      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'biblioteca','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg>','Mi biblioteca','Datos exactos · '+nAlim+' alimentos')}
+      ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'ia','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg>','Que la IA proponga','Orientativo')}
     </div>
     <textarea id="ia-ind-dieta" oninput="IA.indicacionesDieta=this.value" placeholder="Indicaciones para la dieta (opcional): comidas sencillas, mucho boniato, sin lactosa…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesDieta||'')}</textarea>
-    <button onclick="iaGenerarDieta()" ${IA.generandoDieta?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoDieta?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoDieta?'wait':'pointer'}">${IA.generandoDieta?'Generando dieta…':'✨ Generar dieta'}</button>
+    <button onclick="iaGenerarDieta()" ${IA.generandoDieta?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoDieta?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoDieta?'wait':'pointer'}">${IA.generandoDieta?'Generando dieta…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Generar dieta'}</button>
     ${IA.propDieta?iaPropDietaHtml():''}
   </div>` : '';
   const bloqueDieta = `<div style="border:1.5px solid var(--border);border-radius:13px;margin-bottom:14px;overflow:hidden">
     <div onclick="IA.bloqueDieta=!IA.bloqueDieta;renderClientPanel()" style="display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border-bottom:${IA.bloqueDieta?'1px solid var(--border)':'none'};cursor:pointer">
-      <span style="font-size:18px">🥗</span>
+      <span style="font-size:18px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 11h18a9 9 0 0 1-18 0ZM7 11a3 3 0 0 1 5-2M12 9a3 3 0 0 1 5 2"/></svg></span>
       <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--text)">Dieta</div></div>
       ${dietaKcal?`<span style="font-size:11px;color:#15803d;background:var(--gl);padding:3px 9px;border-radius:6px;font-weight:600">${dietaKcal} kcal</span>`:''}
       <span style="color:var(--text3);font-size:16px">${IA.bloqueDieta?'⌃':'⌄'}</span>
@@ -14391,24 +14393,24 @@ function iaGeneradorHtml(c){
   const nPlantillas = (TRAINING_TEMPLATES||[]).filter(_iaEsPlantillaConfig).length;
   const bloqueEntrenoBody = IA.bloqueEntreno ? `<div style="padding:15px">
     <div style="display:flex;gap:10px;margin-bottom:14px">
-      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'biblioteca','📚','Mi biblioteca','Tus ejercicios guardados')}
-      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'ia','✨','Que la IA proponga','Orientativo')}
+      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'biblioteca','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2ZM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/></svg>','Mi biblioteca','Tus ejercicios guardados')}
+      ${fuenteCard('iaSetFuenteEntreno',IA.fuenteEntreno,'ia','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg>','Que la IA proponga','Orientativo')}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
       <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Split — ${nEntreno} días de entreno · <span onclick="iaSetDias()" style="color:var(--accent);cursor:pointer">cambiar nº</span></div>
       <div style="display:flex;gap:6px">
-        <button onclick="iaCargarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">📂 Plantilla${nPlantillas?' ('+nPlantillas+')':''}</button>
-        <button onclick="iaGuardarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--accent);background:#f3f0ff;color:var(--accent);cursor:pointer">💾 Guardar</button>
+        <button onclick="iaCargarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z"/></svg> Plantilla${nPlantillas?' ('+nPlantillas+')':''}</button>
+        <button onclick="iaGuardarPlantilla()" style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:8px;border:1.5px solid var(--accent);background:#f3f0ff;color:var(--accent);cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8"/></svg> Guardar</button>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${filasSplit}</div>
     <textarea id="ia-ind-entreno" oninput="IA.indicacionesEntreno=this.value" placeholder="Indicaciones para el entreno (opcional): prioriza pecho, evita sentadilla por la rodilla…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesEntreno||'')}</textarea>
-    <button onclick="iaGenerarEntreno()" ${IA.generandoEntreno?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoEntreno?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoEntreno?'wait':'pointer'}">${IA.generandoEntreno?'Generando entreno…':'✨ Generar entreno'}</button>
+    <button onclick="iaGenerarEntreno()" ${IA.generandoEntreno?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoEntreno?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoEntreno?'wait':'pointer'}">${IA.generandoEntreno?'Generando entreno…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Generar entreno'}</button>
     ${IA.propEntreno?iaPropEntrenoHtml():''}
   </div>` : '';
   const bloqueEntreno = `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
     <div onclick="IA.bloqueEntreno=!IA.bloqueEntreno;renderClientPanel()" style="display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border-bottom:${IA.bloqueEntreno?'1px solid var(--border)':'none'};cursor:pointer">
-      <span style="font-size:18px">🏋️</span>
+      <span style="font-size:18px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg></span>
       <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--text)">Entreno</div></div>
       <span style="font-size:11px;color:var(--blue);background:var(--bl);padding:3px 9px;border-radius:6px;font-weight:600">${nEntreno} días</span>
       <span style="color:var(--text3);font-size:16px">${IA.bloqueEntreno?'⌃':'⌄'}</span>
@@ -14550,7 +14552,7 @@ function iaCargarPlantilla(){
       <button onclick="iaAplicarPlantilla('${escHtml(t.id)}')" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:9px;border:none;background:var(--accent);color:#fff;cursor:pointer">Cargar</button>
       <button onclick="iaBorrarPlantilla('${escHtml(t.id)}')" title="Borrar" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text3);cursor:pointer;font-size:13px">✕</button>
     </div>`;
-  }).join('') : `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Aún no tienes plantillas guardadas.<br>Configura un split y pulsa "💾 Guardar plantilla".</div>`;
+  }).join('') : `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Aún no tienes plantillas guardadas.<br>Configura un split y pulsa "<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2ZM17 21v-8H7v8M7 3v5h8"/></svg> Guardar plantilla".</div>`;
   ov.innerHTML=`<div class="modal-box" style="width:480px" onclick="event.stopPropagation()">
     <div class="modal-hdr"><div><div class="modal-title">Plantillas de configuración</div>
     <div style="font-size:11px;color:var(--text3);margin-top:2px">Cargan el split, los grupos y las cantidades</div></div>
@@ -14819,7 +14821,7 @@ function iaPropEntrenoHtml(){
       return `<tr style="border-top:1px solid var(--border)${idx%2?';background:var(--bg)':''}">
         <td style="padding:9px 12px;font-weight:600;color:var(--text)">${escHtml(e.nombre||'')}${e.grupo?`<span style="font-size:10px;color:var(--text3);margin-left:6px">· ${escHtml(e.grupo)}</span>`:''}${badge}</td>
         <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:90px">${e.sets||'?'} × ${escHtml(String(e.reps||'?'))}</td>
-        <td style="text-align:center;width:38px;cursor:pointer;color:var(--text3)" onclick="iaEditarEj(${d.dia},${idx})" title="Editar">✏️</td>
+        <td style="text-align:center;width:38px;cursor:pointer;color:var(--text3)" onclick="iaEditarEj(${d.dia},${idx})" title="Editar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></td>
       </tr>`;
     }).join('');
     return `<div style="margin-bottom:12px"><div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">D${d.dia} · ${iaTipoLbl(d.tipo)}</div>
@@ -14827,7 +14829,7 @@ function iaPropEntrenoHtml(){
   }).join('');
   return `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de entreno · revísala</span>
+      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Propuesta de entreno · revísala</span>
       <div style="display:flex;gap:7px">
         <button onclick="iaGenerarEntreno()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar</button>
         <button onclick="iaAplicarEntreno()" style="font-size:12px;font-weight:700;color:#fff;background:var(--green);padding:7px 16px;border-radius:9px;cursor:pointer;border:none">✓ Aplicar entreno</button>
@@ -14891,7 +14893,7 @@ function iaPropDietaHtml(){
   </div>`).join('');
   const compraBox = compraItems.length?`<div style="border:1px solid var(--border);border-radius:12px;margin-top:14px;overflow:hidden">
     <div onclick="IA.compraAbierta=!IA.compraAbierta;renderClientPanel()" style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;background:var(--bg)">
-      <span style="font-size:15px">🛒</span>
+      <span style="font-size:15px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg></span>
       <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1">Lista de la compra · semana entera</span>
       ${precioTotal?`<span style="font-size:11px;color:#15803d;background:var(--gl);padding:2px 9px;border-radius:6px;font-weight:700">≈ ${precioTotal.toFixed(2)}€/sem</span>`:''}
       <span style="color:var(--text3);font-size:14px">${IA.compraAbierta?'⌃':'⌄'}</span>
@@ -14904,7 +14906,7 @@ function iaPropDietaHtml(){
   </div>`:'';
   return `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px">✨ Propuesta de dieta · ${p.opciones.length} opciones</span>
+      <span style="font-size:12px;font-weight:700;color:var(--accent);background:#f3f0ff;padding:5px 12px;border-radius:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Propuesta de dieta · ${p.opciones.length} opciones</span>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         ${p.opciones.length<7?`<button onclick="iaCompletarDieta()" ${IA.generandoDieta?'disabled':''} style="font-size:12px;font-weight:700;color:#fff;padding:7px 13px;border:none;border-radius:9px;cursor:${IA.generandoDieta?'wait':'pointer'};background:#7c3aed">${IA.generandoDieta?'Completando…':'+ Completar las que faltan ('+(7-p.opciones.length)+')'}</button>`:''}
         <button onclick="iaGenerarDieta()" style="font-size:12px;font-weight:600;color:var(--text2);padding:7px 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;background:var(--bg2)">Regenerar todo</button>
@@ -15086,7 +15088,7 @@ function renderEditar() {
     ? `<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px">
         <button onclick="abrirModalProgramarCambio('global')" title="Crear borradores de entreno y dieta a la vez con la misma fecha de activación" style="
           height:30px;padding:0 13px;border:1.5px solid var(--border);border-radius:9px;cursor:pointer;
-          background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:600">📅 Programar activación global</button>
+          background:var(--bg2);color:var(--text2);font-size:11.5px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Programar activación global</button>
       </div>`
     : '';
 
@@ -15095,7 +15097,7 @@ function renderEditar() {
   const notasHtml = `
     <div class="edit-section" style="margin-bottom:20px">
       <div class="edit-section-hdr">
-        <div class="edit-section-title">📋 Notas de revisión</div>
+        <div class="edit-section-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg> Notas de revisión</div>
         <span style="font-size:11px;color:var(--text3)">${c.revisionNotes?.length||0} nota${(c.revisionNotes?.length||0)!==1?'s':''}</span>
       </div>
       <div style="margin-bottom:10px">
@@ -15727,9 +15729,9 @@ function openChartModal(metric) {
   const weekLbl=weekOffset===0?'Semana actual':weekOffset===-1?'Semana anterior':'Hace '+Math.abs(weekOffset)+' semanas';
   document.getElementById('chart-modal-title').textContent=cfg.title;
   document.getElementById('chart-modal-sub').textContent=weekLbl+(cfg.sub?' — '+cfg.sub:'');
-  const _chartIcons={pasos:'👟',peso:'⚖️',sueno:'😴',actividad:'⚡',sessions:'🏋️',cheats:'🍕'};
+  const _chartIcons={pasos:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M2 16h13l5 2h2v2H2ZM2 16l1-6 4-2 3 4 5 1"/></svg>',peso:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v18M7 21h10M5 7h14M5 7 2 13a3 3 0 0 0 6 0ZM19 7l-3 6a3 3 0 0 0 6 0Z"/></svg>',sueno:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9ZM8 13h3l-3 3h3"/></svg>',actividad:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>',sessions:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>',cheats:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3 2 21l10-3 10 3ZM12 3v6M9 14h.01M14 13h.01"/></svg>'};
   const _chIcon=document.getElementById('chart-modal-icon');
-  if(_chIcon){ _chIcon.textContent=_chartIcons[metric]||'📊'; if(cfg.color){ _chIcon.style.background=cfg.color+'1f'; _chIcon.style.color=cfg.color; } }
+  if(_chIcon){ _chIcon.innerHTML=_chartIcons[metric]||'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M3 3v18h18M7 16v-5M12 16V8M17 16v-9"/></svg>'; if(cfg.color){ _chIcon.style.background=cfg.color+'1f'; _chIcon.style.color=cfg.color; } }
   document.getElementById('chart-modal').style.display='flex';
   renderChartRangeTabs();
   if(metric==='cheats'){ renderCheatsView(); }
@@ -15782,7 +15784,7 @@ function renderCheatsView(){
     const desc = (x.description||x.descripcion||x.name||'Cheat');
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:16px">🍕</span>
+        <span style="font-size:16px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3 2 21l10-3 10 3ZM12 3v6M9 14h.01M14 13h.01"/></svg></span>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text)">${desc}</div>
           <div style="font-size:11px;color:var(--text3)">${fechaFmt}</div>
@@ -16077,10 +16079,10 @@ let _agView = 'mes';        // 'mes' | 'lista'
 let _agFilterCli = '';      // '' = todos
 let _agFilterTipo = '';     // '' = todos
 const APPT_TYPES = {
-  revision:{label:'Revisión',color:'#16a34a',bg:'#dcfce7',icon:'📋'},
-  llamada:{label:'Llamada',color:'#a16207',bg:'#fef9c3',icon:'📞'},
-  sesion:{label:'Sesión',color:'#1d4ed8',bg:'#dbeafe',icon:'🏋'},
-  otro:{label:'Otro',color:'#6b6b66',bg:'#ececec',icon:'📌'}
+  revision:{label:'Revisión',color:'#16a34a',bg:'#dcfce7',icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/></svg>'},
+  llamada:{label:'Llamada',color:'#a16207',bg:'#fef9c3',icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z"/></svg>'},
+  sesion:{label:'Sesión',color:'#1d4ed8',bg:'#dbeafe',icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>'},
+  otro:{label:'Otro',color:'#6b6b66',bg:'#ececec',icon:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 17v5M9 10.8V4h6v6.8l2 3.2H7Z"/></svg>'}
 };
 function _apptType(t){ return APPT_TYPES[t]||APPT_TYPES.otro; }
 function apptClientName(id){ const c=CLIENTS.find(x=>String(x.id)===String(id)); return c?c.name:'Cliente'; }
@@ -16973,7 +16975,7 @@ async function ejecutarImportClientes(){
     return;
   }
   const partes=[]; if(nClientes)partes.push(nClientes+' cliente'+(nClientes!==1?'s':'')); if(nMet)partes.push(nMet+' métrica'+(nMet!==1?'s':'')); if(nEnt)partes.push(nEnt+' entreno'+(nEnt!==1?'s':'')); if(nRut)partes.push(nRut+' rutina'+(nRut!==1?'s':'')); if(nNut)partes.push(nNut+' dieta'+(nNut!==1?'s':''));
-  showToast('✓ Importado: '+partes.join(' · ')+(errores.length?' · ⚠ '+errores[0]:''));
+  showToast('✓ Importado: '+partes.join(' · ')+(errores.length?' · <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+errores[0]:''));
   _importRows=null; _importMetrics=null; _importWorkouts=null; _importRoutine=null; _importNutrition=null;
   await loadRealClients(); renderSidebar();
   renderImportPanel();
@@ -17104,7 +17106,7 @@ function renderImportPanel(){
         <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 6px">Clientes</div>
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
           ${chip('✓ '+okN+' listos','#15803d','#dcfce7')}
-          ${warnN?chip('⚠ '+warnN+' a revisar','#a16207','#fef3c7'):''}
+          ${warnN?chip('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+warnN+' a revisar','#a16207','#fef3c7'):''}
           ${dupN?chip('• '+dupN+' ya existen','#dc2626','#fee2e2'):''}
         </div>
         <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">
@@ -17123,13 +17125,13 @@ function renderImportPanel(){
         <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 6px">Historial y planes</div>
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
           ${_importMetrics?chip('✓ '+metOk+' métricas','#15803d','#dcfce7'):''}
-          ${metBad?chip('⚠ '+metBad+' sin cliente','#a16207','#fef3c7'):''}
+          ${metBad?chip('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+metBad+' sin cliente','#a16207','#fef3c7'):''}
           ${_importWorkouts?chip('✓ '+entFilas+' series de entreno','#15803d','#dcfce7'):''}
-          ${entBad?chip('⚠ '+entBad+' sin cliente','#a16207','#fef3c7'):''}
+          ${entBad?chip('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+entBad+' sin cliente','#a16207','#fef3c7'):''}
           ${_importRoutine?chip('✓ rutina para '+rutClientes+' cliente'+(rutClientes!==1?'s':''),'#15803d','#dcfce7'):''}
-          ${rutBad?chip('⚠ '+rutBad+' filas de rutina sin cliente','#a16207','#fef3c7'):''}
+          ${rutBad?chip('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+rutBad+' filas de rutina sin cliente','#a16207','#fef3c7'):''}
           ${_importNutrition?chip('✓ dieta para '+nutClientes+' cliente'+(nutClientes!==1?'s':''),'#15803d','#dcfce7'):''}
-          ${nutBad?chip('⚠ '+nutBad+' filas de dieta sin cliente','#a16207','#fef3c7'):''}
+          ${nutBad?chip('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01"/></svg> '+nutBad+' filas de dieta sin cliente','#a16207','#fef3c7'):''}
         </div>` : '';
 
     paso3=`<div style="${cardOpen}">

@@ -70,7 +70,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
 /* VIEW TABS */
 .view-tabs{display:inline-flex;gap:5px;margin-top:14px;background:var(--bg3);border-radius:999px;padding:5px}
-.vtab{padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--text3);cursor:pointer;border-radius:999px;transition:all .15s}
+.vtab{padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--text3);cursor:pointer;border-radius:999px;transition:background .15s,color .15s,border-color .15s,transform .15s}
 .vtab:hover{color:var(--text2)}
 .vtab.active{color:#fff;background:var(--accent)}
 
@@ -287,7 +287,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
 /* CHART */
 .chart-range-tabs{display:inline-flex;gap:3px;margin-bottom:18px;background:var(--bg3);border-radius:10px;padding:3px}
-.range-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--text2);background:transparent;font-family:'DM Sans',sans-serif;transition:all .12s}
+.range-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;color:var(--text2);background:transparent;font-family:'DM Sans',sans-serif;transition:background .12s,color .12s,border-color .12s,transform .12s}
 .range-tab:hover{color:var(--text)}
 .range-tab.active{background:var(--accent);color:#fff;font-weight:700}
 .chart-wrap{position:relative;height:200px;margin-bottom:8px}
@@ -313,7 +313,7 @@ canvas{width:100%!important}
 .opciones-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .opciones-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
 .opciones-tabs::-webkit-scrollbar{display:none}
-.opcion-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);white-space:nowrap;transition:all .12s;flex-shrink:0}
+.opcion-tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);white-space:nowrap;transition:background .12s,color .12s,border-color .12s,transform .12s;flex-shrink:0}
 .opcion-tab:hover{background:var(--bg3)}
 .opcion-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .opcion-tab.has-data{border-color:var(--green);color:var(--green)}
@@ -344,7 +344,7 @@ canvas{width:100%!important}
 .comida-item-qty:focus{border-color:var(--accent)}
 .comida-item-del{width:20px;height:20px;border-radius:5px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;margin-top:3px}
 .comida-item-del:hover{color:var(--red);background:var(--rl)}
-.add-item-btn{font-size:11px;color:var(--text3);background:none;border:1px dashed var(--border2);border-radius:6px;padding:5px 8px;cursor:pointer;width:100%;text-align:left;font-family:'DM Sans',sans-serif;transition:all .12s}
+.add-item-btn{font-size:11px;color:var(--text3);background:none;border:1px dashed var(--border2);border-radius:6px;padding:5px 8px;cursor:pointer;width:100%;text-align:left;font-family:'DM Sans',sans-serif;transition:background .12s,color .12s,border-color .12s,transform .12s}
 .add-item-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Asignación semanal */
@@ -373,7 +373,7 @@ canvas{width:100%!important}
 
 /* ── PLAN ENTRENAMIENTO SYSTEM ── */
 .split-picker{display:flex;gap:8px;margin-bottom:16px}
-.split-btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);font-family:'DM Sans',sans-serif;transition:all .12s}
+.split-btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);font-family:'DM Sans',sans-serif;transition:background .12s,color .12s,border-color .12s,transform .12s}
 .split-btn:hover{background:var(--bg3)}
 .split-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
@@ -383,7 +383,7 @@ canvas{width:100%!important}
 .split-day-num.has-session{background:var(--accent);color:#fff;border-color:var(--accent)}
 .split-day-num.is-off{background:var(--bg3);color:var(--text3)}
 .split-type-btns{display:flex;gap:5px;flex-wrap:wrap}
-.split-type-btn{padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap}
+.split-type-btn{padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:var(--bg2);font-family:'DM Sans',sans-serif;transition:background .1s,color .1s,border-color .1s,transform .1s;white-space:nowrap}
 .split-type-btn:hover{background:var(--bg3)}
 .split-type-btn.sel{color:#fff;border-color:transparent}
 .split-type-btn.sel-PUSH{background:#2563eb}
@@ -489,7 +489,7 @@ canvas{width:100%!important}
 .sb-search{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none}
 .sb-search:focus{border-color:var(--border2)}
 .sb-filter-row{display:flex;gap:8px;margin-bottom:8px}
-.sb-filter-btn{flex:1;padding:7px 0;border-radius:999px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text3);font-family:'DM Sans',sans-serif;transition:all .1s;white-space:nowrap;text-align:center}
+.sb-filter-btn{flex:1;padding:7px 0;border-radius:999px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text3);font-family:'DM Sans',sans-serif;transition:background .1s,color .1s,border-color .1s,transform .1s;white-space:nowrap;text-align:center}
 .sb-filter-btn:hover{background:var(--bg3)}
 .sb-filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .sb-sort-select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:5px 8px;font-size:11px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer}
@@ -613,7 +613,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
 .lg-inp-icon.ok{pointer-events:none}
 
 .lg-check-row{display:flex;align-items:center;gap:8px;margin-bottom:20px;cursor:pointer}
-.lg-check-box{width:16px;height:16px;border-radius:5px;border:1.5px solid #e5e4e0;background:#f0efed;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.lg-check-box{width:16px;height:16px;border-radius:5px;border:1.5px solid #e5e4e0;background:#f0efed;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s,border-color .12s,transform .12s}
 .lg-check-box.on{background:#1a1a18;border-color:#1a1a18}
 .lg-check-box.on::after{content:'✓';color:#fff;font-size:10px;line-height:1}
 .lg-check-lbl{font-size:12px;color:#a3a39e}
@@ -720,6 +720,36 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
   .main-header{padding:14px 14px 0}
   .vg-header{padding:16px 14px 12px}
   .vg-body{padding:14px 14px 18px}
+}
+
+/* ── Feel: feedback al pulsar (scale 0.97) en todos los pulsables ── */
+.ai-btn, .vtab, .range-tab, .opcion-tab, .add-item-btn, .split-btn,
+.split-type-btn, .sb-filter-btn, button, .vg-alert-card, .ccard,
+[onclick]:not(input):not(textarea):not(select){
+  transition: transform .16s cubic-bezier(0.23,1,0.32,1),
+              background-color .16s ease, color .16s ease,
+              border-color .16s ease, opacity .16s ease, box-shadow .16s ease;
+}
+.ai-btn:active, .vtab:active, .range-tab:active, .opcion-tab:active,
+.add-item-btn:active, .split-btn:active, .split-type-btn:active,
+.sb-filter-btn:active, button:active{
+  transform: scale(0.97);
+}
+.ccard:active, .vg-alert-card:active{ transform: scale(0.985); }
+
+/* ── Accesibilidad: respetar "reducir movimiento" ── */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ai-btn:active, .vtab:active, .range-tab:active, .opcion-tab:active,
+  .add-item-btn:active, .split-btn:active, .split-type-btn:active,
+  .sb-filter-btn:active, button:active, .ccard:active, .vg-alert-card:active{
+    transform: none;
+  }
 }
 
 </style>
@@ -1058,9 +1088,9 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
       <div class="avatar">PB</div>
       <div><div class="coach-name">Pol De Blas</div><div class="coach-role">Entrenador personal</div></div>
       <div style="margin-left:auto;display:flex;gap:5px">
-        <button onclick="startTour()" title="Ver el tour de bienvenida" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:13px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">?</button>
-        <button onclick="openGeminiKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:all .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
-        <button onclick="lgLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);display:flex;align-items:center;transition:all .15s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
+        <button onclick="startTour()" title="Ver el tour de bienvenida" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:13px;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">?</button>
+        <button onclick="openGeminiKeyModal()" title="Configurar API key IA" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);font-size:14px;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⚙️</button>
+        <button onclick="lgLogout()" title="Cerrar sesión" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--text3);display:flex;align-items:center;transition:background .15s,color .15s,border-color .15s,transform .15s" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
@@ -1263,8 +1293,8 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
           <div class="section-title" style="margin-bottom:0" id="metrics-title">Métricas de hoy</div>
           <div style="display:flex;gap:4px">
-            <button onclick="setMetricsDay(0)" id="btn-metrics-hoy" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-family:&#39;Geist&#39;,sans-serif;font-weight:500;transition:all .15s">Hoy</button>
-            <button onclick="setMetricsDay(-1)" id="btn-metrics-ayer" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-family:&#39;Geist&#39;,sans-serif;font-weight:500;transition:all .15s">Ayer</button>
+            <button onclick="setMetricsDay(0)" id="btn-metrics-hoy" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-family:&#39;Geist&#39;,sans-serif;font-weight:500;transition:background .15s,color .15s,border-color .15s,transform .15s">Hoy</button>
+            <button onclick="setMetricsDay(-1)" id="btn-metrics-ayer" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-family:&#39;Geist&#39;,sans-serif;font-weight:500;transition:background .15s,color .15s,border-color .15s,transform .15s">Ayer</button>
           </div>
         </div>
         <div class="metrics-2x2" style="flex:1" id="metrics-grid">
@@ -6945,8 +6975,8 @@ function renderResumen() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
           <div class="section-title" style="margin-bottom:0" id="metrics-title">Métricas de hoy</div>
           <div style="display:flex;gap:4px">
-            <button onclick="setMetricsDay(0)" id="btn-metrics-hoy" style="font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s">Hoy</button>
-            <button onclick="setMetricsDay(-1)" id="btn-metrics-ayer" style="font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .15s">Ayer</button>
+            <button onclick="setMetricsDay(0)" id="btn-metrics-hoy" style="font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:background .15s,color .15s,border-color .15s,transform .15s">Hoy</button>
+            <button onclick="setMetricsDay(-1)" id="btn-metrics-ayer" style="font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:background .15s,color .15s,border-color .15s,transform .15s">Ayer</button>
           </div>
         </div>
         <div class="metrics-2x2" style="flex:1" id="metrics-grid">

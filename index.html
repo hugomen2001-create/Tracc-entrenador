@@ -10932,6 +10932,89 @@ function _renderPlanPanelBody(){
     <div class="vg-body">${body}</div>`;
 }
 
+// Genera las alertas de un cliente para el panel de la vista general.
+// Devuelve [{nivel:'crit'|'attn'|'ok', icon, texto}]. Solo datos reales en memoria.
+function vgAlertasCliente(c, s){
+  const out = [];
+  const hoy = new Date(); const dow = hoy.getDay()===0?7:hoy.getDay(); // 1=lun..7=dom
+  // 1) Días sin entrenar (crítico ≥5, atención ≥3)
+  if(s.diasDesdeUltima==null){
+    out.push({nivel:'crit', icon:'zzz', texto:'Sin ningún entreno registrado'});
+  } else if(s.diasDesdeUltima>=5){
+    out.push({nivel:'crit', icon:'zzz', texto:s.diasDesdeUltima+' días sin entrenar'});
+  } else if(s.diasDesdeUltima>=3){
+    out.push({nivel:'attn', icon:'zzz', texto:s.diasDesdeUltima+' días sin entrenar'});
+  }
+  // 2) Faltó a sesiones de la semana (a mitad de semana o más)
+  if(dow>=4 && s.sesObjetivo>0){
+    const faltan = s.sesObjetivo - s.sesCompletadas;
+    const esperadas = Math.round(s.sesObjetivo * (dow/7));
+    if(s.sesCompletadas < esperadas && faltan>=2){
+      out.push({nivel:'attn', icon:'calendar-x', texto:'Va '+s.sesCompletadas+'/'+s.sesObjetivo+' sesiones esta semana'});
+    }
+  }
+  // 3) Sin revisión hace mucho (más del doble del intervalo)
+  if(c.ultimaRevision){
+    const last = new Date(String(c.ultimaRevision).slice(0,10)+'T00:00:00');
+    if(!isNaN(last)){
+      const dias = Math.round((Date.now()-last.getTime())/86400000);
+      const limite = (c.revisionCadaSemanas||2)*7*2;
+      if(dias>limite) out.push({nivel:'attn', icon:'clipboard-x', texto:'Sin revisión hace '+Math.round(dias/7)+' semanas'});
+    }
+  }
+  // 4) Caída de adherencia: esta semana muy por debajo de su media reciente
+  try{
+    const ses = (c._sessions||[]).filter(x=>x&&x.completed&&x.session_date);
+    if(ses.length>=6 && s.sesObjetivo>0){
+      const hoy0 = new Date(); hoy0.setHours(0,0,0,0);
+      const semCompletadas = (off)=>{
+        const ini = new Date(hoy0); ini.setDate(ini.getDate()-((hoy0.getDay()===0?7:hoy0.getDay())-1)-7*off);
+        const fin = new Date(ini); fin.setDate(fin.getDate()+7);
+        return ses.filter(x=>{const d=new Date(String(x.session_date).slice(0,10)+'T00:00:00'); return d>=ini&&d<fin;}).length;
+      };
+      const prev = (semCompletadas(1)+semCompletadas(2)+semCompletadas(3))/3;
+      if(prev>=2 && s.sesCompletadas < prev*0.5 && dow>=5){
+        out.push({nivel:'attn', icon:'activity', texto:'Adherencia bajando (antes ~'+Math.round(prev)+'/sem)'});
+      }
+    }
+  }catch(e){}
+  // 5) Logros positivos: racha de días entrenando seguidos (≥7) o nuevo PR reciente
+  try{
+    const racha = _vgRachaDias(c);
+    if(racha>=7) out.push({nivel:'ok', icon:'flame', texto:'Racha de '+racha+' días'});
+    if(c._prReciente) out.push({nivel:'ok', icon:'trophy', texto:c._prReciente});
+  }catch(e){}
+  return out;
+}
+// Racha de días consecutivos con al menos una sesión completada (hasta hoy o ayer)
+// Filtro del panel de alertas de la vista general
+function vgFiltrarAlertas(modo, btn){
+  document.querySelectorAll('.vg-alert-filtro').forEach(b=>{
+    b.style.background='var(--bg2)'; b.style.color='var(--text2)'; b.style.borderColor='var(--border)';
+  });
+  if(btn){ btn.style.background='var(--text)'; btn.style.color='#fff'; btn.style.borderColor='var(--text)'; }
+  document.querySelectorAll('#vg-alertas-lista .vg-alert-card').forEach(card=>{
+    const esLogro = card.getAttribute('data-logros')==='1';
+    let mostrar = true;
+    if(modo==='avisos') mostrar = !esLogro;
+    else if(modo==='logros') mostrar = esLogro;
+    card.style.display = mostrar ? 'flex' : 'none';
+  });
+}
+
+function _vgRachaDias(c){
+  const ses = (c._sessions||[]).filter(x=>x&&x.completed&&x.session_date);
+  if(!ses.length) return 0;
+  const dias = new Set(ses.map(x=>String(x.session_date).slice(0,10)));
+  let racha=0; const d=new Date(); d.setHours(0,0,0,0);
+  const hoyStr=d.toISOString().slice(0,10);
+  const ayer=new Date(d); ayer.setDate(ayer.getDate()-1);
+  if(!dias.has(hoyStr) && !dias.has(ayer.toISOString().slice(0,10))) return 0;
+  if(!dias.has(hoyStr)) d.setDate(d.getDate()-1);
+  while(dias.has(d.toISOString().slice(0,10))){ racha++; d.setDate(d.getDate()-1); }
+  return racha;
+}
+
 function renderOverview() {
   const clientes = CLIENTS.filter(c => !(c._raw && c._raw.active === false));
   const stats = clientes.map(c => ({ c, s: _vgStatsCliente(c) }));
@@ -10945,17 +11028,53 @@ function renderOverview() {
   const adherencia = sesPlanSem>0?Math.round(sesTotalesSem/sesPlanSem*100):0;
   const necesitanNombres = stats.filter(x=>x.s.estado==='attn'||x.s.estado==='crit').map(x=>x.c.name.split(' ')[0]).slice(0,3).join(' · ') || '—';
 
-  // Alertas (críticos)
-  const alertasHtml = criticos.length ? criticos.map(({c,s}) => `
-    <div class="alert-row amber" onclick="selectClientById('${c.id}')">
-      <div class="alert-dot-a"></div>
-      <div class="alert-av" style="background:${c.colorBg||'var(--bg3)'};color:${c.color||'var(--text2)'};border:none">${c.initials||'?'}</div>
-      <div style="flex:1">
-        <div class="alert-txt">${c.name} lleva ${s.diasDesdeUltima} días sin registrar ningún entreno</div>
-        <div class="alert-sub">${s.sesObjetivo} sesiones/semana planificadas</div>
+  // Panel de alertas: una tarjeta por cliente que tenga algo (avisos o logros)
+  const conAlertas = stats.map(({c,s})=>({c,s,alertas:vgAlertasCliente(c,s)})).filter(x=>x.alertas.length);
+  // ordenar: críticos primero, luego atención, luego solo-logros
+  const peso = a => a.some(x=>x.nivel==='crit')?0 : a.some(x=>x.nivel==='attn')?1 : 2;
+  conAlertas.sort((A,B)=>peso(A.alertas)-peso(B.alertas));
+  const nAvisos = conAlertas.filter(x=>x.alertas.some(a=>a.nivel!=='ok')).length;
+  const _alertaIcon = {
+    'zzz':'M3 4h6l-6 7h6 M14 8h7l-7 9h7',
+    'calendar-x':'M4 5h16v15H4z M4 9h16 M9 13l6 6 M15 13l-6 6',
+    'clipboard-x':'M9 4h6v3H9z M5 6h3 M16 6h3v15H5V6h3 M9 12l6 6 M15 12l-6 6',
+    'activity':'M3 12h4l3 8 4-16 3 8h4',
+    'flame':'M12 3c2 4 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 1 2 3 1 3-5z',
+    'trophy':'M7 4h10v4a5 5 0 0 1-10 0z M5 5H3v2a3 3 0 0 0 3 3 M19 5h2v2a3 3 0 0 1-3 3 M9 16h6 M12 13v3 M8 20h8'
+  };
+  const lvlCol = {crit:'var(--red)', attn:'var(--amber)', ok:'var(--green)'};
+  const lvlBg  = {crit:'#fee2e2', attn:'#fef3c7', ok:'var(--gl)'};
+  const tagHtml = a => `<span style="display:inline-flex;align-items:center;gap:5px;background:${lvlBg[a.nivel]};color:${lvlCol[a.nivel]};font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:7px">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="${_alertaIcon[a.icon]||''}"/></svg>${escHtml(a.texto)}</span>`;
+  const tarjetas = conAlertas.map(({c,s,alertas})=>{
+    const dom = alertas.some(a=>a.nivel==='crit')?'crit':alertas.some(a=>a.nivel==='attn')?'attn':'ok';
+    const avBg = dom==='crit'?'#fee2e2':dom==='attn'?'#fef3c7':'var(--gl)';
+    const avCol = lvlCol[dom];
+    const soloLogros = alertas.every(a=>a.nivel==='ok') ? '1':'0';
+    return `<div class="vg-alert-card" data-logros="${soloLogros}" style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1.5px solid var(--border);border-radius:13px;padding:13px 15px">
+      <div style="width:38px;height:38px;border-radius:50%;background:${avBg};color:${avCol};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0">${c.initials||'?'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14.5px;font-weight:700;color:var(--text)">${escHtml(c.name)}</div>
+        <div style="display:flex;gap:7px;margin-top:5px;flex-wrap:wrap">${alertas.map(tagHtml).join('')}</div>
       </div>
-      <div class="alert-arrow">→</div>
-    </div>`).join('') : '';
+      <button onclick="selectClientById('${c.id}')" style="font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0">Ver →</button>
+    </div>`;
+  }).join('');
+  const alertasHtml = conAlertas.length ? `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span style="font-size:16px;font-weight:700;color:var(--text)">Clientes que necesitan atención</span>
+        ${nAvisos?`<span style="margin-left:auto;background:#fee2e2;color:var(--red);font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px">${nAvisos} ${nAvisos===1?'cliente':'clientes'}</span>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px" id="vg-alertas-lista">${tarjetas}</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:14px">
+        <span style="font-size:11.5px;color:var(--text3)">Filtrar:</span>
+        <button onclick="vgFiltrarAlertas('todos',this)" class="vg-alert-filtro" style="font-size:11.5px;padding:5px 11px;border-radius:8px;border:1.5px solid var(--text);background:var(--text);color:#fff;cursor:pointer">Todos</button>
+        <button onclick="vgFiltrarAlertas('avisos',this)" class="vg-alert-filtro" style="font-size:11.5px;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">Solo avisos</button>
+        <button onclick="vgFiltrarAlertas('logros',this)" class="vg-alert-filtro" style="font-size:11.5px;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer">Solo logros</button>
+      </div>
+    </div>` : '';
 
   // Grid de cards de cliente
   function fmtUlt(s){

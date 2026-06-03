@@ -13172,24 +13172,32 @@ function seccionPlanEntreno(c){
   let sesionesHtml;
   if (!tiposSesion.length){
     sesionesHtml = `<div style="font-size:12px;color:var(--text3);padding:14px;background:var(--bg);border-radius:11px;text-align:center;line-height:1.6">
-      Configura primero la <strong style="color:var(--text2)">distribución del split</strong> arriba para asignar sesiones a los días. Luego pulsa un cuadrado para añadir ejercicios.
-    </div>`;
+      Configura primero la <strong style="color:var(--text2)">distribución del split</strong> arriba para asignar sesiones a los días, o crea una sesión directamente.
+    </div>
+    <div style="margin-top:10px"><button onclick="anadirSesionEntreno()" style="
+        height:34px;padding:0 15px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;
+        border:1.5px dashed var(--accent);background:var(--bg);color:var(--accent)">+ Añadir sesión</button></div>`;
   } else {
     if (editSesionEntreno >= tiposSesion.length) editSesionEntreno = 0;
 
-    // Pestañas de sesión (TORSO, LEG, PUSH, PULL...)
+    // Pestañas de sesión (TORSO, LEG, PUSH, PULL...) con botón de eliminar
     const pills = tiposSesion.map((t,i) => {
       const activa = i === editSesionEntreno;
       const vacia = ((porSesion[t] || []).length === 0);
       const dot = vacia
         ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${activa?'#fde68a':'#f59e0b'};margin-right:6px;vertical-align:middle"></span>`
         : '';
-      return `<button onclick="seleccionarSesionEntreno(${i})" title="${vacia?'Esta sesión aún no tiene ejercicios':''}" style="
-        height:32px;padding:0 15px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;
-        border:1.5px solid ${activa?'var(--green)':'var(--border)'};
-        background:${activa?'var(--green)':'var(--bg2)'};
-        color:${activa?'#fff':'var(--text2)'};text-transform:capitalize">${dot}${escHtml(t.toLowerCase())}</button>`;
-    }).join('');
+      return `<span style="display:inline-flex;align-items:center;border-radius:9px;overflow:hidden;border:1.5px solid ${activa?'var(--green)':'var(--border)'};background:${activa?'var(--green)':'var(--bg2)'}">
+        <button onclick="seleccionarSesionEntreno(${i})" title="${vacia?'Esta sesión aún no tiene ejercicios':''}" style="
+          height:32px;padding:0 10px 0 13px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:transparent;
+          color:${activa?'#fff':'var(--text2)'};text-transform:capitalize">${dot}${escHtml(t.toLowerCase())}</button>
+        <button onclick="event.stopPropagation();eliminarSesionEntreno('${escHtml(t)}')" title="Eliminar esta sesión" style="
+          height:32px;width:26px;border:none;cursor:pointer;background:transparent;padding:0;
+          color:${activa?'rgba(255,255,255,.7)':'var(--text3)'};font-size:11px;display:flex;align-items:center;justify-content:center">✕</button>
+      </span>`;
+    }).join('') + `<button onclick="anadirSesionEntreno()" title="Crear una sesión nueva" style="
+        height:32px;padding:0 13px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;
+        border:1.5px dashed var(--accent);background:var(--bg);color:var(--accent)">+ Añadir sesión</button>`;
 
     // Ejercicios de la sesión seleccionada
     const tipoSel = tiposSesion[editSesionEntreno];
@@ -13862,13 +13870,70 @@ async function quitarEjercicio(id){
   renderClientPanel();
 }
 
+// Elimina una sesión completa (pestaña) y todos sus ejercicios de ese session_type
+async function eliminarSesionEntreno(tipo){
+  const c = currentClient;
+  if (!c || !c._training || !tipo) return;
+  const ejs = (c._training.exercises||[]).filter(e => (e.session_type||'') === tipo);
+  const ok = await confirmDestructive({
+    title: 'Eliminar sesión '+escHtml(tipo),
+    message: ejs.length
+      ? '¿Eliminar la sesión <strong style="color:#111">'+escHtml(tipo)+'</strong> y sus <strong style="color:#111">'+ejs.length+'</strong> ejercicio'+(ejs.length===1?'':'s')+'? Las demás sesiones se conservan.'
+      : '¿Eliminar la sesión <strong style="color:#111">'+escHtml(tipo)+'</strong>?',
+    confirmText: 'Eliminar sesión', icon: 'trash', danger: true,
+  });
+  if (!ok) return;
+  // Borrar en Supabase todos los ejercicios de ese tipo
+  if (ejs.length){
+    const { error } = await sb.from("client_plans").delete().eq("client_id", c.id).eq("session_type", tipo);
+    if (error){ console.error("eliminarSesionEntreno error:", error); showToast("No se pudo eliminar la sesión"); return; }
+    c._training.exercises = (c._training.exercises||[]).filter(e => (e.session_type||'') !== tipo);
+  }
+  // Quitar el tipo del split del plan (si estaba) para que no reaparezca la pestaña vacía
+  if (Array.isArray(c._training.split) && c._training.split.includes(tipo)){
+    const nuevoSplit = c._training.split.map(s => s===tipo ? 'OFF' : s);
+    const planId = c._training.plan && c._training.plan.id;
+    if (planId){
+      try{ await sb.from('training_plans').update({split:nuevoSplit, split_days:nuevoSplit.length}).eq('id',planId); c._training.split = nuevoSplit; }
+      catch(e){ console.warn('actualizar split tras eliminar sesión:',e); }
+    }
+  }
+  editSesionEntreno = 0;
+  showToast('✓ Sesión eliminada');
+  renderClientPanel();
+}
+
+// Crea una sesión nueva (pestaña): pide el nombre y la deja lista para añadir ejercicios
+async function anadirSesionEntreno(){
+  const c = currentClient;
+  if (!c || !c._training) return;
+  const nombre = (prompt('Nombre de la nueva sesión (ej. PUSH, PULL, PIERNA, BRAZO):')||'').trim().toUpperCase();
+  if (!nombre) return;
+  // ¿ya existe ese tipo? (evitar duplicados)
+  const existentes = new Set((c._training.exercises||[]).map(e=>(e.session_type||'').toUpperCase()));
+  (c._training.split||[]).forEach(s=>{ if(s&&s!=='OFF') existentes.add(s.toUpperCase()); });
+  if (existentes.has(nombre)){ showToast('Ya existe una sesión "'+nombre+'"'); return; }
+  // Añadir el tipo al split en el primer día OFF disponible (o al final)
+  let split = Array.isArray(c._training.split) ? c._training.split.slice() : [];
+  const idxOff = split.indexOf('OFF');
+  if (idxOff>=0) split[idxOff] = nombre; else split.push(nombre);
+  const planId = c._training.plan && c._training.plan.id;
+  if (planId){
+    try{ await sb.from('training_plans').update({split, split_days:split.length}).eq('id',planId); c._training.split = split; }
+    catch(e){ console.warn('crear sesión (split):',e); showToast('No se pudo crear la sesión'); return; }
+  } else {
+    c._training.split = split;
+  }
+  showToast('✓ Sesión "'+nombre+'" creada — añádele ejercicios');
+  renderClientPanel();
+}
+
 // Mueve un ejercicio una posición arriba (-1) o abajo (+1) dentro de su sesión
 async function moverEjercicio(id, dir){
   const c = currentClient;
   if (!c || !c._training) return;
   const ej = (c._training.exercises||[]).find(e => e.id === id);
   if (!ej) return;
-  // Ejercicios de la misma sesión, ordenados
   const grupo = c._training.exercises
     .filter(e => e.session_type === ej.session_type)
     .sort((a,b)=>(a.exercise_order||0)-(b.exercise_order||0));

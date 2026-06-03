@@ -12153,15 +12153,19 @@ function seccionPlanNutricional(c){
       const num = n => { const v=Number(n); return Number.isFinite(v)? (Math.round(v*10)/10).toLocaleString('es-ES') : '·'; };
       const headCol = 'font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.03em;text-align:right;padding:0 0 5px';
       const cell = 'font-size:12.5px;color:var(--text2);text-align:right;padding:5px 0;white-space:nowrap';
-      const filas = items.length ? items.map(it => `
+      const filas = items.length ? items.map(it => {
+        const g = it.grams;
+        const gTxt = (g==null||g==='') ? '·' : (/[a-zA-Z]/.test(String(g)) ? escHtml(String(g)) : escHtml(String(g))+' g');
+        const marca = it.marca ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin-top:1px">${escHtml(it.marca)}</div>` : '';
+        return `
         <tr style="border-bottom:1px solid var(--border)">
-          <td style="${cell};text-align:left;color:var(--text3);width:46px">${it.grams!=null?escHtml(it.grams)+' g':'·'}</td>
-          <td style="${cell};text-align:left;color:var(--text);padding-left:6px;white-space:normal">${escHtml(it.name||'—')}</td>
+          <td style="${cell};text-align:left;color:var(--text3);width:62px">${gTxt}</td>
+          <td style="${cell};text-align:left;color:var(--text);padding-left:6px;white-space:normal">${escHtml(it.name||'—')}${marca}</td>
           <td style="${cell};color:var(--green);font-weight:600">${num(it.kcal)}</td>
           <td style="${cell}">${num(it.protein)}</td>
           <td style="${cell}">${num(it.carbs)}</td>
           <td style="${cell}">${num(it.fat)}</td>
-        </tr>`).join('')
+        </tr>`; }).join('')
         : `<tr><td colspan="6" style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">Sin alimentos</td></tr>`;
       return `<div style="background:var(--bg);border-radius:11px;padding:13px 15px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
@@ -14419,11 +14423,14 @@ async function iaCompletarDieta(){
   const previas = IA.propDieta.opciones||[];
   if(previas.length>=7){ showToast('Ya tienes las 7 opciones'); return; }
   IA.generandoDieta=true; renderClientPanel();
+  const antes = previas.length;
   try{
     const ctx = _iaContexto(c,'dieta');
     IA.propDieta = await _iaGenerarDieta(c, ctx, previas);
     const n=(IA.propDieta.opciones||[]).length;
-    showToast(n>=7?'✓ Completada — ya tienes las 7 opciones':`Añadidas algunas. Ahora tienes ${n}. Si falta, pulsa de nuevo.`);
+    if(n>=7) showToast('✓ Completada — ya tienes las 7 opciones');
+    else if(n>antes) showToast(`Añadidas ${n-antes}. Ahora tienes ${n}. Si falta, pulsa de nuevo.`);
+    else showToast('Gemini está saturado, no pudo añadir más ahora. Espera 1-2 min y pulsa otra vez.');
   }catch(e){
     console.error('IA completar dieta:',e);
     const sat=/high demand|overloaded|unavailable|429|503|temporar/i.test(e.message||'');
@@ -14563,8 +14570,11 @@ COHERENCIA DE COMIDAS (MUY IMPORTANTE):
 - DESAYUNO: solo alimentos típicos de desayuno español (avena, copos, pan/tostadas, huevos/claras, yogur, fruta, leche, café, tortitas, mantequilla de cacahuete, fruto seco). PROHIBIDO en desayuno: boniato, patata, arroz, pasta, legumbres, cebolla, carnes en plato, pescado en plato.
 - MERIENDA: ligera (fruta, yogur, fruto seco, tostada, batido). Nunca un plato principal.
 - COMIDA y CENA: plato principal = proteína (pollo, pavo, ternera, pescado, huevo, legumbre) + guarnición (arroz, patata, boniato, pasta, quinoa) + verdura. La cebolla/verdura solo como acompañamiento dentro de un plato.
-Variedad real entre opciones. Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${marcaRegla}${bibTxt}
-Responde EXACTAMENTE este JSON: {"opciones":[{"n":${desde},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Tostadas integrales","cant":"80g","marca":"Pan Bimbo","kcal":200,"protein":7,"carbs":38,"fat":2}]}]}]}`;
+Variedad real entre opciones. Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${marcaRegla}
+CANTIDADES:
+- Los pesos SIEMPRE en CRUDO/SECO (arroz, pasta, legumbres, carne, pescado: peso en seco o crudo, nunca cocido).
+- Alimentos que se cuentan por unidades (huevos, fruta entera como manzana/plátano/naranja, rebanadas de pan, tortitas): pon la cantidad en UNIDADES y añade entre paréntesis el peso estimado por unidad. Ej: "2 uds (~120g)", "1 manzana (~180g)", "3 claras (~100g)".${bibTxt}
+Responde EXACTAMENTE este JSON: {"opciones":[{"n":${desde},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Huevos","cant":"2 uds (~120g)","marca":"","kcal":155,"protein":13,"carbs":1,"fat":11}]}]}]}`;
     const r = await parseIAJson(await callIA(sys, usr, 12000));
     let arr = [];
     if(r && Array.isArray(r.opciones)) arr = r.opciones;
@@ -14576,14 +14586,16 @@ Responde EXACTAMENTE este JSON: {"opciones":[{"n":${desde},"kcal":2400,"comidas"
   };
   let opciones = previas.slice();
   let primerError = null;
-  // recorrer en bloques de 2; cada bloque se reintenta hasta 2 veces si falla
+  const dormir = ms=>new Promise(r=>setTimeout(r,ms));
+  // recorrer en bloques de 2; cada bloque se reintenta hasta 3 veces si falla
   for(let desde=opciones.length+1; desde<=TOTAL; desde+=2){
     const hasta = Math.min(desde+1, TOTAL);
     let nuevas = [], intento=0;
-    while(intento<2){
+    while(intento<3){
       try{ nuevas = await pedirRango(desde, hasta); if(nuevas.length) break; }
       catch(e){ console.warn(`rango ${desde}-${hasta} intento ${intento+1} falló:`,e); if(!opciones.length && !previas.length) primerError=e; }
       intento++;
+      if(intento<3) await dormir(1500*intento); // esperar antes de reintentar
     }
     if(!nuevas.length) break;           // este bloque no salió: paramos y conservamos lo que haya
     opciones = opciones.concat(nuevas);
@@ -14668,12 +14680,12 @@ function iaPropDietaHtml(){
     const items = m.alimentos||[];
     const tot = items.reduce((s,a)=>({k:s.k+(+a.kcal||0),p:s.p+(+a.protein||0),c:s.c+(+a.carbs||0),f:s.f+(+a.fat||0)}),{k:0,p:0,c:0,f:0});
     const filasItems = items.map(a=>`<tr style="border-top:1px solid var(--border)">
-      <td style="padding:7px 10px;color:var(--text)">${escHtml(a.nombre||'')}${a.marca?`<span style="font-size:10px;color:var(--text3);font-style:italic"> · ${escHtml(a.marca)}</span>`:''}</td>
-      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:54px">${escHtml(a.cant||'')}</td>
-      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:48px">${Math.round(+a.kcal||0)}</td>
-      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.protein||0)}</td>
-      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.carbs||0)}</td>
-      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:38px">${Math.round(+a.fat||0)}</td>
+      <td style="padding:7px 10px;color:var(--text);white-space:normal">${escHtml(a.nombre||'')}${a.marca?`<span style="font-size:10px;color:var(--text3);font-style:italic"> · ${escHtml(a.marca)}</span>`:''}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:90px;white-space:normal;font-size:11px">${escHtml(a.cant||'')}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text2);width:42px">${Math.round(+a.kcal||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:34px">${Math.round(+a.protein||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:34px">${Math.round(+a.carbs||0)}</td>
+      <td style="text-align:center;font-family:'Geist Mono';color:var(--text3);width:34px">${Math.round(+a.fat||0)}</td>
     </tr>`).join('');
     return `<div style="margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">

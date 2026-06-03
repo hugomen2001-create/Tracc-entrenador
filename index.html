@@ -14220,6 +14220,8 @@ let IA = {
   fuenteDieta:'biblioteca',   // 'biblioteca' | 'ia'
   fuenteEntreno:'biblioteca', // 'biblioteca' | 'ia'
   indicacionesDieta:'',
+  numOpcionesDieta:7,    // cuántas opciones de dieta generar (1-7)
+  entrenoSeleccion:null, // {indiceDia:true/false} — qué sesiones del split generar (null = todas)
   indicacionesEntreno:'',
   splitDraft:null,       // [{tipo:'PUSH', grupos:[{nombre:'Pecho',n:3},...]}, {tipo:'OFF',grupos:[]}, ...]
   generandoDieta:false,
@@ -14338,7 +14340,16 @@ function iaGeneradorHtml(c){
       ${fuenteCard('iaSetFuenteDieta',IA.fuenteDieta,'ia','<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg>','Que la IA proponga','Orientativo')}
     </div>
     <textarea id="ia-ind-dieta" oninput="IA.indicacionesDieta=this.value" placeholder="Indicaciones para la dieta (opcional): comidas sencillas, mucho boniato, sin lactosa…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesDieta||'')}</textarea>
-    <button onclick="iaGenerarDieta()" ${IA.generandoDieta?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoDieta?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoDieta?'wait':'pointer'}">${IA.generandoDieta?'Generando dieta…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Generar dieta'}</button>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">¿Cuántas opciones de dieta?</div>
+      <div style="display:flex;gap:6px">
+        ${[1,2,3,4,5,6,7].map(num=>{
+          const on=(parseInt(IA.numOpcionesDieta)||7)===num;
+          return `<span onclick="IA.numOpcionesDieta=${num};renderClientPanel()" style="flex:1;text-align:center;padding:8px 0;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;background:${on?'#7c3aed':'var(--bg)'};color:${on?'#fff':'var(--text3)'};border:1.5px solid ${on?'#7c3aed':'var(--border)'}">${num}</span>`;
+        }).join('')}
+      </div>
+    </div>
+    <button onclick="iaGenerarDieta()" ${IA.generandoDieta?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoDieta?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoDieta?'wait':'pointer'}">${IA.generandoDieta?'Generando dieta…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Generar '+( (parseInt(IA.numOpcionesDieta)||7) )+' opcion'+(((parseInt(IA.numOpcionesDieta)||7)===1)?'':'es')}</button>
     ${IA.propDieta?iaPropDietaHtml():''}
   </div>` : '';
   const bloqueDieta = `<div style="border:1.5px solid var(--border);border-radius:13px;margin-bottom:14px;overflow:hidden">
@@ -14405,7 +14416,8 @@ function iaGeneradorHtml(c){
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${filasSplit}</div>
     <textarea id="ia-ind-entreno" oninput="IA.indicacionesEntreno=this.value" placeholder="Indicaciones para el entreno (opcional): prioriza pecho, evita sentadilla por la rodilla…" style="width:100%;min-height:50px;border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);box-sizing:border-box;font-family:inherit;resize:vertical;outline:none;background:var(--bg);margin-bottom:14px">${escHtml(IA.indicacionesEntreno||'')}</textarea>
-    <button onclick="iaGenerarEntreno()" ${IA.generandoEntreno?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoEntreno?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoEntreno?'wait':'pointer'}">${IA.generandoEntreno?'Generando entreno…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> Generar entreno'}</button>
+    ${iaSelectorSesionesHtml()}
+    <button onclick="iaGenerarEntreno()" ${IA.generandoEntreno?'disabled':''} style="width:100%;height:44px;border-radius:11px;background:${IA.generandoEntreno?'var(--bg3)':'#7c3aed'};color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:${IA.generandoEntreno?'wait':'pointer'}">${IA.generandoEntreno?'Generando entreno…':'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M16 6l-2 2M8 16l-2 2"/></svg> '+iaTextoBotonEntreno()}</button>
     ${IA.propEntreno?iaPropEntrenoHtml():''}
   </div>` : '';
   const bloqueEntreno = `<div style="border:1.5px solid var(--border);border-radius:13px;overflow:hidden">
@@ -14589,9 +14601,10 @@ async function iaGenerarDieta(){
   renderClientPanel();
   try{
     const ctx = _iaContexto(c,'dieta');
-    IA.propDieta = await _iaGenerarDieta(c, ctx, []); IA.opcionActiva=1;
+    const nQuiere = Math.max(1, Math.min(7, parseInt(IA.numOpcionesDieta)||7));
+    IA.propDieta = await _iaGenerarDieta(c, ctx, [], nQuiere); IA.opcionActiva=1;
     const n=(IA.propDieta.opciones||[]).length;
-    showToast(n>=7?'✓ Dieta lista — revísala antes de aplicar':`✓ Dieta lista con ${n} opciones (Gemini iba saturado; pulsa "Completar las que faltan")`);
+    showToast(n>=nQuiere?`✓ Dieta lista con ${n} opcion${n===1?'':'es'} — revísala antes de aplicar`:`✓ Dieta lista con ${n} de ${nQuiere} (Gemini iba saturado; pulsa "Completar las que faltan")`);
   }catch(e){
     console.error('IA dieta:',e);
     const sat=/high demand|overloaded|unavailable|429|503|temporar/i.test(e.message||'');
@@ -14603,14 +14616,15 @@ async function iaGenerarDieta(){
 async function iaCompletarDieta(){
   const c = currentClient; if(!c||!IA.propDieta) return;
   const previas = IA.propDieta.opciones||[];
-  if(previas.length>=7){ showToast('Ya tienes las 7 opciones'); return; }
+  const objetivo = Math.max(1, Math.min(7, parseInt(IA.numOpcionesDieta)||7));
+  if(previas.length>=objetivo){ showToast(`Ya tienes las ${objetivo} opciones`); return; }
   IA.generandoDieta=true; renderClientPanel();
   const antes = previas.length;
   try{
     const ctx = _iaContexto(c,'dieta');
-    IA.propDieta = await _iaGenerarDieta(c, ctx, previas);
+    IA.propDieta = await _iaGenerarDieta(c, ctx, previas, objetivo);
     const n=(IA.propDieta.opciones||[]).length;
-    if(n>=7) showToast('✓ Completada — ya tienes las 7 opciones');
+    if(n>=objetivo) showToast(`✓ Completada — ya tienes las ${objetivo} opciones`);
     else if(n>antes) showToast(`Añadidas ${n-antes}. Ahora tienes ${n}. Si falta, pulsa de nuevo.`);
     else showToast('Gemini está saturado, no pudo añadir más ahora. Espera 1-2 min y pulsa otra vez.');
   }catch(e){
@@ -14619,6 +14633,51 @@ async function iaCompletarDieta(){
     showToast(sat?'Gemini sigue saturado. Espera 1-2 min y pulsa otra vez.':'No se pudieron añadir más: '+(e.message||''));
   }
   finally{ IA.generandoDieta=false; renderClientPanel(); }
+}
+// ── Selección de qué sesiones del split generar con IA ──
+// Devuelve los días de entreno (no OFF) del split actual: [{i, tipo, lbl}]
+function _iaDiasEntreno(){
+  if(!IA.splitDraft) return [];
+  return IA.splitDraft.map((d,i)=>({i, tipo:d.tipo, lbl:iaTipoLbl(d.tipo)})).filter(d=>d.tipo!=='OFF');
+}
+// ¿Está seleccionado el día i? (null = todos seleccionados por defecto)
+function _iaSesionOn(i){
+  if(!IA.entrenoSeleccion) return true;
+  return IA.entrenoSeleccion[i]!==false;
+}
+function iaToggleSesion(i){
+  const dias=_iaDiasEntreno();
+  if(!IA.entrenoSeleccion){ IA.entrenoSeleccion={}; dias.forEach(d=>IA.entrenoSeleccion[d.i]=true); }
+  IA.entrenoSeleccion[i]=!_iaSesionOn(i);
+  // no permitir dejar 0 seleccionadas: si todas quedan off, volver a marcar esta
+  if(!dias.some(d=>_iaSesionOn(d.i))) IA.entrenoSeleccion[i]=true;
+  renderClientPanel();
+}
+function iaSelectorSesionesHtml(){
+  const dias=_iaDiasEntreno();
+  if(dias.length<=1) return ''; // con una sola sesión no tiene sentido el selector
+  const chips=dias.map(d=>{
+    const on=_iaSesionOn(d.i);
+    const check = on
+      ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '';
+    return `<span onclick="iaToggleSesion(${d.i})" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;cursor:pointer;font-size:12.5px;font-weight:700;background:${on?'#7c3aed':'var(--bg)'};color:${on?'#fff':'var(--text3)'};border:1.5px solid ${on?'#7c3aed':'var(--border)'}"><span style="width:14px;height:14px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid ${on?'#fff':'var(--border2)'};background:${on?'rgba(255,255,255,.15)':'transparent'}">${check}</span>${d.lbl}</span>`;
+  }).join('');
+  const nSel=dias.filter(d=>_iaSesionOn(d.i)).length;
+  return `<div style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">¿Qué sesiones generar?</div>
+      <span onclick="IA.entrenoSeleccion=null;renderClientPanel()" style="font-size:11px;font-weight:600;color:var(--accent);cursor:pointer">Todas</span>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">${chips}</div>
+    <div style="font-size:10.5px;color:var(--text3);margin-top:6px">${nSel} de ${dias.length} seleccionada${nSel===1?'':'s'}</div>
+  </div>`;
+}
+function iaTextoBotonEntreno(){
+  const dias=_iaDiasEntreno();
+  const nSel=dias.filter(d=>_iaSesionOn(d.i)).length;
+  if(dias.length>1 && nSel<dias.length) return `Generar ${nSel} sesion${nSel===1?'':'es'}`;
+  return 'Generar entreno';
 }
 async function iaGenerarEntreno(){
   const c = currentClient; if(!c) return;
@@ -14695,7 +14754,7 @@ function _iaContexto(c, cual){
 }
 
 async function _iaGenerarEntreno(c, ctx){
-  const dias = IA.splitDraft.map((d,i)=>({dia:i+1,tipo:d.tipo,lbl:iaTipoLbl(d.tipo),grupos:(d.grupos||[]).filter(g=>g.n>0)})).filter(d=>d.tipo!=='OFF');
+  const dias = IA.splitDraft.map((d,i)=>({dia:i+1,_idx:i,tipo:d.tipo,lbl:iaTipoLbl(d.tipo),grupos:(d.grupos||[]).filter(g=>g.n>0)})).filter(d=>d.tipo!=='OFF' && _iaSesionOn(d._idx));
   // biblioteca de ejercicios del coach (toda, para que la IA use el máximo posible)
   let bibTxt='', bibNames=new Set();
   if(ctx.usarBiblioteca){
@@ -14727,9 +14786,9 @@ Responde EXACTAMENTE este JSON (incluye el grupo de cada ejercicio):
   return data;
 }
 
-async function _iaGenerarDieta(c, ctx, opcionesPrevias){
+async function _iaGenerarDieta(c, ctx, opcionesPrevias, total){
   const previas = Array.isArray(opcionesPrevias)?opcionesPrevias:[];
-  const TOTAL = 7;
+  const TOTAL = Math.max(1, Math.min(7, parseInt(total)||7));
   let compraPrev = (IA.propDieta&&IA.propDieta.compra)||[];
   let superPrev = (IA.propDieta&&IA.propDieta.supermercado)||ctx.supermercado||'';
   if(previas.length>=TOTAL) return { supermercado:superPrev, opciones:previas, compra:compraPrev };
@@ -14789,7 +14848,7 @@ Responde EXACTAMENTE este JSON: {"opciones":[{"n":${desde},"kcal":2400,"comidas"
   if(opciones.length>=TOTAL && !compra.length){
     try{
       const resumen = opciones.map(o=>o.comidas.map(m=>(m.alimentos||[]).map(a=>a.nombre+' '+(a.cant||'')).join(', ')).join(' | ')).join(' || ');
-      const usrC = `A partir de estas 7 opciones de menú, genera la lista de la compra para una semana entera (una opción por día). Agrupa por categoría, suma cantidades totales y estima un precio aproximado en euros por línea (número). ${marcaRegla}
+      const usrC = `A partir de estas ${opciones.length} opciones de menú, genera la lista de la compra (una opción por día). Agrupa por categoría, suma cantidades totales y estima un precio aproximado en euros por línea (número). ${marcaRegla}
 Menús: ${resumen}
 Responde EXACTAMENTE este JSON: {"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]}`;
       const rc = await parseIAJson(await callIA(sys, usrC, 6000));
@@ -14938,7 +14997,11 @@ function iaEditarEj(dia, idx){
 // ── Aplicar al plan real (Supabase) ───────────────────────────────────────
 async function iaAplicarEntreno(){
   const c=currentClient; if(!c||!IA.propEntreno||!coachData) return;
-  if(!confirm('¿Aplicar este entreno al plan? Sobrescribe el plan de entreno actual (luego podrás editarlo).')) return;
+  const _tipos=[...new Set((IA.propEntreno.dias||[]).map(d=>d.tipo))];
+  const _msg = _tipos.length===1
+    ? `¿Aplicar la sesión ${iaTipoLbl(_tipos[0])} al plan? Solo se actualizará esa sesión; las demás se conservan.`
+    : '¿Aplicar este entreno al plan? Se actualizan las sesiones generadas (luego podrás editarlo).';
+  if(!confirm(_msg)) return;
   try{
     // tipos custom → su etiqueta (con espacios), igual que el split normal
     const tipoReal = (t)=> (typeof IA_TIPOS_CUSTOM!=='undefined' && IA_TIPOS_CUSTOM[t]) ? (IA_TIPOS_CUSTOM[t].lbl||t).toUpperCase() : t;
@@ -14972,8 +15035,14 @@ async function iaAplicarEntreno(){
         (ins||[]).forEach(e=>{ if(e&&e.name) libByName[e.name.trim().toLowerCase()]=e.id; });
       }catch(e){ console.warn('crear exercises:',e); }
     }
-    // 4) Borrar los client_plans actuales del cliente y meter los nuevos
-    try{ await sb.from('client_plans').delete().eq('client_id',c.id); }catch(e){}
+    // 4) Reemplazo PARCIAL: borrar solo los client_plans de las sesiones que estamos aplicando
+    //    (así, si solo se generó PUSH, se conservan PULL/LEG/etc. que ya tuviera el cliente).
+    const tiposAplicados = [...new Set((IA.propEntreno.dias||[]).map(d=>tipoReal(d.tipo)))];
+    try{
+      if(tiposAplicados.length){
+        await sb.from('client_plans').delete().eq('client_id',c.id).in('session_type',tiposAplicados);
+      }
+    }catch(e){ console.warn('borrar sesiones a reemplazar:',e); }
     // ¿la columna training_plan_id existe?
     let tieneTPI=false;
     try{ const t=await sb.from('client_plans').select('training_plan_id').limit(1); tieneTPI=!t.error; }catch(e){ tieneTPI=false; }

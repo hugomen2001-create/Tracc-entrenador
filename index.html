@@ -14516,20 +14516,35 @@ REGLAS: coherencia (desayuno de desayuno: avena/huevos/tostadas/fruta/yogur; com
 Responde EXACTAMENTE este JSON (una sola opción):
 {"n":${n},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}`;
     const r = await parseIAJson(await callIA(sys, usr, 4000));
-    // puede venir como {n,...} o envuelto en {opciones:[...]}
-    if(r && r.comidas) return r;
-    if(r && r.opciones && r.opciones[0]) return r.opciones[0];
-    return null;
+    // normalizar: aceptar la opción venga como venga
+    let op = null;
+    if(r){
+      if(Array.isArray(r.comidas)) op = r;                       // {n,comidas:[...]}
+      else if(Array.isArray(r.meals)) op = {...r, comidas:r.meals}; // {n,meals:[...]}
+      else if(r.opciones && r.opciones[0]) op = r.opciones[0];   // {opciones:[{...}]}
+      else if(Array.isArray(r)) op = r[0];                       // [{...}]
+      else if(r.opcion && r.opcion.comidas) op = r.opcion;       // {opcion:{...}}
+      else {
+        // último recurso: ¿tiene desayuno/comida/etc. como claves sueltas?
+        const tipos=['desayuno','comida','merienda','cena','almuerzo','snack'];
+        const claves=Object.keys(r).filter(k=>tipos.includes(k.toLowerCase()));
+        if(claves.length){ op = { n, comidas: claves.map(k=>({tipo:k, alimentos: Array.isArray(r[k])?r[k]:[]})) }; }
+      }
+    }
+    if(op && !op.comidas && op.meals) op.comidas = op.meals;
+    return (op && Array.isArray(op.comidas) && op.comidas.length) ? op : null;
   };
   let opciones = previas.slice();
   // generar las que falten, una a una; si una falla, paramos pero conservamos las hechas
+  let primerError = null;
   for(let n=opciones.length+1; n<=TOTAL; n++){
     try{
       const op = await pedirOpcion(n);
-      if(op) opciones.push(op); else break;
-    }catch(e){ console.warn('opción '+n+' falló:',e); break; }
+      if(op) opciones.push(op);
+      else { if(!opciones.length && !previas.length) primerError = new Error('La IA devolvió un formato inesperado'); break; }
+    }catch(e){ console.warn('opción '+n+' falló:',e); if(n===opciones.length+1 && !opciones.length) primerError=e; break; }
   }
-  if(!opciones.length) throw new Error('La IA no devolvió opciones de dieta');
+  if(!opciones.length) throw (primerError || new Error('La IA no devolvió opciones de dieta'));
   opciones.forEach((o,i)=>{ o.n=i+1; });
   // ── lista de la compra: solo si tenemos las 7 y aún no hay compra ──
   let compra = compraPrev;

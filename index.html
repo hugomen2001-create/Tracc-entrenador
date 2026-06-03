@@ -4345,6 +4345,25 @@ let trainState = {};
 const SPLIT_TYPES  = ['PUSH','PULL','LEG','TORSO','BRAZO','FULL','CARDIO','OFF'];
 const SPLIT_COLORS = {PUSH:'#2563eb',PULL:'#7c3aed',LEG:'#16a34a',TORSO:'#d97706',BRAZO:'#db2777',FULL:'#0891b2',CARDIO:'#059669',OFF:'#a3a39e'};
 
+// Sinónimos de tipos de sesión → nombre canónico. Así "LEG", "Pierna", "PIERNAS" se tratan como lo mismo.
+const SPLIT_SINONIMOS = {
+  'leg':'LEG', 'legs':'LEG', 'pierna':'LEG', 'piernas':'LEG',
+  'push':'PUSH', 'empuje':'PUSH',
+  'pull':'PULL', 'tiron':'PULL', 'tirón':'PULL', 'jalon':'PULL', 'jalón':'PULL',
+  'torso':'TORSO', 'tren superior':'TORSO',
+  'brazo':'BRAZO', 'brazos':'BRAZO', 'arm':'BRAZO', 'arms':'BRAZO',
+  'full':'FULL', 'full body':'FULL', 'cuerpo completo':'FULL', 'fullbody':'FULL',
+  'cardio':'CARDIO',
+  'off':'OFF', 'descanso':'OFF', 'rest':'OFF'
+};
+// Normaliza un tipo de sesión a su nombre canónico. Si no es un sinónimo conocido, lo deja en mayúsculas tal cual.
+function normalizarTipoSesion(t){
+  if(t==null) return '';
+  const k = String(t).trim().toLowerCase();
+  if(!k) return '';
+  return SPLIT_SINONIMOS[k] || String(t).trim().toUpperCase();
+}
+
 function getTrainState(clientId) {
   if (!trainState[clientId]) {
     trainState[clientId] = {
@@ -13003,10 +13022,10 @@ function seccionPlanEntreno(c){
   const ejercicios = nut.exercises || [];
   const diasEntreno = split.filter(s => s && s !== 'OFF').length;
 
-  // ── Agrupar ejercicios por tipo de sesión ──
+  // ── Agrupar ejercicios por tipo de sesión (normalizado: LEG/Pierna/Piernas = LEG) ──
   const porSesion = {};
   ejercicios.forEach(ej => {
-    const t = ej.session_type || 'OTROS';
+    const t = normalizarTipoSesion(ej.session_type || 'OTROS');
     (porSesion[t] = porSesion[t] || []).push(ej);
   });
   // Orden de las sesiones: primero según aparecen en el split (incluso sin ejercicios),
@@ -13014,7 +13033,8 @@ function seccionPlanEntreno(c){
   // Así el cliente puede seleccionar una sesión vacía y empezar a meter ejercicios.
   const ordenSplit = [];
   split.forEach(s => {
-    if (s && s !== 'OFF' && !ordenSplit.includes(s)) ordenSplit.push(s);
+    const sn = normalizarTipoSesion(s);
+    if (sn && sn !== 'OFF' && !ordenSplit.includes(sn)) ordenSplit.push(sn);
   });
   const tiposSesion = ordenSplit
     .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t) && t !== 'OTROS'));
@@ -13364,13 +13384,14 @@ function seccionPlanEntreno(c){
 function tipoSesionActual(c){
   if (!c || !c._training) return null;
   const ejercicios = c._training.exercises || [];
-  const split = c._training.split || [];
+  const split = numerarSplit(c._training.split || []);
+  // Mismo criterio que el render: agrupar normalizado y ordenar split primero
   const porSesion = {};
-  ejercicios.forEach(e => { const t=e.session_type||'OTROS'; (porSesion[t]=porSesion[t]||[]).push(e); });
+  ejercicios.forEach(e => { const t=normalizarTipoSesion(e.session_type||'OTROS'); (porSesion[t]=porSesion[t]||[]).push(e); });
   const ordenSplit = [];
-  split.forEach(s => { if (s && s!=='OFF' && !ordenSplit.includes(s)) ordenSplit.push(s); });
-  const tiposSesion = ordenSplit.filter(t=>porSesion[t])
-    .concat(Object.keys(porSesion).filter(t=>!ordenSplit.includes(t)));
+  split.forEach(s => { const sn=normalizarTipoSesion(s); if (sn && sn!=='OFF' && !ordenSplit.includes(sn)) ordenSplit.push(sn); });
+  const tiposSesion = ordenSplit
+    .concat(Object.keys(porSesion).filter(t => !ordenSplit.includes(t) && t !== 'OTROS'));
   return tiposSesion[editSesionEntreno] || null;
 }
 
@@ -13789,16 +13810,13 @@ async function anadirEjercicio(exerciseId){
   const ej = EXERCISE_LIBRARY.find(e => e.id === exerciseId);
   if (!ej) return;
 
-  // Tipo de sesión actualmente seleccionado
+  // Tipo de sesión actualmente seleccionado (normalizado: LEG, no Pierna)
   const ejercicios = c._training.exercises || [];
-  const split = c._training.split || [];
-  const porSesion = {};
-  ejercicios.forEach(e => { const t=e.session_type||"OTROS"; (porSesion[t]=porSesion[t]||[]).push(e); });
-  const ordenSplit = [];
-  split.forEach(s => { if (s && s!=="OFF" && !ordenSplit.includes(s)) ordenSplit.push(s); });
-  const tiposSesion = ordenSplit.filter(t=>porSesion[t]).concat(Object.keys(porSesion).filter(t=>!ordenSplit.includes(t)));
-  const sessionType = tiposSesion[editSesionEntreno];
+  const sessionType = tipoSesionActual(c);
   if (!sessionType){ alert("No hay una sesión seleccionada."); return; }
+  // agrupar normalizado para calcular el orden dentro de la sesión
+  const porSesion = {};
+  ejercicios.forEach(e => { const t=normalizarTipoSesion(e.session_type||"OTROS"); (porSesion[t]=porSesion[t]||[]).push(e); });
 
   // exercise_order = al final de los de esa sesión
   const ordenMax = (porSesion[sessionType]||[]).reduce((m,e)=>Math.max(m, e.exercise_order||0), 0);
@@ -13870,36 +13888,31 @@ async function quitarEjercicio(id){
   renderClientPanel();
 }
 
-// Elimina una sesión completa (pestaña) y todos sus ejercicios de ese session_type
+// Vacía una sesión (pestaña): borra sus ejercicios (incluyendo sinónimos: LEG+Pierna).
+// NO toca el split — el día sigue en el split, solo se queda sin ejercicios.
 async function eliminarSesionEntreno(tipo){
   const c = currentClient;
   if (!c || !c._training || !tipo) return;
-  const ejs = (c._training.exercises||[]).filter(e => (e.session_type||'') === tipo);
+  const canon = normalizarTipoSesion(tipo);
+  // todos los ejercicios cuyo tipo normalizado coincide (LEG, Pierna, Piernas…)
+  const ejs = (c._training.exercises||[]).filter(e => normalizarTipoSesion(e.session_type) === canon);
   const ok = await confirmDestructive({
-    title: 'Eliminar sesión '+escHtml(tipo),
+    title: 'Vaciar sesión '+escHtml(canon),
     message: ejs.length
-      ? '¿Eliminar la sesión <strong style="color:#111">'+escHtml(tipo)+'</strong> y sus <strong style="color:#111">'+ejs.length+'</strong> ejercicio'+(ejs.length===1?'':'s')+'? Las demás sesiones se conservan.'
-      : '¿Eliminar la sesión <strong style="color:#111">'+escHtml(tipo)+'</strong>?',
-    confirmText: 'Eliminar sesión', icon: 'trash', danger: true,
+      ? '¿Borrar los <strong style="color:#111">'+ejs.length+'</strong> ejercicio'+(ejs.length===1?'':'s')+' de la sesión <strong style="color:#111">'+escHtml(canon)+'</strong>? El día seguirá en el split, pero sin ejercicios. Las demás sesiones no se tocan.'
+      : '¿Quitar la sesión <strong style="color:#111">'+escHtml(canon)+'</strong> de la lista?',
+    confirmText: 'Vaciar sesión', icon: 'trash', danger: true,
   });
   if (!ok) return;
-  // Borrar en Supabase todos los ejercicios de ese tipo
   if (ejs.length){
-    const { error } = await sb.from("client_plans").delete().eq("client_id", c.id).eq("session_type", tipo);
-    if (error){ console.error("eliminarSesionEntreno error:", error); showToast("No se pudo eliminar la sesión"); return; }
-    c._training.exercises = (c._training.exercises||[]).filter(e => (e.session_type||'') !== tipo);
-  }
-  // Quitar el tipo del split del plan (si estaba) para que no reaparezca la pestaña vacía
-  if (Array.isArray(c._training.split) && c._training.split.includes(tipo)){
-    const nuevoSplit = c._training.split.map(s => s===tipo ? 'OFF' : s);
-    const planId = c._training.plan && c._training.plan.id;
-    if (planId){
-      try{ await sb.from('training_plans').update({split:nuevoSplit, split_days:nuevoSplit.length}).eq('id',planId); c._training.split = nuevoSplit; }
-      catch(e){ console.warn('actualizar split tras eliminar sesión:',e); }
-    }
+    // Borrar en Supabase TODAS las variantes de nombre de ese tipo
+    const variantes = [...new Set(ejs.map(e=>e.session_type).filter(Boolean))];
+    const { error } = await sb.from("client_plans").delete().eq("client_id", c.id).in("session_type", variantes);
+    if (error){ console.error("eliminarSesionEntreno error:", error); showToast("No se pudo vaciar la sesión"); return; }
+    c._training.exercises = (c._training.exercises||[]).filter(e => normalizarTipoSesion(e.session_type) !== canon);
   }
   editSesionEntreno = 0;
-  showToast('✓ Sesión eliminada');
+  showToast('✓ Sesión vaciada (el día sigue en el split)');
   renderClientPanel();
 }
 

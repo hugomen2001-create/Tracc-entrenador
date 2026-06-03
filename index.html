@@ -2675,7 +2675,7 @@ async function callIA(system, user, maxTokens=4000, jsonMode=true){
     const url = `${IA_CFG.geminiBase}/${IA_CFG.model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
     const genCfg = { temperature:0.7, maxOutputTokens:maxTokens };
     if(jsonMode) genCfg.responseMimeType='application/json';
-    const body = JSON.stringify({
+    const construirBody = ()=>JSON.stringify({
       system_instruction:{ parts:[{ text: system }] },
       contents:[{ role:'user', parts:[{ text: user }] }],
       generationConfig: genCfg
@@ -2685,6 +2685,7 @@ async function callIA(system, user, maxTokens=4000, jsonMode=true){
     let ultimoErr = '';
     for(let intento=1; intento<=MAX_INTENTOS; intento++){
       let res, data;
+      const body = construirBody(); // se reconstruye por si subimos maxOutputTokens
       try{ res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body}); }
       catch(e){ ultimoErr='Sin conexión con la IA'; await esperar(1500*intento); continue; }
       try{ data = await res.json(); }catch(e){ ultimoErr='Respuesta no válida de la IA'; await esperar(1500*intento); continue; }
@@ -2698,9 +2699,25 @@ async function callIA(system, user, maxTokens=4000, jsonMode=true){
         if(temporal && intento<MAX_INTENTOS){ await esperar(2000*intento); continue; }
         throw new Error(msg);
       }
-      const txt = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || '';
+      const cand = data.candidates?.[0];
+      const finish = cand?.finishReason || '';
+      const txt = cand?.content?.parts?.map(p=>p.text||'').join('') || '';
+      // bloqueo por seguridad/recitación: no tiene sentido reintentar igual
+      if(!txt && (finish==='SAFETY'||finish==='RECITATION'||finish==='PROHIBITED_CONTENT')){
+        throw new Error('Gemini bloqueó la respuesta ('+finish+'). Reformula las indicaciones.');
+      }
+      // respuesta cortada por límite de tokens: reintentar con más margen
+      if(finish==='MAX_TOKENS'){
+        ultimoErr = 'Respuesta cortada (MAX_TOKENS)';
+        if(intento<MAX_INTENTOS){
+          genCfg.maxOutputTokens = Math.min((genCfg.maxOutputTokens||4000)*2, 32000);
+          await esperar(600); continue;
+        }
+        if(txt) return txt; // devolver lo parcial para recuperar lo posible
+        throw new Error(ultimoErr);
+      }
       if(!txt){
-        ultimoErr = 'La IA no devolvió respuesta';
+        ultimoErr = 'La IA no devolvió respuesta'+(finish?' ('+finish+')':'');
         if(intento<MAX_INTENTOS){ await esperar(1500*intento); continue; }
         throw new Error(ultimoErr);
       }
@@ -14515,7 +14532,7 @@ Indicaciones del entrenador: ${ctx.indicaciones}.
 REGLAS: coherencia (desayuno de desayuno: avena/huevos/tostadas/fruta/yogur; comida y cena platos principales con proteína+guarnición+verdura; merienda ligera; NUNCA pasta/arroz en desayuno o merienda). Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${superTxt} Pon "marca" en cada alimento.${bibTxt}
 Responde EXACTAMENTE este JSON (una sola opción):
 {"n":${n},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}`;
-    const r = await parseIAJson(await callIA(sys, usr, 4000));
+    const r = await parseIAJson(await callIA(sys, usr, 8000));
     // normalizar: aceptar la opción venga como venga
     let op = null;
     if(r){
@@ -14554,7 +14571,7 @@ Responde EXACTAMENTE este JSON (una sola opción):
       const usrC = `A partir de estas 7 opciones de menú, genera la lista de la compra para una semana entera (asumiendo una opción por día). Agrupa por categoría, suma cantidades totales y estima un precio aproximado en euros por línea. ${superTxt}
 Menús: ${resumen}
 Responde EXACTAMENTE este JSON: {"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]}`;
-      const rc = await parseIAJson(await callIA(sys, usrC, 4000));
+      const rc = await parseIAJson(await callIA(sys, usrC, 6000));
       if(rc && rc.compra) compra = rc.compra;
     }catch(e){ console.warn('lista compra falló:',e); }
   }

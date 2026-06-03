@@ -14495,57 +14495,55 @@ Responde EXACTAMENTE este JSON (incluye el grupo de cada ejercicio):
 async function _iaGenerarDieta(c, ctx, opcionesPrevias){
   const previas = Array.isArray(opcionesPrevias)?opcionesPrevias:[];
   const TOTAL = 7;
-  if(previas.length>=TOTAL) return { supermercado:ctx.supermercado||'', opciones:previas, compra:(IA.propDieta&&IA.propDieta.compra)||[] };
+  let compraPrev = (IA.propDieta&&IA.propDieta.compra)||[];
+  let superPrev = (IA.propDieta&&IA.propDieta.supermercado)||ctx.supermercado||'';
+  if(previas.length>=TOTAL) return { supermercado:superPrev, opciones:previas, compra:compraPrev };
   let bibTxt='';
   if(ctx.usarBiblioteca && typeof FOOD_LIBRARY!=='undefined' && FOOD_LIBRARY.length){
-    const lineas = FOOD_LIBRARY.slice(0,60).map(f=>`${f.name} (${f.kcal||'?'}kcal, P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
-    bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca del entrenador (con sus macros exactos):\n'+lineas.join('; ');
+    const lineas = FOOD_LIBRARY.slice(0,50).map(f=>`${f.name} (${f.kcal||'?'}kcal P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
+    bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca (con sus macros exactos): '+lineas.join('; ');
   }
-  const sys = `Eres un nutricionista experto. Generas menús variados, equilibrados y coherentes. Respondes SOLO con JSON válido y COMPLETO, sin texto alrededor, sin markdown. Cierra siempre todas las llaves y corchetes.`;
+  const sys = `Eres un nutricionista experto. Generas menús coherentes y equilibrados. Respondes SOLO con JSON válido y COMPLETO, sin texto alrededor, sin markdown. Cierra siempre todas las llaves.`;
   const superTxt = ctx.supermercado
-    ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos y marcas reales de ${ctx.supermercado} (no mezcles supermercados).`
-    : `En "marca" sugiere productos de UN ÚNICO supermercado español coherente para toda la dieta (elige uno: Mercadona/Hacendado, Lidl, Carrefour…) y mantén ese mismo supermercado en todos los alimentos. No mezcles supermercados.`;
-  // pide un rango de opciones; conCompra solo en la primera tanda cuando no hay nada previo
-  const pedirTanda = async (desde, hasta, conCompra)=>{
-    const usr = `Genera las opciones de menú diario numeradas del ${desde} al ${hasta} (${hasta-desde+1} opciones). Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
+    ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos reales de ${ctx.supermercado}.`
+    : `En "marca" usa productos de UN ÚNICO supermercado español coherente para toda la dieta (Mercadona/Hacendado, Lidl, Carrefour…). No mezcles supermercados.`;
+  // ── 1 opción (1 día completo) por llamada: respuesta pequeña, no se corta ──
+  const pedirOpcion = async (n)=>{
+    const usr = `Genera UNA sola opción de menú diario (opción nº ${n}), día completo: desayuno, comida, merienda, cena. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
 ${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
-REGLAS:
-- Cada opción es un día completo: desayuno, comida, merienda, cena.
-- COHERENCIA: desayuno con comida de desayuno (avena, huevos, tostadas, fruta, yogur...); comida y cena con platos principales (proteína + guarnición + verdura); merienda ligera. NUNCA pongas pasta o arroz como desayuno o merienda.
-- VARIEDAD REAL entre las opciones. Cada opción debe acercarse a las calorías objetivo.
-- Para cada alimento: cantidad y macros (kcal, protein, carbs, fat) de esa cantidad. Para cada comida, el total de kcal.
-- ${superTxt} Pon la "marca" a nivel de cada alimento.${bibTxt}
-${conCompra?'- Incluye además "compra": lista de la compra de la semana entera con categoría, cantidad total y precio aproximado en euros (número).':'- NO incluyas lista de la compra en esta respuesta.'}
-Responde EXACTAMENTE este JSON${conCompra?'':' (sin campo compra)'}:
-{"supermercado":"Mercadona","opciones":[{"n":${desde},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}]${conCompra?',"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]':''}}`;
-    return parseIAJson(await callIA(sys, usr, 12000));
+REGLAS: coherencia (desayuno de desayuno: avena/huevos/tostadas/fruta/yogur; comida y cena platos principales con proteína+guarnición+verdura; merienda ligera; NUNCA pasta/arroz en desayuno o merienda). Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${superTxt} Pon "marca" en cada alimento.${bibTxt}
+Responde EXACTAMENTE este JSON (una sola opción):
+{"n":${n},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}`;
+    const r = await parseIAJson(await callIA(sys, usr, 4000));
+    // puede venir como {n,...} o envuelto en {opciones:[...]}
+    if(r && r.comidas) return r;
+    if(r && r.opciones && r.opciones[0]) return r.opciones[0];
+    return null;
   };
-
   let opciones = previas.slice();
-  let compra = (IA.propDieta&&IA.propDieta.compra)||[];
-  let supermercado = (IA.propDieta&&IA.propDieta.supermercado)||ctx.supermercado||'';
-
-  if(previas.length===0){
-    // generación desde cero en 2 tandas: 1-4 (con compra) y 5-7
-    const t1 = await pedirTanda(1,4,true);
-    opciones = (t1.opciones||[]).slice();
-    compra = t1.compra||[];
-    supermercado = t1.supermercado||supermercado;
+  // generar las que falten, una a una; si una falla, paramos pero conservamos las hechas
+  for(let n=opciones.length+1; n<=TOTAL; n++){
     try{
-      const t2 = await pedirTanda(5,7,false);
-      opciones = opciones.concat(t2.opciones||[]);
-    }catch(e){ console.warn('tanda 2 dieta falló, sigo con las que hay:',e); }
-  } else {
-    // completar solo las que faltan (ej: tengo 4 → pido 5-7)
-    const faltan = TOTAL - previas.length;
-    const t = await pedirTanda(previas.length+1, TOTAL, opciones.length && !compra.length);
-    opciones = opciones.concat(t.opciones||[]);
-    if(!compra.length && t.compra) compra = t.compra;
+      const op = await pedirOpcion(n);
+      if(op) opciones.push(op); else break;
+    }catch(e){ console.warn('opción '+n+' falló:',e); break; }
   }
   if(!opciones.length) throw new Error('La IA no devolvió opciones de dieta');
   opciones.forEach((o,i)=>{ o.n=i+1; });
-  return { supermercado, opciones, compra };
+  // ── lista de la compra: solo si tenemos las 7 y aún no hay compra ──
+  let compra = compraPrev;
+  if(opciones.length>=TOTAL && !compra.length){
+    try{
+      const resumen = opciones.map(o=>o.comidas.map(m=>(m.alimentos||[]).map(a=>a.nombre+' '+(a.cant||'')).join(', ')).join(' | ')).join(' || ');
+      const usrC = `A partir de estas 7 opciones de menú, genera la lista de la compra para una semana entera (asumiendo una opción por día). Agrupa por categoría, suma cantidades totales y estima un precio aproximado en euros por línea. ${superTxt}
+Menús: ${resumen}
+Responde EXACTAMENTE este JSON: {"compra":[{"cat":"Proteínas","nombre":"Pechuga de pollo","cant":"1,4 kg","precio":8.5}]}`;
+      const rc = await parseIAJson(await callIA(sys, usrC, 4000));
+      if(rc && rc.compra) compra = rc.compra;
+    }catch(e){ console.warn('lista compra falló:',e); }
+  }
+  return { supermercado:superPrev, opciones, compra };
 }
 
 // ── Propuesta de ENTRENO (burbujitas de día + editable + aplicar) ─────────

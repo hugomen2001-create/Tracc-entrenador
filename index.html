@@ -3825,6 +3825,32 @@ async function recargarNutricionDeCliente(c, planId){
   return true;
 }
 
+// Crea una opción de dieta vacía manualmente (sin IA) y la abre para editar
+async function crearOpcionDietaManual(){
+  const c = currentClient; if(!c||!coachData) return;
+  try{
+    // asegurar plan nutricional
+    let planId = c._nutrition && c._nutrition.plan && c._nutrition.plan.id;
+    if(!planId){
+      const {data,error}=await sb.from('nutrition_plans').insert({
+        client_id:c.id, coach_id:coachData.id, kcal_goal:0, protein_g:0, carbs_g:0, fat_g:0,
+        is_active:true, activation_date:new Date().toISOString().slice(0,10)
+      }).select().single();
+      if(error||!data){ showToast('No se pudo crear el plan: '+(error?.message||'')); return; }
+      planId=data.id; if(!c._nutrition) c._nutrition={plan:data,options:[]}; else c._nutrition.plan=data;
+    }
+    const num = ((c._nutrition.options||[]).reduce((m,o)=>Math.max(m,o.option_number||0),0))+1;
+    // opción vacía con las comidas estándar
+    const meals = { desayuno:{items:[]}, comida:{items:[]}, merienda:{items:[]}, cena:{items:[]} };
+    const {error}=await sb.from('nutrition_options').insert({ nutrition_plan_id:planId, option_number:num, meals });
+    if(error){ console.error('crear opción:',error); showToast('No se pudo crear la opción: '+(error.message||error.code||'')); return; }
+    await recargarNutricionDeCliente(c, planId);
+    editNutriOpcion = (c._nutrition.options||[]).length-1; // seleccionar la nueva
+    renderClientPanel();
+    showToast('✓ Opción '+num+' creada — añádele alimentos');
+  }catch(e){ console.error(e); showToast('No se pudo crear la opción'); }
+}
+
 // Recarga info de planes programados de UN cliente (para refrescar badge).
 async function recargarScheduledDates(c){
   if (!c) return;
@@ -12204,7 +12230,10 @@ function seccionPlanNutricional(c){
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
     ${tiraBibliotecaAlimentos()}
     ${panelBibliotecaHtml()}
-    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Opciones de dieta</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Opciones de dieta</div>
+      <button onclick="crearOpcionDietaManual()" style="font-size:12px;font-weight:700;padding:6px 13px;border-radius:9px;border:1.5px solid var(--green);background:var(--gl);color:#15803d;cursor:pointer">+ Crear opción</button>
+    </div>
     ${opcionesHtml}
   </div>`;
 }
@@ -14520,18 +14549,22 @@ async function _iaGenerarDieta(c, ctx, opcionesPrevias){
     const lineas = FOOD_LIBRARY.slice(0,50).map(f=>`${f.name} (${f.kcal||'?'}kcal P${f.protein||'?'} C${f.carbs||'?'} G${f.fat||'?'})`);
     bibTxt='\n\nUSA PREFERENTEMENTE estos alimentos de la biblioteca (con sus macros exactos): '+lineas.join('; ');
   }
-  const sys = `Eres un nutricionista experto. Generas menús coherentes y equilibrados. Respondes SOLO con JSON válido y COMPLETO, sin texto alrededor, sin markdown. Cierra siempre todas las llaves.`;
-  const superTxt = ctx.supermercado
-    ? `El cliente compra en ${ctx.supermercado.toUpperCase()}: en "marca" pon SIEMPRE productos reales de ${ctx.supermercado}.`
-    : `En "marca" usa productos de UN ÚNICO supermercado español coherente para toda la dieta (Mercadona/Hacendado, Lidl, Carrefour…). No mezcles supermercados.`;
+  const sys = `Eres un nutricionista experto y conocedor de los productos reales que se venden en los supermercados españoles. Generas menús coherentes y equilibrados. Respondes SOLO con JSON válido y COMPLETO, sin texto alrededor, sin markdown. Cierra siempre todas las llaves.`;
+  const marcaRegla = ctx.supermercado
+    ? `MARCAS: el cliente compra en ${ctx.supermercado}. Para cada alimento procesado/envasado pon en "marca" una MARCA REAL Y CONCRETA que se venda en ${ctx.supermercado}, usando VARIEDAD de marcas reales de fabricante (ej. Central Lechera Asturiana, Hacendado, Pavofrío, Gallo, Danone, Bonduelle, Calvo, Carbonell, Reny Picot…), NO pongas la marca blanca del súper en TODO. Para alimentos FRESCOS sin marca (cebolla, tomate, pollo fresco, fruta, verdura, huevos a granel) deja "marca" como cadena vacía "" — no inventes marca para frescos.`
+    : `MARCAS: usa marcas reales y variadas de fabricantes españoles (Central Lechera Asturiana, Pavofrío, Gallo, Danone, Bonduelle, Calvo, Carbonell…) coherentes entre sí. Para alimentos frescos sin marca (cebolla, tomate, pollo fresco, fruta, verdura) deja "marca" vacía "".`;
   // ── 1 opción (1 día completo) por llamada: respuesta pequeña, no se corta ──
   const pedirOpcion = async (n)=>{
     const usr = `Genera UNA sola opción de menú diario (opción nº ${n}), día completo: desayuno, comida, merienda, cena. Objetivo: ${ctx.objetivo}. Calorías objetivo: ${ctx.kcal}. Macros objetivo: ${ctx.macros}. Alergias/restricciones: ${ctx.alergias}.
 ${ctx.extra}
 Indicaciones del entrenador: ${ctx.indicaciones}.
-REGLAS: coherencia (desayuno de desayuno: avena/huevos/tostadas/fruta/yogur; comida y cena platos principales con proteína+guarnición+verdura; merienda ligera; NUNCA pasta/arroz en desayuno o merienda). Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${superTxt} Pon "marca" en cada alimento.${bibTxt}
+COHERENCIA DE COMIDAS (MUY IMPORTANTE):
+- DESAYUNO: solo alimentos típicos de desayuno español (avena, copos, pan/tostadas, huevos/claras, yogur, fruta, leche, café, tortitas, mantequilla de cacahuete, fruto seco). PROHIBIDO en desayuno: boniato, patata, arroz, pasta, legumbres, cebolla, carnes en plato, pescado en plato, ensaladas de plato principal.
+- MERIENDA: ligera (fruta, yogur, fruto seco, tostada, batido). Nunca un plato principal.
+- COMIDA y CENA: plato principal real = proteína (pollo, pavo, ternera, pescado, huevo, legumbre) + guarnición (arroz, patata, boniato, pasta, quinoa) + verdura. La cebolla/verdura solo como acompañamiento dentro de un plato, nunca como alimento suelto de desayuno.
+Acércate a las calorías objetivo. Para cada alimento: cantidad y macros (kcal, protein, carbs, fat). Para cada comida, total de kcal. ${marcaRegla}${bibTxt}
 Responde EXACTAMENTE este JSON (una sola opción):
-{"n":${n},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Avena","cant":"80g","marca":"Avena Hacendado","kcal":300,"protein":10,"carbs":50,"fat":6}]}]}`;
+{"n":${n},"kcal":2400,"comidas":[{"tipo":"Desayuno","kcal":520,"alimentos":[{"nombre":"Tostadas integrales","cant":"80g","marca":"Pan Bimbo","kcal":200,"protein":7,"carbs":38,"fat":2}]}]}`;
     const r = await parseIAJson(await callIA(sys, usr, 8000));
     // normalizar: aceptar la opción venga como venga
     let op = null;
@@ -14763,7 +14796,7 @@ async function iaAplicarEntreno(){
         const row={ client_id:c.id, coach_id:coachData.id, is_active:true,
           exercise_id: libByName[(e.nombre||'').trim().toLowerCase()]||null,
           session_type:st, exercise_order:idx+1,
-          sets:e.sets||3, reps:String(e.reps||'10'), rest_sec:e.restSec||90, approx:'' };
+          sets:parseInt(e.sets,10)||3, reps:String(e.reps||'10'), rest_sec:parseInt(e.restSec,10)||90, approx:null };
         if(tieneTPI) row.training_plan_id=planId;
         filas.push(row);
       });
@@ -14842,12 +14875,12 @@ async function _iaVolcarDieta(c){
       if(items.length && !items[0].kcal && m.kcal){ items[0].kcal=Number(m.kcal)||0; }
       meals[key]={ items };
     });
-    return { nutrition_plan_id:planId, option_number:op.n, meals, kcal_estimate:op.kcal||null, name:'Opción '+op.n };
+    return { nutrition_plan_id:planId, option_number:op.n, meals };
   });
   // 3) Insertar (borrando opciones previas para no duplicar)
   await sb.from('nutrition_options').delete().eq('nutrition_plan_id', planId);
   const {error} = await sb.from('nutrition_options').insert(filas);
-  if(error) throw new Error('No se pudieron guardar las opciones');
+  if(error){ console.error('insert nutrition_options:',error); throw new Error('No se pudieron guardar las opciones: '+(error.message||error.code||'')); }
   // 4) Recargar la nutrición del cliente para que se vea abajo
   if(typeof recargarNutricionDeCliente==='function') await recargarNutricionDeCliente(c, planId);
 }

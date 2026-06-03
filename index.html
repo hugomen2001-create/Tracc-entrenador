@@ -521,7 +521,7 @@ canvas{width:100%!important}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
-.content-panel{animation:slideUp .2s ease}
+.content-panel.anim-in{animation:slideUp .2s ease}
 
 /* BADGE */
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:500}
@@ -5157,6 +5157,8 @@ function selectClient(id) {
   document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
   document.getElementById(`ci-${id}`)?.classList.add('active');
   renderClientPanel();
+  const _tc2 = document.getElementById('tab-content');
+  if(_tc2){ _tc2.classList.add('anim-in'); setTimeout(()=>_tc2.classList.remove('anim-in'), 260); }
   renderMiniSidebar();
   // El tab por defecto al seleccionar cliente es Resumen → cargar ajustes
   // (retrasos/reorganización) y re-renderizar cuando lleguen.
@@ -5309,6 +5311,9 @@ function switchTab(tab) {
   creandoAlimento = false;
   editandoAlimentoId = null;
   renderClientPanel();
+  // Animar la entrada SOLO al cambiar de pestaña (no en los refrescos internos, que causaban parpadeo)
+  const _tc = document.getElementById('tab-content');
+  if(_tc){ _tc.classList.add('anim-in'); setTimeout(()=>_tc.classList.remove('anim-in'), 260); }
   document.getElementById('main-panel').scrollTop = 0;
   // Si es el tab Perfil, cargar las fotos de progreso (asíncrono)
   if (tab === 'perfil') setTimeout(hydratePhotoUrls, 0);

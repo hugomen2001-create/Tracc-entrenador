@@ -174,16 +174,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM San
 
 .clients-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .ccard{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden}
-.clients-grid .ccard{opacity:0;transform:translateY(10px);animation:cardIn .42s cubic-bezier(0.23,1,0.32,1) forwards}
-.clients-grid .ccard:nth-child(1){animation-delay:0ms}
-.clients-grid .ccard:nth-child(2){animation-delay:45ms}
-.clients-grid .ccard:nth-child(3){animation-delay:90ms}
-.clients-grid .ccard:nth-child(4){animation-delay:135ms}
-.clients-grid .ccard:nth-child(5){animation-delay:180ms}
-.clients-grid .ccard:nth-child(6){animation-delay:225ms}
-.clients-grid .ccard:nth-child(7){animation-delay:270ms}
-.clients-grid .ccard:nth-child(8){animation-delay:315ms}
-.clients-grid .ccard:nth-child(n+9){animation-delay:340ms}
+.clients-grid.stagger-once .ccard{opacity:0;transform:translateY(10px);animation:cardIn .42s cubic-bezier(0.23,1,0.32,1) forwards}
+.clients-grid.stagger-once .ccard:nth-child(1){animation-delay:0ms}
+.clients-grid.stagger-once .ccard:nth-child(2){animation-delay:45ms}
+.clients-grid.stagger-once .ccard:nth-child(3){animation-delay:90ms}
+.clients-grid.stagger-once .ccard:nth-child(4){animation-delay:135ms}
+.clients-grid.stagger-once .ccard:nth-child(5){animation-delay:180ms}
+.clients-grid.stagger-once .ccard:nth-child(6){animation-delay:225ms}
+.clients-grid.stagger-once .ccard:nth-child(7){animation-delay:270ms}
+.clients-grid.stagger-once .ccard:nth-child(8){animation-delay:315ms}
+.clients-grid.stagger-once .ccard:nth-child(n+9){animation-delay:340ms}
 @keyframes cardIn{to{opacity:1;transform:translateY(0)}}
 .ccard:hover{border-color:var(--border2)}
 .ccard.attn{border-color:rgba(217,119,6,.3)}
@@ -757,7 +757,7 @@ textarea.lg-inp{line-height:1.5;min-height:56px}
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
-  .clients-grid .ccard{opacity:1 !important;transform:none !important}
+  .clients-grid.stagger-once .ccard{opacity:1 !important;transform:none !important}
   .ai-btn:active, .vtab:active, .range-tab:active, .opcion-tab:active,
   .add-item-btn:active, .split-btn:active, .split-type-btn:active,
   .sb-filter-btn:active, button:active, .ccard:active, .vg-alert-card:active{
@@ -10763,6 +10763,7 @@ function _vgSaludo(){
 }
 
 let _vgMode = null; // null | 'overview' | 'pagos' | 'plan'
+let _vgStaggerNext = false; // true solo en la 1ª carga de la vista general (para animar en cascada una vez)
 function _setVgButtons(){
   [['overview-btn','overview'],['pagos-btn','pagos'],['plan-btn','plan'],['agenda-btn','agenda'],['import-btn','import']].forEach(([id,m])=>{
     const b=document.getElementById(id); if(!b)return;
@@ -10784,8 +10785,10 @@ function openVgMode(mode){
   _setVgButtons();
   document.querySelectorAll('.client-item').forEach(el => el.classList.remove('active'));
   if(mode==='overview'){
-    Promise.all([cargarBillingTodos()].concat(CLIENTS.map(c => cargarAjustesCliente(c)))).then(() => { if(_vgMode==='overview') renderOverview(); });
+    _vgStaggerNext = true;            // animar en cascada SOLO esta primera carga
     renderOverview();
+    _vgStaggerNext = false;           // los redibujos posteriores (carga de datos) ya no animan
+    Promise.all([cargarBillingTodos()].concat(CLIENTS.map(c => cargarAjustesCliente(c)))).then(() => { if(_vgMode==='overview') renderOverview(); });
   } else if(mode==='pagos'){
     cargarBillingTodos().then(() => { if(_vgMode==='pagos') renderPagosPanel(); });
     renderPagosPanel();
@@ -11209,7 +11212,7 @@ function renderOverview() {
       </div>
       ${alertasHtml ? `<div class="alerts-section"><div class="sec-hd"><div class="sec-t">Alertas</div></div>${alertasHtml}</div>` : ''}
       <div class="sec-hd" style="margin-bottom:10px"><div class="sec-t">Todos los clientes</div></div>
-      <div class="clients-grid">${grid}</div>
+      <div class="clients-grid${_vgStaggerNext?' stagger-once':''}">${grid}</div>
     </div>`;
 }
 function selectClientById(id){ selectClient(id); }
